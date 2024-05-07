@@ -25,7 +25,7 @@
 -- adc : FL9613 12 bit
 -- dac : FL9781 16 bit
 
-use library IEEE;
+library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
@@ -64,18 +64,18 @@ architecture structural of top is
     signal mbus : std_logic_vector(mbus_w - 1 downto 0) := (others => '0'); -- module selection bus, x"00" refers to no module selected
     signal cbus : std_logic_vector(cbus_w - 1 downto 0) := (others => '0'); -- control bus
 
-    type rbus_type : array(0 to module_count - 1) of std_logic_vector(rbus_w - 1 downto 0);
-    type sbus_type : array(0 to module_count - 1) of std_logic_vector(sbus_w - 1 downto 0);
+    type rbus_type is array(0 to module_count - 1) of std_logic_vector(rbus_w - 1 downto 0);
+    type sbus_type is array(0 to module_count - 1) of std_logic_vector(sbus_w - 1 downto 0);
     signal rbus : rbus_type := (others => (others => '0')); -- response bus
     signal sbus : sbus_type := (others => (others => '0')); -- response status bus
 
     SIGNAL rsp : std_logic_vector(rbus_w - 1 downto 0) := (others => '0'); -- response from sub modules
     SIGNAL rsp_stat : std_logic_vector(sbus_w - 1 downto 0) := (others => '0'); -- response status from sub modules
 
-    SIGNAL adc_0 : std_logic_vector(11 downto 0) := x"0000";
-    SIGNAL adc_1 : std_logic_vector(11 downto 0) := x"0000";
-    SIGNAL adc_2 : std_logic_vector(11 downto 0) := x"0000";
-    SIGNAL adc_3 : std_logic_vector(11 downto 0) := x"0000";
+    SIGNAL adc_0 : std_logic_vector(11 downto 0) := x"000";
+    SIGNAL adc_1 : std_logic_vector(11 downto 0) := x"000";
+    SIGNAL adc_2 : std_logic_vector(11 downto 0) := x"000";
+    SIGNAL adc_3 : std_logic_vector(11 downto 0) := x"000";
 
     SIGNAL dac_0 : std_logic_vector(15 downto 0) := x"0000";
     SIGNAL dac_1 : std_logic_vector(15 downto 0) := x"0000";
@@ -144,7 +144,7 @@ begin
             rsp_out => rsp_out,
             rsp_stat_out => rsp_stat_out
         );
-    end
+    end block module_1_block;
 
 
 
@@ -163,4 +163,4 @@ begin
             dac_out_3 <= dac_3;
         end if;
     end process;
-end architecture bhvr;
+end architecture structural;
