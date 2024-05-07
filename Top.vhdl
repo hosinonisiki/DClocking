@@ -25,7 +25,7 @@
 -- adc : FL9613 12 bit
 -- dac : FL9781 16 bit
 
-use library library IEEE;
+use library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
@@ -147,7 +147,7 @@ begin
     end
 
 
-    
+
     -- analog front
     process(clk)
     begin
