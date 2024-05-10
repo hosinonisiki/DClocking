@@ -4,25 +4,93 @@
 -- The template contains an entity that describes the
 -- core function of the module. A bus handler is used
 -- to handle data from the bus and implement custom
--- logic. Also, a <> module is used to map parameters
--- onto the core entity's interface.
+-- logic. Also, a custom ram-like module is used to
+-- store parameters for the core module.
+
+-- Substitute core entity, default parameters, and data
+-- flow ports with the actual module implementation.
+-- Also substitute the bus handler if specific logic
+-- is needed.
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+use work.mypak.all;
 
 entity module_template is
     port(
-        clk : in std_logic;
-        rst : in std_logic;
-        bus_en_in : in std_logic;
-        dbus_in : in std_logic_vector(31 downto 0);
-        abus_in : in std_logic_vector(9 downto 0);
-        cbus_in : in std_logic_vector(7 downto 0);
-        rsp_out : out std_logic_vector(31 downto 0);
-        rsp_stat_out : out std_logic_vector(7 downto 0)
+        clk             :   in  std_logic;
+        rst             :   in  std_logic;
+        bus_en_in       :   in  std_logic;
+        dbus_in         :   in  std_logic_vector(dbus_w - 1 downto 0);
+        abus_in         :   in  std_logic_vector(abus_w - 1 downto 0);
+        cbus_in         :   in  std_logic_vector(cbus_w - 1 downto 0);
+        rsp_out         :   out std_logic_vector(rbus_w - 1 downto 0);
+        rsp_stat_out    :   out std_logic_vector(sbus_w - 1 downto 0)
         -- data flow ports
     );
 end entity module_template;
 
 architecture structural of module_template is
+    constant core_param_size : integer := 2 ** abus_w * dbus_w;
+    signal core_param   :   std_logic_vector(core_param_size - 1 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
+    signal core_rst     :   std_logic := '1';
 
+    signal wdata        :   std_logic_vector(dbus_w - 1 downto 0); -- Data to be written to the ram
+    signal wadd         :   std_logic_vector(abus_w - 1 downto 0); -- Address to write to
+    signal wmask        :   std_logic_vector(dbus_w - 1 downto 0); -- Data mask
+    signal wval         :   std_logic; -- Valid signal
+    signal wen          :   std_logic; -- Write enable signal. The writing process starts as soon as wen is active, but the data is only written once wval is active. 
+                                       -- This is to make sure that parameters longer than dbus_w are written simultaneously.
+    signal rdata        :   std_logic_vector(dbus_w - 1 downto 0); -- Data read from the ram
+    signal radd         :   std_logic_vector(abus_w - 1 downto 0); -- Address to read from
+    signal rval         :   std_logic; -- Valid signal, active when the data is ready
+    signal ren          :   std_logic; -- Read enable signal
 begin
+    
+    core_entity : entity work.core_entity port map(
+        clk             =>  clk,
+        rst             =>  core_rst,
+        core_param_in   =>  core_param
+        -- data flow ports
+    );
+
+    parameter_ram : entity work.parameter_ram generic map(
+        ram_default     =>  x"0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    ) port map(
+        clk             =>  clk,
+        rst             =>  rst,
+        wdata_in        =>  wdata,
+        wadd_in         =>  wadd,
+        wmask_in        =>  wmask,
+        wval_in         =>  wval,
+        wen_in          =>  wen,
+        rdata_out       =>  rdata,
+        radd_in         =>  radd,
+        rval_out        =>  rval,
+        ren_in          =>  ren,
+        ram_data_out    =>  core_param
+    );
+
+    bus_handler : entity work.bus_handler port map(
+        clk             =>  clk,
+        rst             =>  rst,
+        bus_en_in       =>  bus_en_in,
+        dbus_in         =>  dbus_in,
+        abus_in         =>  abus_in,
+        cbus_in         =>  cbus_in,
+        rsp_out         =>  rsp_out,
+        rsp_stat_out    =>  rsp_stat_out,
+        wdata_out       =>  wdata,
+        wadd_out        =>  wadd,
+        wmask_out       =>  wmask,
+        wval_out        =>  wval,
+        wen_out         =>  wen,
+        rdata_in        =>  rdata,
+        radd_out        =>  radd,
+        rval_in         =>  rval,
+        ren_out         =>  ren
+    );
 
 end architecture structural;
