@@ -50,7 +50,7 @@ architecture structural of main_control is
     signal tx_wen       :   std_logic;
     signal tx_empty     :   std_logic;
     signal tx_full      :   std_logic;
-    signal tx_ready     :   std_logic; -- Tells the transmitter that data is ready to be sent
+    signal tx_notemp    :   std_logic;
     signal txd          :   std_logic_vector(7 downto 0); -- Data sent to transmitter
     signal tx_char      :   std_logic_vector(7 downto 0); -- Data read from control logic and sent to fifo
 
@@ -96,12 +96,12 @@ begin
         rst         =>  tx_rst,
         txd_out     =>  txd_out,
         din         =>  txd,
-        dval_in     =>  tx_ready,
+        dval_in     =>  tx_notemp,
+        den_out     =>  tx_ren,
         idle_out    =>  tx_idle
     );
     tx_rst <= rst;
-    -- Transmitt data when the last byte has been sent and there is still data in the fifo.
-    tx_ready <= '1' when tx_idle = '1' and tx_empty = '0' else '0';
+    tx_notemp <= not tx_empty;
 
     -- Vivado Macro
     fifo_tx : FIFO_SYNC_MACRO generic map(
@@ -133,7 +133,7 @@ begin
         rxen_out    =>  rx_ren,
         rxemp_in    =>  rx_empty,
         txd_out     =>  tx_char,
-        txen_out    =>  tx_ren,
+        txen_out    =>  tx_wen,
         txful_in    =>  tx_full,
         rsp_in      =>  rsp_in,
         rsp_stat_in =>  rsp_stat_in,

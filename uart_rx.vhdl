@@ -22,7 +22,7 @@ entity uart_rx is
         rxd_in          :   in  std_logic;
         dout            :   out std_logic_vector(data_bits - 1 downto 0) := (others => '0');
         dval_out        :   out std_logic := '0';
-        idle_out        :   out std_logic := '1'
+        idle_out        :   out std_logic := '0'
     );
 end entity uart_rx;
 

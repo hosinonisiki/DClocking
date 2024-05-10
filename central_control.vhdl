@@ -32,7 +32,7 @@ end entity central_control;
 -- This is a simple architecture that repeats any byte received.
 -- It is used for testing purposes.
 architecture repeater of central_control is
-    type state_type is (idle, receive, transmit, error);
+    type state_type is (idle, hold, receive, transmit, error);
     signal state    :   state_type := idle;
     signal byte     :   std_logic_vector(7 downto 0);
 begin
@@ -47,20 +47,22 @@ begin
                     txen_out <= '0';
                     if rxemp_in = '0' then
                         rxen_out <= '1';
-                        state <= receive;
+                        state <= hold;
                     end if;
-                when receive =>
+                when hold =>
                     rxen_out <= '0';
+                    state <= receive;
+                when receive =>
                     byte <= rxd_in;
-                    state <= transmit;
-                when transmit =>
-                    txen_out <= '1';
-                    txd_out <= byte;
                     if txful_in = '0' then
-                        state <= idle;
+                        state <= transmit;
                     else
                         state <= error;
                     end if;
+                when transmit =>
+                    txen_out <= '1';
+                    txd_out <= byte;
+                    state <= idle;
                 when error =>
                     -- Do nothing
             end case;

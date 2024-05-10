@@ -41,16 +41,18 @@ begin
     process(clk, rst)
         variable wadd : integer;
     begin
-        if rst = '1' then
-            ram_data <= ram_default;
-            ram_buf <= ram_default;
-        elsif rising_edge(clk) then
-            if wen_in = '1' then
-                wadd := to_integer(unsigned(wadd_in));
-                ram_buf(wadd * dbus_w + dbus_w - 1 downto wadd * dbus_w) <= (wmask_in and wdata_in) or ((not wmask_in) and ram_buf(wadd * dbus_w + dbus_w - 1 downto wadd * dbus_w));
-            end if;
-            if wval_in = '1' then
-                ram_data <= ram_buf;
+        if rising_edge(clk) then
+            if rst = '1' then
+                ram_data <= ram_default;
+                ram_buf <= ram_default;
+            else
+                if wen_in = '1' then
+                    wadd := to_integer(unsigned(wadd_in));
+                    ram_buf(wadd * dbus_w + dbus_w - 1 downto wadd * dbus_w) <= (wmask_in and wdata_in) or ((not wmask_in) and ram_buf(wadd * dbus_w + dbus_w - 1 downto wadd * dbus_w));
+                end if;
+                if wval_in = '1' then
+                    ram_data <= ram_buf;
+                end if;
             end if;
         end if;
     end process;
@@ -58,14 +60,15 @@ begin
     process(clk, rst)
         variable radd : integer;
     begin
-        if rst = '1' then
-            rval_out <= '0';
-        elsif rising_edge(clk) then
-            if ren_in = '1' then
-                radd := to_integer(unsigned(radd_in));
-                rdata_out <= ram_data(radd * dbus_w + dbus_w - 1 downto radd * dbus_w);
+        if rising_edge(clk) then
+            if rst = '1' then
+                rval_out <= '0';
+            else
+                if ren_in = '1' then
+                    radd := to_integer(unsigned(radd_in));
+                    rdata_out <= ram_data(radd * dbus_w + dbus_w - 1 downto radd * dbus_w);
+                end if;
             end if;
-            rval_out <= ren_in;
         end if;
     end process;
     
