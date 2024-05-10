@@ -33,7 +33,7 @@ entity parameter_ram is
     );
 end entity parameter_ram;
 
-architecture behavioural of parameter_ram is
+architecture behavioral of parameter_ram is
     signal ram_data     :   std_logic_vector(2 ** abus_w * dbus_w - 1 downto 0) := ram_default;
     signal ram_buf      :   std_logic_vector(2 ** abus_w * dbus_w - 1 downto 0) := ram_default;
 begin
@@ -71,4 +71,4 @@ begin
     
     ram_data_out <= ram_data;
 
-end architecture behavioural;
+end architecture behavioral;

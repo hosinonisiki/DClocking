@@ -34,19 +34,22 @@ end entity module_template;
 
 architecture structural of module_template is
     constant core_param_size : integer := 2 ** abus_w * dbus_w;
-    signal core_param   :   std_logic_vector(core_param_size - 1 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
-    signal core_rst     :   std_logic := '1';
+    signal core_param       :   std_logic_vector(core_param_size - 1 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
+    signal core_rst         :   std_logic := '1';
 
-    signal wdata        :   std_logic_vector(dbus_w - 1 downto 0); -- Data to be written to the ram
-    signal wadd         :   std_logic_vector(abus_w - 1 downto 0); -- Address to write to
-    signal wmask        :   std_logic_vector(dbus_w - 1 downto 0); -- Data mask
-    signal wval         :   std_logic; -- Valid signal
-    signal wen          :   std_logic; -- Write enable signal. The writing process starts as soon as wen is active, but the data is only written once wval is active. 
+    signal ram_rst          :   std_logic := '1';
+    signal handler_rst      :   std_logic := '1';
+
+    signal wdata            :   std_logic_vector(dbus_w - 1 downto 0); -- Data to be written to the ram
+    signal wadd             :   std_logic_vector(abus_w - 1 downto 0); -- Address to write to
+    signal wmask            :   std_logic_vector(dbus_w - 1 downto 0); -- Data mask
+    signal wval             :   std_logic; -- Valid signal
+    signal wen              :   std_logic; -- Write enable signal. The writing process starts as soon as wen is active, but the data is only written once wval is active. 
                                        -- This is to make sure that parameters longer than dbus_w are written simultaneously.
-    signal rdata        :   std_logic_vector(dbus_w - 1 downto 0); -- Data read from the ram
-    signal radd         :   std_logic_vector(abus_w - 1 downto 0); -- Address to read from
-    signal rval         :   std_logic; -- Valid signal, active when the data is ready
-    signal ren          :   std_logic; -- Read enable signal
+    signal rdata            :   std_logic_vector(dbus_w - 1 downto 0); -- Data read from the ram
+    signal radd             :   std_logic_vector(abus_w - 1 downto 0); -- Address to read from
+    signal rval             :   std_logic; -- Valid signal, active when the data is ready
+    signal ren              :   std_logic; -- Read enable signal
 begin
     
     core_entity : entity work.core_entity port map(
@@ -55,12 +58,13 @@ begin
         core_param_in   =>  core_param
         -- data flow ports
     );
+    core_rst <= rst;
 
     parameter_ram : entity work.parameter_ram generic map(
         ram_default     =>  x"0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
     ) port map(
         clk             =>  clk,
-        rst             =>  rst,
+        rst             =>  ram_rst,
         wdata_in        =>  wdata,
         wadd_in         =>  wadd,
         wmask_in        =>  wmask,
@@ -72,10 +76,11 @@ begin
         ren_in          =>  ren,
         ram_data_out    =>  core_param
     );
+    ram_rst <= rst;
 
     bus_handler : entity work.bus_handler port map(
         clk             =>  clk,
-        rst             =>  rst,
+        rst             =>  handler_rst,
         bus_en_in       =>  bus_en_in,
         dbus_in         =>  dbus_in,
         abus_in         =>  abus_in,
@@ -92,5 +97,6 @@ begin
         rval_in         =>  rval,
         ren_out         =>  ren
     );
+    handler_rst <= rst;
 
 end architecture structural;

@@ -14,4 +14,5 @@ package mypak is
     constant sbus_w     :   integer := 8; -- Width of the response status bus.
 
     constant clk_freq   :   integer := 200_000_000; -- Clock frequency in Hz.
+    constant baudrate   :   integer := 57600; -- Baudrate for the UART.
 end package mypak;

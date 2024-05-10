@@ -34,7 +34,7 @@ use work.mypak.all;
 entity top is
     port(
         clk         :   in  std_logic;
-        rst         :   in  td_logic;
+        rst         :   in  std_logic;
         txd         :   out std_logic;
         rxd         :   in  std_logic;
 
@@ -52,6 +52,9 @@ end entity top;
 
 architecture structural of top is
     constant module_count : integer := 1; -- Number of modules connected to the bus.
+
+    signal mc_rst       :   std_logic; -- main control reset
+    signal mod_rst      :   std_logic_vector(1 to module_count); -- module reset
 
     -- Bus width defined in mypak
     signal dbus         :   std_logic_vector(dbus_w - 1 downto 0) := (others => '0'); -- data bus
@@ -81,7 +84,7 @@ begin
     -- The main control module handles all ios and communication with the modules.
     main_control : entity work.main_control port map(
         clk             =>  clk,
-        rst             =>  rst,
+        rst             =>  mc_rst,
         txd_out         =>  txd,
         rxd_in          =>  rxd,
         dbus_out        =>  dbus,
@@ -91,6 +94,7 @@ begin
         rsp_in          =>  rsp,
         rsp_stat_in     =>  rsp_stat
     );
+    mc_rst <= rst;
 
     response_mux : entity work.response_mux generic map(
         channel_count   =>  module_count   
@@ -103,6 +107,7 @@ begin
 
 
 
+    mod_rst <= (others => rst);
     -- register each module as the following
     module_1_block : block
         port(
@@ -132,7 +137,7 @@ begin
 
         module_1 : entity work.module_1 port map(
             clk             =>  clk,
-            rst             =>  rst,
+            rst             =>  mod_rst(1),
             bus_en_in       =>  bus_en,
             dbus_in         =>  dbus_in,
             abus_in         =>  abus_in,

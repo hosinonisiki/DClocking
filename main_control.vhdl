@@ -1,7 +1,7 @@
 -- ///////////////Documentation////////////////////
 -- This design is the main control unit of the system.
 -- It involves an entity containing control logic,
--- a uart receiver and a tranceiver, along with
+-- a uart receiver and a transmitter, along with
 -- two fifo buffers.
 
 library ieee;
@@ -33,6 +33,8 @@ entity main_control is
 end entity main_control;
 
 architecture structural of main_control is
+    signal rx_rst       :   std_logic;
+    signal rx_fifo_rst  :   std_logic;
     signal rx_idle      :   std_logic;
     signal rx_ren       :   std_logic;
     signal rx_wen       :   std_logic;
@@ -41,6 +43,8 @@ architecture structural of main_control is
     signal rxd          :   std_logic_vector(7 downto 0); -- Data received from receiver and sent to fifo
     signal rx_char      :   std_logic_vector(7 downto 0); -- Data read from fifo and sent to control logic
 
+    signal tx_rst       :   std_logic;
+    signal tx_fifo_rst  :   std_logic;
     signal tx_idle      :   std_logic;
     signal tx_ren       :   std_logic;
     signal tx_wen       :   std_logic;
@@ -50,21 +54,24 @@ architecture structural of main_control is
     signal txd          :   std_logic_vector(7 downto 0); -- Data sent to transmitter
     signal tx_char      :   std_logic_vector(7 downto 0); -- Data read from control logic and sent to fifo
 
+    signal cc_rst       :   std_logic;
 begin
     uart_rx : entity work.uart_rx port map(
         clk         =>  clk,
-        rst         =>  rst,
+        rst         =>  rx_rst,
         rxd_in      =>  rxd_in,
         dout        =>  rxd,
         dval_out    =>  rx_wen,
-        idle        =>  rx_idle
+        idle_out    =>  rx_idle
     );
+    rx_rst <= rst;
 
     -- Vivado Macro
     fifo_rx : FIFO_SYNC_MACRO generic map(
         data_width      =>  8,
         fifo_size       =>  "18Kb" -- Max data velocity on a uart bus is far slower than the velocity at which central control unit can process data.
-                               -- Therefore, the size of receiver fifo can be kept small.
+                                   -- Therefore, the size of receiver fifo can be kept small.
+                                   -- Notice that this design does not detect if the receiver fifo is full, which can lead to data loss in very rare cases.
         -- other generics set as default    
     )port map(
         almostempty     =>  open,
@@ -79,18 +86,22 @@ begin
         clk             =>  clk,
         di              =>  rxd,
         rden            =>  rx_ren,
-        rst             =>  rst,
+        rst             =>  rx_fifo_rst,
         wren            =>  rx_wen
     );
+    rx_fifo_rst <= rst;
 
     uart_tx : entity work.uart_tx port map(
-        clk => clk,
-        rst => rst,
-        txd_out => txd_out,
-        din => txd,
-        dval_in => tx_ready,
-        idle => tx_idle
+        clk         =>  clk,
+        rst         =>  tx_rst,
+        txd_out     =>  txd_out,
+        din         =>  txd,
+        dval_in     =>  tx_ready,
+        idle_out    =>  tx_idle
     );
+    tx_rst <= rst;
+    -- Transmitt data when the last byte has been sent and there is still data in the fifo.
+    tx_ready <= '1' when tx_idle = '1' and tx_empty = '0' else '0';
 
     -- Vivado Macro
     fifo_tx : FIFO_SYNC_MACRO generic map(
@@ -110,13 +121,14 @@ begin
         clk             =>  clk,
         di              =>  tx_char,
         rden            =>  tx_ren,
-        rst             =>  rst,
+        rst             =>  tx_fifo_rst,
         wren            =>  tx_wen
     );
+    tx_fifo_rst <= rst;
 
     central_control : entity work.central_control port map(
         clk         =>  clk,
-        rst         =>  rst,
+        rst         =>  cc_rst,
         rxd_in      =>  rx_char,
         rxen_out    =>  rx_ren,
         rxemp_in    =>  rx_empty,
@@ -130,4 +142,5 @@ begin
         mbus_out    =>  mbus_out,
         cbus_out    =>  cbus_out
     );
+    cc_rst <= rst;
 end architecture structural;
