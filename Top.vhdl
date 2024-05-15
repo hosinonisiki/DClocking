@@ -123,7 +123,7 @@ begin
         );
         port map(
             clk             =>  clk,
-            rst             =>  rst,
+            rst             =>  mod_rst(1),
             dbus_in         =>  dbus,
             abus_in         =>  abus,
             mbus_in         =>  mbus,
@@ -137,7 +137,7 @@ begin
 
         module_1 : entity work.module_1 port map(
             clk             =>  clk,
-            rst             =>  mod_rst(1),
+            rst             =>  rst,
             bus_en_in       =>  bus_en,
             dbus_in         =>  dbus_in,
             abus_in         =>  abus_in,

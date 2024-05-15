@@ -10,13 +10,6 @@ use ieee.numeric_std.all;
 
 use work.mypak.all;
 
--- Instantiating Vivado IPs in this design.
-library unisim;
-use unisim.vcomponents.all;
-
-library unimacro;
-use unimacro.vcomponents.all;
-
 entity main_control is
     port(
         clk             :   in  std_logic;
@@ -28,7 +21,7 @@ entity main_control is
         mbus_out        :   out std_logic_vector(mbus_w - 1 downto 0);
         cbus_out        :   out std_logic_vector(cbus_w - 1 downto 0);
         rsp_in          :   in  std_logic_vector(rbus_w - 1 downto 0);
-        rsp_stat_in     :   in  std_logic_vector(sbus_w downto 0)
+        rsp_stat_in     :   in  std_logic_vector(sbus_w - 1 downto 0)
     );
 end entity main_control;
 
@@ -55,6 +48,22 @@ architecture structural of main_control is
     signal tx_char      :   std_logic_vector(7 downto 0); -- Data read from control logic and sent to fifo
 
     signal cc_rst       :   std_logic;
+
+    -- Instantiating Vivado IPs in this design.
+    component fifo_generator_0
+        PORT(
+            clk : in std_logic;
+            srst : in std_logic;
+            din : in std_logic_vector(7 downto 0);
+            wr_en : in std_logic;
+            rd_en : in std_logic;
+            dout : out std_logic_vector(7 downto 0);
+            full : out std_logic;
+            empty : out std_logic;
+            wr_rst_busy : out std_logic;
+            rd_rst_busy : out std_logic 
+        );
+    end component;
 begin
     uart_rx : entity work.uart_rx port map(
         clk         =>  clk,
@@ -66,28 +75,18 @@ begin
     );
     rx_rst <= rst;
 
-    -- Vivado Macro
-    fifo_rx : FIFO_SYNC_MACRO generic map(
-        data_width      =>  8,
-        fifo_size       =>  "18Kb" -- Max data velocity on a uart bus is far slower than the velocity at which central control unit can process data.
-                                   -- Therefore, the size of receiver fifo can be kept small.
-                                   -- Notice that this design does not detect if the receiver fifo is full, which can lead to data loss in very rare cases.
-        -- other generics set as default    
-    )port map(
-        almostempty     =>  open,
-        almostfull      =>  open,
-        do              =>  rx_char,
-        empty           =>  rx_empty,
-        full            =>  rx_full,
-        rdcount         =>  open,
-        rderr           =>  open, -- This design does not handle internal errors in the fifo.
-        wrcount         =>  open,
-        wrerr           =>  open,
-        clk             =>  clk,
-        di              =>  rxd,
-        rden            =>  rx_ren,
-        rst             =>  rx_fifo_rst,
-        wren            =>  rx_wen
+    -- Vivado IP, 8 bits width, 512 depth
+    fifo_rx : fifo_generator_0 port map(
+        clk         =>  clk,
+        srst        =>  rx_fifo_rst,
+        din         =>  rxd,
+        wr_en       =>  rx_wen,
+        rd_en       =>  rx_ren,
+        dout        =>  rx_char,
+        full        =>  rx_full,
+        empty       =>  rx_empty,
+        wr_rst_busy =>  open,
+        rd_rst_busy =>  open
     );
     rx_fifo_rst <= rst;
 
@@ -103,26 +102,18 @@ begin
     tx_rst <= rst;
     tx_notemp <= not tx_empty;
 
-    -- Vivado Macro
-    fifo_tx : FIFO_SYNC_MACRO generic map(
-        data_width      =>  8,
-        fifo_size       =>  "36Kb" -- The size of the transmitter fifo is kept larger than the receiver fifo to prevent data loss.
-        -- other generics set as default
-    )port map(
-        almostempty     =>  open,
-        almostfull      =>  open,
-        do              =>  txd,
-        empty           =>  tx_empty,
-        full            =>  tx_full,
-        rdcount         =>  open,
-        rderr           =>  open, -- This design does not handle internal errors in the fifo.
-        wrcount         =>  open,
-        wrerr           =>  open,
-        clk             =>  clk,
-        di              =>  tx_char,
-        rden            =>  tx_ren,
-        rst             =>  tx_fifo_rst,
-        wren            =>  tx_wen
+    -- Vivado IP, 8 bits width, 512 depth
+    fifo_tx : fifo_generator_0 port map(
+        clk         =>  clk,
+        srst        =>  tx_fifo_rst,
+        din         =>  tx_char,
+        wr_en       =>  tx_ren,
+        rd_en       =>  tx_wen,
+        dout        =>  txd,
+        full        =>  tx_full,
+        empty       =>  tx_empty,
+        wr_rst_busy =>  open,
+        rd_rst_busy =>  open
     );
     tx_fifo_rst <= rst;
 

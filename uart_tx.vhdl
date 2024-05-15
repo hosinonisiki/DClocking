@@ -124,7 +124,7 @@ begin
                     txd_out <= '0';
                 when s_data =>
                     if bit_ready = '1' then
-                        txd_out <= data(bit_cnt);
+                        txd_out <= data(to_integer(bit_cnt));
                     end if;
                 when s_parity =>
                     if bit_ready = '1' then
@@ -137,6 +137,7 @@ begin
                                 txd_out <= '1';
                             when "space" =>
                                 txd_out <= '0';
+                            when others =>
                         end case;
                     end if;
                 when s_stop =>
@@ -162,7 +163,7 @@ begin
 
     idle_out <= '1' when state = s_idle and rst = '0' else '0';
 
-    bit_ready <= '1' when cycle_cnt = bit_length + x"FFFF" or (state = s_start and cycle_cnt = half_bit_length + x"FFFF") else '0';
+    bit_ready <= '1' when cycle_cnt = bit_length + x"FFFF" else '0';
     data_final_dgt <= '1' when bit_cnt = data_bits_u + x"F" else '0';
     stop_final_dgt <= '1' when bit_cnt = stop_bits_u + x"F" else '0';
 
