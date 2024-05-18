@@ -15,7 +15,7 @@ use work.mypak.all;
 
 entity parameter_ram is
     generic(
-        ram_default     :   std_logic_vector(2 ** abus_w * dbus_w - 1 downto 0) := (others => '0')
+        ram_default     :   std_logic_vector(core_param_size - 1 downto 0) := (others => '0')
     );
     port(
         clk             :   in  std_logic;
@@ -29,13 +29,13 @@ entity parameter_ram is
         radd_in         :   in  std_logic_vector(abus_w - 1 downto 0);
         rval_out        :   out std_logic;
         ren_in          :   in  std_logic;
-        ram_data_out    :   out std_logic_vector(2 ** abus_w * dbus_w - 1 downto 0)
+        ram_data_out    :   out std_logic_vector(core_param_size - 1 downto 0)
     );
 end entity parameter_ram;
 
 architecture behavioral of parameter_ram is
-    signal ram_data     :   std_logic_vector(2 ** abus_w * dbus_w - 1 downto 0) := ram_default;
-    signal ram_buf      :   std_logic_vector(2 ** abus_w * dbus_w - 1 downto 0) := ram_default;
+    signal ram_data     :   std_logic_vector(core_param_size - 1 downto 0) := ram_default;
+    signal ram_buf      :   std_logic_vector(core_param_size - 1 downto 0) := ram_default;
 begin
     
     process(clk, rst)

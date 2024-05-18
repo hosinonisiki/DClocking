@@ -32,7 +32,7 @@ architecture behavioral of uart_tx is
     constant stop_bits_u        :   unsigned(3 downto 0) := to_unsigned(stop_bits, 4);
     constant bit_length         :   unsigned(15 downto 0) := to_unsigned(clk_freq / baudrate, 16); -- clock cycles per bit
 
-    type state_type is (s_idle, s_init_1, s_init_2, s_data, s_parity, s_stop);
+    type state_type is (s_idle, s_init_1, s_init_2, s_data, s_parity, s_stop, s_wait);
     signal state                :   state_type := s_idle;
     signal last_state           :   state_type := s_idle;
 
@@ -75,6 +75,10 @@ begin
                         end if;
                     when s_stop =>
                         if bit_ready = '1' and stop_final_dgt = '1' then
+                            state <= s_wait;
+                        end if;
+                    when s_wait =>
+                        if bit_ready = '1' then
                             state <= s_idle;
                         end if;
                 end case;
