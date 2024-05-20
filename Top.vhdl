@@ -51,8 +51,6 @@ entity top is
 end entity top;
 
 architecture structural of top is
-    constant module_count : integer := 1; -- Number of modules connected to the bus.
-
     signal mc_rst       :   std_logic; -- main control reset
     signal mod_rst      :   std_logic_vector(1 to module_count); -- module reset
 
@@ -62,11 +60,10 @@ architecture structural of top is
     signal mbus         :   std_logic_vector(mbus_w - 1 downto 0) := (others => '0'); -- module selection bus, x"00" refers to no module selected
     signal cbus         :   std_logic_vector(cbus_w - 1 downto 0) := (others => '0'); -- control bus
 
-    type rbus_type is array(1 to module_count) of std_logic_vector(rbus_w - 1 downto 0);
-    type sbus_type is array(1 to module_count) of std_logic_vector(sbus_w - 1 downto 0);
     signal rbus         :   rbus_type := (others => (others => '0')); -- response bus
     signal sbus         :   sbus_type := (others => (others => '0')); -- response status bus
 
+    SIGNAL rsp_sel      :   std_logic_vector(mbus_w - 1 downto 0) := (others => '0'); -- response select
     SIGNAL rsp          :   std_logic_vector(rbus_w - 1 downto 0) := (others => '0'); -- response from sub modules
     SIGNAL rsp_stat     :   std_logic_vector(sbus_w - 1 downto 0) := (others => '0'); -- response status from sub modules
 
@@ -91,6 +88,8 @@ begin
         abus_out        =>  abus,
         mbus_out        =>  mbus,
         cbus_out        =>  cbus,
+
+        rsp_sel_out     =>  rsp_sel,
         rsp_in          =>  rsp,
         rsp_stat_in     =>  rsp_stat
     );
@@ -101,6 +100,7 @@ begin
     )port map(
         rbus_in         =>  rbus,
         sbus_in         =>  sbus,
+        rsp_sel_in      =>  rsp_sel,
         rsp_out         =>  rsp,
         rsp_stat_out    =>  rsp_stat
     );

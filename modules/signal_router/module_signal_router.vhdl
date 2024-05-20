@@ -27,8 +27,10 @@ entity module_template is
         abus_in         :   in  std_logic_vector(abus_w - 1 downto 0);
         cbus_in         :   in  std_logic_vector(cbus_w - 1 downto 0);
         rsp_out         :   out std_logic_vector(rbus_w - 1 downto 0);
-        rsp_stat_out    :   out std_logic_vector(sbus_w - 1 downto 0)
+        rsp_stat_out    :   out std_logic_vector(sbus_w - 1 downto 0);
         -- data flow ports
+        sig_in          :   in  signal_array(63 downto 0);
+        sig_out         :   out signal_array(63 downto 0)
     );
 end entity module_template;
 
@@ -40,22 +42,24 @@ architecture structural of module_template is
     signal handler_rst      :   std_logic := '1';
 
     signal wdata            :   std_logic_vector(dbus_w - 1 downto 0); -- Data to be written to the ram
-    signal waddr             :   std_logic_vector(abus_w - 1 downto 0); -- Address to write to
+    signal wadd             :   std_logic_vector(abus_w - 1 downto 0); -- Address to write to
     signal wmask            :   std_logic_vector(dbus_w - 1 downto 0); -- Data mask
     signal wval             :   std_logic; -- Valid signal
     signal wen              :   std_logic; -- Write enable signal. The writing process starts as soon as wen is active, but the data is only written once wval is active. 
                                        -- This is to make sure that parameters longer than dbus_w are written simultaneously.
     signal rdata            :   std_logic_vector(dbus_w - 1 downto 0); -- Data read from the ram
-    signal raddr             :   std_logic_vector(abus_w - 1 downto 0); -- Address to read from
+    signal radd             :   std_logic_vector(abus_w - 1 downto 0); -- Address to read from
     signal rval             :   std_logic; -- Valid signal, active when the data is ready
     signal ren              :   std_logic; -- Read enable signal
 begin
     
-    core_entity : entity work.core_entity port map(
+    core_entity : entity work.signal_router port map(
         clk             =>  clk,
         rst             =>  core_rst,
-        core_param_in   =>  core_param
+        core_param_in   =>  core_param,
         -- data flow ports
+        sig_in          =>  sig_in,
+        sig_out         =>  sig_out
     );
 
     parameter_ram : entity work.parameter_ram generic map(
@@ -64,12 +68,12 @@ begin
         clk             =>  clk,
         rst             =>  ram_rst,
         wdata_in        =>  wdata,
-        waddr_in         =>  waddr,
+        wadd_in         =>  wadd,
         wmask_in        =>  wmask,
         wval_in         =>  wval,
         wen_in          =>  wen,
         rdata_out       =>  rdata,
-        raddr_in         =>  raddr,
+        radd_in         =>  radd,
         rval_out        =>  rval,
         ren_in          =>  ren,
         ram_data_out    =>  core_param
@@ -85,14 +89,14 @@ begin
         rsp_out         =>  rsp_out,
         rsp_stat_out    =>  rsp_stat_out,
         wdata_out       =>  wdata,
-        waddr_out        =>  waddr,
+        wadd_out        =>  wadd,
         wmask_out       =>  wmask,
         wval_out        =>  wval,
         wen_out         =>  wen,
         rdata_in        =>  rdata,
-        raddr_out        =>  raddr,
+        radd_out        =>  radd,
         rval_in         =>  rval,
-        ren_out         =>  ren
+        ren_out         =>  ren,
         ram_rst_out     =>  ram_rst,
         core_rst_out    =>  core_rst
     );
