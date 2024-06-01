@@ -33,7 +33,7 @@ entity module_template is
 end entity module_template;
 
 architecture structural of module_template is
-    signal core_param       :   std_logic_vector(core_param_size - 1 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
+    signal core_param       :   std_logic_vector(<size> - 1 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
     signal core_rst         :   std_logic := '1';
 
     signal ram_rst          :   std_logic := '1';
@@ -58,8 +58,15 @@ begin
         -- data flow ports
     );
 
-    parameter_ram : entity work.parameter_ram generic map(
-        ram_default     =>  x"0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    parameter_ram : entity work.parameter_ram_<size> generic map(
+        ram_default     =>  x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000"
     )port map(
         clk             =>  clk,
         rst             =>  ram_rst,

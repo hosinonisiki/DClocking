@@ -35,7 +35,7 @@ entity module_signal_router is
 end entity module_signal_router;
 
 architecture structural of module_signal_router is
-    signal core_param       :   std_logic_vector(core_param_size - 1 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
+    signal core_param       :   std_logic_vector(511 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
     signal core_rst         :   std_logic := '1';
 
     signal ram_rst          :   std_logic := '1';
@@ -62,15 +62,11 @@ begin
         sig_out         =>  sig_out
     );
 
-    parameter_ram : entity work.parameter_ram generic map(
-        ram_default     =>  x"00000000000000000000000000000000" &
-                            x"00000000000000000000000000000000" &
-                            x"00000000000000000000000000000000" &
-                            x"00000000000000000000000000000000" &
-                            x"00000000000000000000000000000000" &
-                            x"00000000000000000000000000000000" &
-                            x"00000000000000000000000000000000" &
-                            x"00000000000000000000000000000000"
+    parameter_ram : entity work.parameter_ram_512 generic map(
+        ram_default     =>  x"000000007b9ac5a928398a4188204a2f" &
+                            x"6ad2728c128bdab49ca304a2f6ad2728" &
+                            x"c128bdab49ca304a2f6ad2728c128bda" &
+                            x"b49ca304a2f6ad2728c128bdab49ca30"
     )port map(
         clk             =>  clk,
         rst             =>  ram_rst,

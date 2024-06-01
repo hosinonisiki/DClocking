@@ -43,7 +43,7 @@ entity signal_router is
     port(
         clk             :   in  std_logic;
         rst             :   in  std_logic;
-        core_param_in   :   in  std_logic_vector(core_param_size - 1 downto 0);
+        core_param_in   :   in  std_logic_vector(511 downto 0);
         sig_in          :   in  signal_array(63 downto 0);
         sig_out         :   out signal_array(63 downto 0)
     );

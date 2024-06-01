@@ -16,7 +16,9 @@ package mypak is
     constant cbus_w     :   integer := 5; -- Width of the control bus.
     constant rbus_w     :   integer := 32; -- Width of the response bus.
     constant sbus_w     :   integer := 3; -- Width of the response status bus.
-    constant core_param_size : integer := 2 ** abus_w * dbus_w;
+    constant core_param_size : integer := 2 ** abus_w * dbus_w; -- Upper limit of ram size for each module.
+
+    constant log_dbus_w :   integer := 5; -- Log2 of the data bus width.
 
     type rbus_type is array(0 to module_count) of std_logic_vector(rbus_w - 1 downto 0); -- 0 is reserved for no module.
     type sbus_type is array(0 to module_count) of std_logic_vector(sbus_w - 1 downto 0);
