@@ -18,7 +18,7 @@ use ieee.numeric_std.all;
 
 use work.mypak.all;
 
-entity module_template is
+entity module_signal_router is
     port(
         clk             :   in  std_logic;
         rst             :   in  std_logic;
@@ -32,9 +32,9 @@ entity module_template is
         sig_in          :   in  signal_array(63 downto 0);
         sig_out         :   out signal_array(63 downto 0)
     );
-end entity module_template;
+end entity module_signal_router;
 
-architecture structural of module_template is
+architecture structural of module_signal_router is
     signal core_param       :   std_logic_vector(core_param_size - 1 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
     signal core_rst         :   std_logic := '1';
 
@@ -42,13 +42,13 @@ architecture structural of module_template is
     signal handler_rst      :   std_logic := '1';
 
     signal wdata            :   std_logic_vector(dbus_w - 1 downto 0); -- Data to be written to the ram
-    signal wadd             :   std_logic_vector(abus_w - 1 downto 0); -- Address to write to
+    signal waddr             :   std_logic_vector(abus_w - 1 downto 0); -- Address to write to
     signal wmask            :   std_logic_vector(dbus_w - 1 downto 0); -- Data mask
     signal wval             :   std_logic; -- Valid signal
     signal wen              :   std_logic; -- Write enable signal. The writing process starts as soon as wen is active, but the data is only written once wval is active. 
                                        -- This is to make sure that parameters longer than dbus_w are written simultaneously.
     signal rdata            :   std_logic_vector(dbus_w - 1 downto 0); -- Data read from the ram
-    signal radd             :   std_logic_vector(abus_w - 1 downto 0); -- Address to read from
+    signal raddr             :   std_logic_vector(abus_w - 1 downto 0); -- Address to read from
     signal rval             :   std_logic; -- Valid signal, active when the data is ready
     signal ren              :   std_logic; -- Read enable signal
 begin
@@ -63,17 +63,24 @@ begin
     );
 
     parameter_ram : entity work.parameter_ram generic map(
-        ram_default     =>  x"0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        ram_default     =>  x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000"
     )port map(
         clk             =>  clk,
         rst             =>  ram_rst,
         wdata_in        =>  wdata,
-        wadd_in         =>  wadd,
+        waddr_in        =>  waddr,
         wmask_in        =>  wmask,
         wval_in         =>  wval,
         wen_in          =>  wen,
         rdata_out       =>  rdata,
-        radd_in         =>  radd,
+        raddr_in        =>  raddr,
         rval_out        =>  rval,
         ren_in          =>  ren,
         ram_data_out    =>  core_param
@@ -89,12 +96,12 @@ begin
         rsp_out         =>  rsp_out,
         rsp_stat_out    =>  rsp_stat_out,
         wdata_out       =>  wdata,
-        wadd_out        =>  wadd,
+        waddr_out       =>  waddr,
         wmask_out       =>  wmask,
         wval_out        =>  wval,
         wen_out         =>  wen,
         rdata_in        =>  rdata,
-        radd_out        =>  radd,
+        raddr_out       =>  raddr,
         rval_in         =>  rval,
         ren_out         =>  ren,
         ram_rst_out     =>  ram_rst,

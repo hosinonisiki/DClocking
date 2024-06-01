@@ -23,7 +23,7 @@
 -- board : AXKU041
 -- FPGA : XCKU040-FFVA1156-2-I
 -- adc : FL9613 12 bit
--- dac : FL9781 16 bit
+-- dac : FL9781 14 bit
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -43,11 +43,13 @@ entity top is
         adc_in_2    :   in  std_logic_vector(11 downto 0);
         adc_in_3    :   in  std_logic_vector(11 downto 0);
 
-        dac_out_0   :   out std_logic_vector(15 downto 0);
-        dac_out_1   :   out std_logic_vector(15 downto 0);
-        dac_out_2   :   out std_logic_vector(15 downto 0);
-        dac_out_3   :   out std_logic_vector(15 downto 0)
+        dac_out_0   :   out std_logic_vector(13 downto 0);
+        dac_out_1   :   out std_logic_vector(13 downto 0);
+        dac_out_2   :   out std_logic_vector(13 downto 0);
+        dac_out_3   :   out std_logic_vector(13 downto 0)
     );
+    attribute dont_touch : string;
+    attribute dont_touch of top : entity is "true";
 end entity top;
 
 architecture structural of top is
@@ -63,19 +65,22 @@ architecture structural of top is
     signal rbus         :   rbus_type := (others => (others => '0')); -- response bus
     signal sbus         :   sbus_type := (others => (others => '0')); -- response status bus
 
-    SIGNAL rsp_sel      :   std_logic_vector(mbus_w - 1 downto 0) := (others => '0'); -- response select
-    SIGNAL rsp          :   std_logic_vector(rbus_w - 1 downto 0) := (others => '0'); -- response from sub modules
-    SIGNAL rsp_stat     :   std_logic_vector(sbus_w - 1 downto 0) := (others => '0'); -- response status from sub modules
+    signal rsp_sel      :   std_logic_vector(mbus_w - 1 downto 0) := (others => '0'); -- response select
+    signal rsp          :   std_logic_vector(rbus_w - 1 downto 0) := (others => '0'); -- response from sub modules
+    signal rsp_stat     :   std_logic_vector(sbus_w - 1 downto 0) := (others => '0'); -- response status from sub modules
 
-    SIGNAL adc_0        :   std_logic_vector(11 downto 0) := x"000";
-    SIGNAL adc_1        :   std_logic_vector(11 downto 0) := x"000";
-    SIGNAL adc_2        :   std_logic_vector(11 downto 0) := x"000";
-    SIGNAL adc_3        :   std_logic_vector(11 downto 0) := x"000";
+    signal adc_0        :   std_logic_vector(11 downto 0) := "000000000000";
+    signal adc_1        :   std_logic_vector(11 downto 0) := "000000000000";
+    signal adc_2        :   std_logic_vector(11 downto 0) := "000000000000";
+    signal adc_3        :   std_logic_vector(11 downto 0) := "000000000000";
 
-    SIGNAL dac_0        :   std_logic_vector(15 downto 0) := x"0000";
-    SIGNAL dac_1        :   std_logic_vector(15 downto 0) := x"0000";
-    SIGNAL dac_2        :   std_logic_vector(15 downto 0) := x"0000";
-    SIGNAL dac_3        :   std_logic_vector(15 downto 0) := x"0000";
+    signal dac_0        :   std_logic_vector(13 downto 0) := "00000000000000";
+    signal dac_1        :   std_logic_vector(13 downto 0) := "00000000000000";
+    signal dac_2        :   std_logic_vector(13 downto 0) := "00000000000000";
+    signal dac_3        :   std_logic_vector(13 downto 0) := "00000000000000";
+
+    signal sig_bank_in  :   signal_array(63 downto 0);
+    signal sig_bank_out :   signal_array(63 downto 0);
 begin
 
     -- The main control module handles all ios and communication with the modules.
@@ -110,44 +115,34 @@ begin
     mod_rst <= (others => rst);
     -- register each module as the following
     module_1_block : block
-        port(
-            clk             :   in  std_logic;
-            rst             :   in  std_logic;
-            dbus_in         :   in  std_logic_vector(dbus_w - 1 downto 0);
-            abus_in         :   in  std_logic_vector(abus_w - 1 downto 0);
-            mbus_in         :   in  std_logic_vector(mbus_w - 1 downto 0);
-            cbus_in         :   in  std_logic_vector(cbus_w - 1 downto 0);
-            rsp_out         :   out std_logic_vector(rbus_w - 1 downto 0);
-            rsp_stat_out    :   out std_logic_vector(sbus_w - 1 downto 0)
-            -- data flow ports
-        );
-        port map(
-            clk             =>  clk,
-            rst             =>  mod_rst(1),
-            dbus_in         =>  dbus,
-            abus_in         =>  abus,
-            mbus_in         =>  mbus,
-            cbus_in         =>  cbus,
-            rsp_out         =>  rbus(1),
-            rsp_stat_out    =>  sbus(1)
-        );
         signal bus_en       :   std_logic;
     begin
-        bus_en <= '1' when mbus = x"01" else '0';
-
-        module_1 : entity work.module_1 port map(
+        bus_en <= '1' when mbus = "00001" else '0';
+        module_1 : entity work.module_signal_router port map(
             clk             =>  clk,
-            rst             =>  rst,
+            rst             =>  mod_rst(1),
             bus_en_in       =>  bus_en,
-            dbus_in         =>  dbus_in,
-            abus_in         =>  abus_in,
-            cbus_in         =>  cbus_in,
-            rsp_out         =>  rsp_out,
-            rsp_stat_out    =>  rsp_stat_out
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_out         =>  rbus(1),
+            rsp_stat_out    =>  sbus(1),
+            
+            sig_in          =>  sig_bank_in,
+            sig_out         =>  sig_bank_out
         );
     end block module_1_block;
+    
+    sig_bank_in <= (0 => x"0" & adc_0,
+                    1 => x"0" & adc_1,
+                    2 => x"0" & adc_2,
+                    3 => x"0" & adc_3,
+                     others => (others => '0'));
 
-
+    dac_0 <= sig_bank_out(0)(13 downto 0);
+    dac_1 <= sig_bank_out(1)(13 downto 0);
+    dac_2 <= sig_bank_out(2)(13 downto 0);
+    dac_3 <= sig_bank_out(3)(13 downto 0);
 
     -- analog front
     process(clk)

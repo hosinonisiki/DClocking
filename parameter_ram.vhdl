@@ -40,7 +40,6 @@ begin
     
     process(clk, rst)
         variable waddr  : integer;
-        variable target : std_logic_vector(dbus_w - 1 downto 0);
     begin
         if rising_edge(clk) then
             if rst = '1' then
@@ -49,8 +48,7 @@ begin
             else
                 if wen_in = '1' then
                     waddr := to_integer(unsigned(waddr_in));
-                    target := ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w);
-                    target <= (wmask_in and wdata_in) or ((not wmask_in) and target);
+                    ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w) <= (wmask_in and wdata_in) or ((not wmask_in) and ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w));
                 end if;
                 if wval_in = '1' then
                     ram_data <= ram_buf;
@@ -61,7 +59,6 @@ begin
 
     process(clk, rst)
         variable raddr  : integer;
-        variable target : std_logic_vector(dbus_w - 1 downto 0);
     begin
         if rising_edge(clk) then
             if rst = '1' then
@@ -69,8 +66,7 @@ begin
             else
                 if ren_in = '1' then
                     raddr := to_integer(unsigned(raddr_in));
-                    target := ram_data(raddr * dbus_w + dbus_w - 1 downto raddr * dbus_w);
-                    rdata_out <= target;
+                    rdata_out <= ram_data(raddr * dbus_w + dbus_w - 1 downto raddr * dbus_w);
                 end if;
             end if;
         end if;

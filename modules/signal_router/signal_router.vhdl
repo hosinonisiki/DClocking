@@ -111,6 +111,7 @@ begin
     end generate;
 
     banks : for i in 0 to 7 generate
+        signal temp_in : signal_array(9 downto 0);
         signal temp_out : signal_array(9 downto 0);
     begin
         sub_router : entity work.sub_router generic map(
@@ -120,9 +121,11 @@ begin
             clk             =>  clk,
             rst             =>  rst,
             control_in      =>  core_param_in(50 * i + 49 downto 50 * i),
-            sig_in          =>  (7 downto 0 => sig_in_buf(8 * i + 7 downto 8 * i), 9 downto 8 => sig_hout(2 * i + 1 downto 2 * i)),
+            sig_in          =>  temp_in,
             sig_out         =>  temp_out
         );
+        temp_in(7 downto 0) <= sig_in_buf(8 * i + 7 downto 8 * i);
+        temp_in(9 downto 8) <= sig_hout(2 * i + 1 downto 2 * i);
         sig_out_buf(8 * i + 7 downto 8 * i) <= temp_out(7 downto 0);
         sig_hin(2 * i + 1 downto 2 * i) <= temp_out(9 downto 8);
     end generate;
@@ -142,8 +145,16 @@ end architecture structural;
 architecture behavioral of sub_router is
 begin
     routings : for i in 0 to width - 1 generate
-        sig_out(i) <= (others => '0') when control_in(i * (log_width + 1) + log_width) = '0' else 
-                        sig_in(to_integer(unsigned(control_in(i * (log_width + 1) + log_width - 1 downto i * (log_width + 1)))));
+        process(clk)
+        begin
+            if rising_edge(clk) then
+                if control_in(i * (log_width + 1) + log_width) = '0' then
+                    sig_out(i) <= (others => '0');
+                else 
+                    sig_out(i) <= sig_in(to_integer(unsigned(control_in(i * (log_width + 1) + log_width - 1 downto i * (log_width + 1)))));
+                end if;
+            end if;
+        end process;
     end generate;
 end architecture behavioral;
 

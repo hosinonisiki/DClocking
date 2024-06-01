@@ -19,12 +19,12 @@ entity bus_handler is
         abus_in         :   in  std_logic_vector(abus_w - 1 downto 0);
         cbus_in         :   in  std_logic_vector(cbus_w - 1 downto 0);
         rsp_out         :   out std_logic_vector(rbus_w - 1 downto 0);
-        rsp_stat_out    :   out std_logic_vector(sbus_w downto 0);
+        rsp_stat_out    :   out std_logic_vector(sbus_w - 1 downto 0);
         wdata_out       :   out std_logic_vector(dbus_w - 1 downto 0);
         waddr_out       :   out std_logic_vector(abus_w - 1 downto 0);
         wmask_out       :   out std_logic_vector(dbus_w - 1 downto 0);
         wval_out        :   out std_logic;
-        wen_out         :   out std_logic;
+        wen_out         :   inout std_logic;
         rdata_in        :   in  std_logic_vector(dbus_w - 1 downto 0);
         raddr_out       :   out std_logic_vector(abus_w - 1 downto 0);
         rval_in         :   in  std_logic;
@@ -121,13 +121,13 @@ begin
                     wen_out <= '0';
                 when s_handle_write =>
                     wdata_out <= data_buf;
-                    wadd_out <= addr_buf;
-                    if cmd_body_buf = WRITE_MASK or cmd_body_buf = WRITE_MSK_HOLD then
+                    waddr_out <= addr_buf;
+                    if cmd_body_buf = WRITE_MASK or cmd_body_buf = WRITE_MASK_HOLD then
                         wmask_out <= dbus_in;
                     else
                         wmask_out <= (others => '1');
                     end if;
-                    if cmd_body_buf = WRITE_HOLD or cmd_body_buf = WRITE_MSK_HOLD then
+                    if cmd_body_buf = WRITE_HOLD or cmd_body_buf = WRITE_MASK_HOLD then
                         wval_reg <= '0';
                     else
                         wval_reg <= '1';

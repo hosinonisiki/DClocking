@@ -1,29 +1,53 @@
 // This verilog testbench instantiates a VHDL entity. This is done with vivado mixed language simulation.
 
-module main_control_tb;
+module wrapper_tb;
     reg clk, rst;
 
     reg rxd;
-    reg [31:0] rsp;
-    reg [2:0] rsp_stat;
-
     wire txd;
-    wire [31:0] dbus;
-    wire [4:0] abus;
-    wire [4:0] mbus;
-    wire [4:0] cbus;
 
-    main_control UUT(
-        .clk(clk),
+    wire led_1, led_2, led_3, led_4;
+    wire panel_led_1, panel_led_2;
+
+    wire dac_1_2_dci_p_ddr_o, dac_1_2_dci_n_ddr_o, dac_3_4_dci_p_ddr_o, dac_3_4_dci_n_ddr_o;
+    wire dac_1_2_spi_ss_o, dac_3_4_spi_ss_o, dac_clk_spi_ss_o, dac_spi_sck_o, dac_spi_mosi_o, dac_eeprom_iic_scl_o, dac_eeprom_iic_sda_io;
+    wire [13:0] dac_1_2_data_p_ddr_o, dac_1_2_data_n_ddr_o, dac_3_4_data_p_ddr_o, dac_3_4_data_n_ddr_o;
+
+    reg dac_1_2_dco_p_i, dac_1_2_dco_n_i, dac_3_4_dco_p_i, dac_3_4_dco_n_i;
+    reg dac_spi_miso_i;
+
+    wrapper UUT(
+        .sys_clk_p(clk),
+        .sys_clk_n(~clk),
         .rst(rst),
-        .rxd_in(rxd),
-        .txd_out(txd),
-        .dbus_out(dbus),
-        .abus_out(abus),
-        .mbus_out(mbus),
-        .cbus_out(cbus),
-        .rsp_in(rsp),
-        .rsp_stat_in(rsp_stat)
+        .led_1_o(led_1),
+        .led_2_o(led_2),
+        .led_3_o(led_3),
+        .led_4_o(led_4),
+        .panel_led_1_o(panel_led_1),
+        .panel_led_2_o(panel_led_2),
+        .uart_rxd_i(rxd),
+        .uart_txd_o(txd),
+        .dac_1_2_dci_p_ddr_o(dac_1_2_dci_p_ddr_o),
+        .dac_1_2_dci_n_ddr_o(dac_1_2_dci_n_ddr_o),
+        .dac_3_4_dci_p_ddr_o(dac_3_4_dci_p_ddr_o),
+        .dac_3_4_dci_n_ddr_o(dac_3_4_dci_n_ddr_o),
+        .dac_1_2_spi_ss_o(dac_1_2_spi_ss_o),
+        .dac_3_4_spi_ss_o(dac_3_4_spi_ss_o),
+        .dac_clk_spi_ss_o(dac_clk_spi_ss_o),
+        .dac_spi_sck_o(dac_spi_sck_o),
+        .dac_spi_mosi_o(dac_spi_mosi_o),
+        .dac_eeprom_iic_scl_o(dac_eeprom_iic_scl_o),
+        .dac_eeprom_iic_sda_io(dac_eeprom_iic_sda_io),
+        .dac_1_2_data_p_ddr_o(dac_1_2_data_p_ddr_o),
+        .dac_1_2_data_n_ddr_o(dac_1_2_data_n_ddr_o),
+        .dac_3_4_data_p_ddr_o(dac_3_4_data_p_ddr_o),
+        .dac_3_4_data_n_ddr_o(dac_3_4_data_n_ddr_o),
+        .dac_1_2_dco_p_i(dac_1_2_dco_p_i),
+        .dac_1_2_dco_n_i(dac_1_2_dco_n_i),
+        .dac_3_4_dco_p_i(dac_3_4_dco_p_i),
+        .dac_3_4_dco_n_i(dac_3_4_dco_n_i),
+        .dac_spi_miso_i(dac_spi_miso_i)
     );
 
     initial begin
@@ -34,8 +58,11 @@ module main_control_tb;
     end
 
     initial begin
-        rsp = 32'h00000000;
-        rsp_stat = 8'h00;
+        dac_1_2_dco_p_i = 0;
+        dac_1_2_dco_n_i = 0;
+        dac_3_4_dco_p_i = 0;
+        dac_3_4_dco_n_i = 0;
+        dac_spi_miso_i = 0;
         rst = 1;
         #1000 rst = 0;
     end

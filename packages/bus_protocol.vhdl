@@ -28,8 +28,8 @@ package bus_protocol is
     --     control     address      data
     --  t0 COMMAND     ADDRESS      DATA1
     --  t1 X           X            DATA2
-    constant WRITE_MSK : std_logic_vector(cbus_w - 3 downto 0) := "100"; -- Write DATA1 to ADDRESS, using DATA2 as mask, and immediately apply all changes
-    constant WRITE_MSK_HOLD : std_logic_vector(cbus_w - 3 downto 0) := "101"; -- Write DATA1 to ADDRESS, using DATA2 as mask, but don't immediately apply it
+    constant WRITE_MASK : std_logic_vector(cbus_w - 3 downto 0) := "100"; -- Write DATA1 to ADDRESS, using DATA2 as mask, and immediately apply all changes
+    constant WRITE_MASK_HOLD : std_logic_vector(cbus_w - 3 downto 0) := "101"; -- Write DATA1 to ADDRESS, using DATA2 as mask, but don't immediately apply it
     -- "10XXX" usage:
     --     control     address      data
     --  t0 COMMAND     ADDRESS      X

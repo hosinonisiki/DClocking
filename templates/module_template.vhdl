@@ -92,7 +92,7 @@ begin
         rdata_in        =>  rdata,
         raddr_out        =>  raddr,
         rval_in         =>  rval,
-        ren_out         =>  ren
+        ren_out         =>  ren,
         ram_rst_out     =>  ram_rst,
         core_rst_out    =>  core_rst
     );

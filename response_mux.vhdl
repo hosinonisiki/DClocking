@@ -19,7 +19,7 @@ entity response_mux is
         sbus_in         :   in  sbus_type;
         rsp_sel_in      :   in  std_logic_vector(mbus_w - 1 downto 0);
         rsp_out         :   out std_logic_vector(rbus_w - 1 downto 0);
-        rsp_stat_out    :   out std_logic_vector(sbus_w - 1 downto 0);
+        rsp_stat_out    :   out std_logic_vector(sbus_w - 1 downto 0)
     );
 end entity response_mux;
 
