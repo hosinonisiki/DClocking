@@ -119,7 +119,7 @@ begin
     begin
         if rising_edge(clk) then
             if state = s_data and bit_ready = '1' then
-                data(to_integer(bit_cnt)) <= rxd_in;
+                data <= rxd_in & data(data_bits - 1 downto 1);
             end if;
         end if;
     end process;
@@ -160,98 +160,4 @@ begin
     bit_ready <= '1' when cycle_cnt = bit_length + x"FFFF" or (state = s_start and cycle_cnt = half_bit_length + x"FFFF") else '0';
     data_final_dgt <= '1' when bit_cnt = data_bits_u + x"F" else '0';
     stop_final_dgt <= '1' when bit_cnt = stop_bits_u + x"F" else '0';
-
-    -- process(clk, rst)
-    -- begin
-    --     if rising_edge(clk) then
-    --         if rst = '1' then
-    --             state <= idle;
-    --         else
-    --             case state is
-    --                 when idle =>
-    --                     dval_out <= '0';
-    --                     if rxd_in = '0' then
-    --                         cycle_cnt <= 0;
-    --                         idle_out <= '0';
-    --                         state <= start;
-    --                     end if;
-    --                 when start =>
-    --                     if cycle_cnt = half_bit_length then
-    --                         cycle_cnt <= 0;
-    --                         bit_cnt <= 0;
-    --                         data <= (others => '0');
-    --                         parity <= '0';
-    --                         state <= sample;
-    --                     else
-    --                         cycle_cnt <= cycle_cnt + 1;
-    --                     end if;
-    --                 when sample =>
-    --                     if cycle_cnt = bit_length then
-    --                         cycle_cnt <= 0;
-    --                         data(bit_cnt) <= rxd_in;
-    --                         parity <= parity xor rxd_in;
-    --                         if bit_cnt = data_bits - 1 then
-    --                             valid <= '1';
-    --                             bit_cnt <= 0;
-    --                             if parity_type = "none" then
-    --                                 state <= stop;
-    --                             else
-    --                                 state <= verify;
-    --                             end if;
-    --                         else
-    --                             bit_cnt <= bit_cnt + 1;
-    --                         end if;
-    --                     else
-    --                         cycle_cnt <= cycle_cnt + 1;
-    --                     end if;
-    --                 when verify =>
-    --                     if cycle_cnt = bit_length then
-    --                         cycle_cnt <= 0;
-    --                         case parity_type is
-    --                             when "odd" =>
-    --                                 if (parity xor rxd_in) = '0' then
-    --                                     valid <= '0';
-    --                                 end if;
-    --                             when "even" =>
-    --                                 if (parity xor rxd_in) = '1' then
-    --                                     valid <= '0';
-    --                                 end if;
-    --                             when "mark" =>
-    --                                 if rxd_in = '0' then
-    --                                     valid <= '0';
-    --                                 end if;
-    --                             when "space" =>
-    --                                 if rxd_in = '1' then
-    --                                     valid <= '0';
-    --                                 end if;
-    --                         end case;
-    --                         state <= stop;
-    --                     else
-    --                         cycle_cnt <= cycle_cnt + 1;
-    --                     end if;
-    --                 when stop =>
-    --                     if cycle_cnt = bit_length then
-    --                         cycle_cnt <= 0;
-    --                         if rxd_in = '0' then
-    --                             valid <= '0';
-    --                         end if;
-    --                         if bit_cnt = stop_bits - 1 then
-    --                             if valid = '1' then
-    --                                 dout <= data;
-    --                                 dval_out <= '1';
-    --                             end if;
-    --                             idle_out <= '1';
-    --                             state <= idle;
-    --                         else
-    --                             bit_cnt <= bit_cnt + 1;
-    --                         end if;
-    --                     else
-    --                         cycle_cnt <= cycle_cnt + 1;
-    --                     end if;
-    --                 when others =>
-    --                     state <= idle;
-    --             end case;
-    --         end if;
-    --     end if;
-    -- end process;
 end architecture behavioral;

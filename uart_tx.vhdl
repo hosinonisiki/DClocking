@@ -112,7 +112,11 @@ begin
     process(clk)
     begin
         if rising_edge(clk) then
-            if state = s_init_2 then
+            if state = s_data then
+                if bit_ready = '1' then
+                    data <= '0' & data(data_bits - 1 downto 1);
+                end if;
+            else
                 data <= din;
             end if;
         end if;
@@ -128,7 +132,7 @@ begin
                     txd_out <= '0';
                 when s_data =>
                     if bit_ready = '1' then
-                        txd_out <= data(to_integer(bit_cnt));
+                        txd_out <= data(0);
                     end if;
                 when s_parity =>
                     if bit_ready = '1' then
