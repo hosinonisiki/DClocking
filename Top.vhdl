@@ -113,11 +113,15 @@ begin
 
 
     mod_rst <= (others => rst);
-    -- register each module as the following
+    -- To register a module:
+    -- 1.Follow the format below
+    -- 2.Register the address of the module in mypak
+    -- 3.Register the name of the module in uart_protocol
+    -- 4.Add corresponding lines in central_control
     module_1_block : block
         signal bus_en       :   std_logic;
     begin
-        bus_en <= '1' when mbus = "00001" else '0';
+        bus_en <= '1' when mbus = ROUT_ADDR else '0'; -- constant defined in mypak
         module_1 : entity work.module_signal_router port map(
             clk             =>  clk,
             rst             =>  mod_rst(1),
@@ -133,11 +137,12 @@ begin
         );
     end block module_1_block;
     
+    -- signal banks provided by the router
     sig_bank_in <= (0 => x"0" & adc_0,
                     1 => x"0" & adc_1,
                     2 => x"0" & adc_2,
                     3 => x"0" & adc_3,
-                     others => (others => '0'));
+                    others => (others => '0'));
 
     dac_0 <= sig_bank_out(0)(13 downto 0);
     dac_1 <= sig_bank_out(1)(13 downto 0);

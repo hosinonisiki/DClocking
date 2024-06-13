@@ -55,11 +55,11 @@ begin
                 when s_idle =>
                     if bus_en_in = '1' and (or cbus_in) = '1' then
                         case cbus_in(cbus_w - 1 downto cbus_w - 2) is
-                            when "00" =>
+                            when CONTROL_HEAD =>
                                 state <= s_handle_command;
-                            when "01" =>
+                            when WRITE_HEAD =>
                                 state <= s_handle_write;
-                            when "10" =>
+                            when READ_HEAD =>
                                 state <= s_handle_read;
                             when others =>
                         end case;
@@ -97,13 +97,13 @@ begin
     process(clk)
     begin
         if rising_edge(clk) and state = s_handle_command then
-            if cmd_body_buf = UNRST_CORE then
+            if cmd_body_buf = SET_CORE then
                 core_rst_out <= '0';
             end if;
             if cmd_body_buf = RST_CORE then
                 core_rst_out <= '1';
             end if;
-            if cmd_body_buf = UNRST_RAM then
+            if cmd_body_buf = SET_RAM then
                 ram_rst_out <= '0';
             end if;
             if cmd_body_buf = RST_RAM then
@@ -147,6 +147,7 @@ begin
             case state is
                 when s_idle =>
                     -- init
+                    ren_out <= '0';
                 when s_handle_read =>
                     raddr_out <= addr_buf;
                     ren_out <= '1';
@@ -166,14 +167,14 @@ begin
                     rsp_stat_out <= (others => '0');
                 when s_handle_command =>
                     -- All commands that currently exist only take one cycle to complete
-                    rsp_stat_out <= (0 => '1', others => '0');
+                    rsp_stat_out <= ROGER;
                 when s_handle_write =>
                     -- All writes that currently exist only take one cycle to complete
-                    rsp_stat_out <= (0 => '1', others => '0');
+                    rsp_stat_out <= ROGER;
                 when s_wait_response =>
                     rsp_out <= rdata_in;
                     if rval_in = '1' then
-                        rsp_stat_out <= (0 => '1', others => '0');
+                        rsp_stat_out <= ROGER;
                     end if;
                 when others =>
             end case;

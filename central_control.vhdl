@@ -10,6 +10,9 @@ use ieee.numeric_std.all;
 
 use work.mypak.all;
 
+use work.uart_protocol.all;
+use work.bus_protocol.all;
+
 entity central_control is
     port(
         clk             :   in  std_logic;
@@ -30,8 +33,427 @@ entity central_control is
     );
 end entity central_control;
 
+architecture parser of central_control is
+    type state_type is (s_idle, s_fetch, s_receive, s_flip, s_parse_space, s_spi_parse_device,
+                        s_bus_parse_device, s_bus_parse_head, s_bus_control_parse_body,
+                        s_bus_write_parse_body, s_bus_write_parse_address,
+                        s_bus_write_parse_data, s_bus_write_parse_mask,
+                        s_bus_read_parse_body, s_bus_read_parse_address, s_bus_transmit_1,
+                        s_bus_transmit_2, s_bus_listen, s_respond_acknowledgement,
+                        s_respond_exception, s_send);
+    signal state        : state_type := s_idle;
+
+    signal cur_str      : std_logic_vector(31 downto 0); -- Current string being parsed
+
+    signal response_data_buf    : std_logic_vector(31 downto 0); -- Buffer for response data
+    signal response_data_attached : std_logic;
+    signal response_err_buf     : std_logic_vector(31 downto 0); -- Buffer for response error
+    constant response_err_attached : std_logic := '1'; -- For test purposes
+
+    -- Buffers for bus commands
+    signal bus_mod_buf  : std_logic_vector(mbus_w - 1 downto 0); -- Buffer for bus module
+    signal bus_cmd_buf  : std_logic_vector(cbus_w - 1 downto 0); -- Buffer for bus command
+    signal bus_addr_buf : std_logic_vector(abus_w - 1 downto 0); -- Buffer for bus address
+    signal bus_data_buf : std_logic_vector(dbus_w - 1 downto 0); -- Buffer for bus data
+    signal bus_mask_buf : std_logic_vector(dbus_w - 1 downto 0); -- Buffer for bus mask
+
+    constant bsr_size   : integer := 64; -- Size of the bidirectional shift registers
+    type bsr_type is array(0 to bsr_size - 1) of std_logic_vector(7 downto 0);
+
+    -- Two shift registers used in the design.
+    -- One flips the order of the characters in a message, and the other flips back.
+    -- This is because the length of a message is unpredictable.
+    -- By using two shift registers, the central control can always read the current character at address 0.
+    signal bsr_i1_reg    : bsr_type; -- Shift registers
+    signal bsr_i1_din    : std_logic_vector(7 downto 0); -- Data in
+    signal bsr_i1_sl     : std_logic; -- Shift left, output
+    signal bsr_i1_sr     : std_logic; -- Shift right, input
+    signal bsr_i1_rst    : std_logic; -- Reset
+
+    signal bsr_i2_reg    : bsr_type; -- Shift registers
+    signal bsr_i2_din    : std_logic_vector(7 downto 0); -- Data in
+    signal bsr_i2_sl     : std_logic; -- Shift left, output, 5 chars at a time
+    signal bsr_i2_sr     : std_logic; -- Shift right, input
+    signal bsr_i2_rst    : std_logic; -- Reset
+
+    -- Output shift register stores the message to be sent
+    signal bsr_o_reg     : bsr_type; -- Shift registers
+    signal bsr_o_din     : bsr_type; -- Read all characters at once
+    signal bsr_o_ren     : std_logic; -- Read enable
+    signal bsr_o_sl      : std_logic; -- Shift left, output
+    signal bsr_o_rst     : std_logic; -- Reset
+begin
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            if rst = '1' then
+                -- Reset to idle state
+                state <= s_idle;
+                rxen_out <= '0';
+                txen_out <= '0';
+                cbus_out <= (others => '0'); -- Clear the bus
+                bsr_i1_sl <= '0';
+                bsr_i2_sr <= '0';
+                bsr_i1_sr <= '0';
+                bsr_i2_sl <= '0';
+                bsr_o_sl <= '0';
+                bsr_o_ren <= '0';
+                response_data_attached <= '0';
+            else
+                case state is
+                    when s_idle =>
+                        -- If a chatacter is available, fetch it
+                        if rxemp_in = '0' then
+                            rxen_out <= '1';
+                            state <= s_fetch;
+                        end if;
+                    when s_fetch =>
+                        -- Wait for the fifo to return, while preparing the shift register
+                        rxen_out <= '0';
+                        bsr_i1_sr <= '1';
+                        state <= s_receive;
+                    when s_receive =>
+                        -- Receive the character with the shift register
+                        bsr_i1_sr <= '0';
+                        -- If the character is a terminator, start flipping the message
+                        if rxd_in = u_TERM then
+                            bsr_i1_sl <= '1';
+                            bsr_i2_sr <= '1';
+                            state <= s_flip;
+                        else
+                            state <= s_idle;
+                        end if;
+                    when s_flip =>
+                        -- If the character is an initiator, start parsing the message
+                        if bsr_i1_reg(0) = u_INIT then
+                            bsr_i1_sl <= '0';
+                            bsr_i2_sr <= '0';
+                            bsr_i2_sl <= '1';
+                            state <= s_parse_space;
+                        end if;
+                    when s_parse_space =>
+                        -- segment lies on bsr_i2_reg(1 to 5)
+                        -- Assert that the end of current segment is a separator or a terminator, else throw an exception
+                        if bsr_i2_reg(5) /= u_SEP then
+                            response_err_buf <= x"534e5458"; -- "SNTX" for syntax error
+                            state <= s_respond_exception;
+                        else
+                            case cur_str is
+                                -- Parse space
+                                when u_SPACE_SPI =>
+                                    state <= s_spi_parse_device;
+                                when u_SPACE_BUS =>
+                                    state <= s_bus_parse_device;
+                                when others =>
+                                    response_err_buf <= x"53504153"; -- "SPAS" for space error
+                                    state <= s_respond_exception;
+                            end case;
+                        end if;
+                    when s_spi_parse_device =>
+                        -- Come back later
+                        state <= s_idle;
+                    when s_bus_parse_device =>
+                        -- Parse the device
+                        if bsr_i2_reg(5) /= u_SEP then
+                            response_err_buf <= x"534e5458"; -- "SNTX" for syntax error
+                            state <= s_respond_exception;
+                        else
+                            case cur_str is
+                                when u_DEVICE_ROUT =>
+                                    bus_mod_buf <= ROUT_ADDR;
+                                    state <= s_bus_parse_head;
+                                when others =>
+                                    response_err_buf <= x"44564345"; -- "DVCE" for device error
+                                    state <= s_respond_exception;
+                            end case;
+                        end if;
+                    when s_bus_parse_head =>
+                        -- Parse the specific command. Constants defined in bus_protocol
+                        if bsr_i2_reg(5) /= u_SEP then
+                            response_err_buf <= x"534e5458"; -- "SNTX" for syntax error
+                            state <= s_respond_exception;
+                        else
+                            case cur_str is
+                                when u_COMMAND_CTRL =>
+                                    bus_cmd_buf(cbus_w - 1 downto cbus_w - 2) <= CONTROL_HEAD;
+                                    state <= s_bus_control_parse_body;
+                                when u_COMMAND_READ =>
+                                    bus_cmd_buf(cbus_w - 1 downto cbus_w - 2) <= READ_HEAD;
+                                    bus_cmd_buf(cbus_w - 3 downto 0) <= (others => '0');
+                                    state <= s_bus_read_parse_body;
+                                when u_COMMAND_WRTE =>
+                                    bus_cmd_buf(cbus_w - 1 downto cbus_w - 2) <= WRITE_HEAD;
+                                    bus_cmd_buf(cbus_w - 3 downto 0) <= (others => '0');
+                                    state <= s_bus_write_parse_body;
+                                when others =>
+                                    response_err_buf <= x"48454144"; -- "HEAD" for head error
+                                    state <= s_respond_exception;
+                            end case;
+                        end if;
+                    when s_bus_control_parse_body =>
+                        -- Parse the specific action. Constants defined in bus_protocol
+                        if bsr_i2_reg(5) /= u_TERM then -- Assert end of message
+                            response_err_buf <= x"534e5458"; -- "SNTX" for syntax error
+                            state <= s_respond_exception;
+                        else
+                            case cur_str is
+                                when u_KEYWORD_SETC =>
+                                    bus_cmd_buf(cbus_w - 3 downto 0) <= SET_CORE;
+                                    state <= s_bus_transmit_1;
+                                when u_KEYWORD_RSTC =>
+                                    bus_cmd_buf(cbus_w - 3 downto 0) <= RST_CORE;
+                                    state <= s_bus_transmit_1;
+                                when u_KEYWORD_SETR =>
+                                    bus_cmd_buf(cbus_w - 3 downto 0) <= SET_RAM;
+                                    state <= s_bus_transmit_1;
+                                when u_KEYWORD_RSTR =>
+                                    bus_cmd_buf(cbus_w - 3 downto 0) <= RST_RAM;
+                                    state <= s_bus_transmit_1;
+                                when others =>
+                                    response_err_buf <= x"424f4459"; -- "BODY" for body error
+                                    state <= s_respond_exception;
+                            end case;
+                        end if;
+                    when s_bus_write_parse_body =>
+                        if bsr_i2_reg(5) /= u_SEP and bsr_i2_reg(5) /= u_TERM then
+                            response_err_buf <= x"534e5458"; -- "SNTX" for syntax error
+                            state <= s_respond_exception;
+                        else
+                            case cur_str is
+                                when u_KEYWORD_ADDR =>
+                                    state <= s_bus_write_parse_address;
+                                when u_KEYWORD_DATA =>
+                                    state <= s_bus_write_parse_data;
+                                when u_KEYWORD_MASK =>
+                                    bus_cmd_buf(cbus_w - 3) <= '1'; -- Could cause problems in the future, assuming third MSB indicates whether a mask is added
+                                    state <= s_bus_write_parse_mask;
+                                when u_KEYWORD_HOLD =>
+                                    bus_cmd_buf(0) <= '1'; -- Could cause problems in the future, assuming LSB indicates hold
+                                    if bsr_i2_reg(5) = u_TERM then
+                                        state <= s_bus_transmit_1;
+                                    end if;
+                                when others =>
+                                    response_err_buf <= x"424f4459"; -- "BODY" for body error
+                                    state <= s_respond_exception;
+                            end case;
+                        end if;
+                    when s_bus_write_parse_address =>
+                        if bsr_i2_reg(5) /= u_SEP and bsr_i2_reg(5) /= u_TERM then
+                            response_err_buf <= x"534e5458"; -- "SNTX" for syntax error
+                            state <= s_respond_exception;
+                        else
+                            bus_addr_buf <= cur_str(abus_w - 1 downto 0);
+                            if bsr_i2_reg(5) = u_TERM then
+                                state <= s_bus_transmit_1;
+                            else
+                                state <= s_bus_write_parse_body;
+                            end if;
+                        end if;
+                    when s_bus_write_parse_data =>
+                        if bsr_i2_reg(5) /= u_SEP and bsr_i2_reg(5) /= u_TERM then
+                            response_err_buf <= x"534e5458"; -- "SNTX" for syntax error
+                            state <= s_respond_exception;
+                        else
+                            bus_data_buf <= cur_str(dbus_w - 1 downto 0);
+                            if bsr_i2_reg(5) = u_TERM then
+                                state <= s_bus_transmit_1;
+                            else
+                                state <= s_bus_write_parse_body;
+                            end if;
+                        end if;
+                    when s_bus_write_parse_mask =>
+                        if bsr_i2_reg(5) /= u_SEP and bsr_i2_reg(5) /= u_TERM then
+                            response_err_buf <= x"534e5458"; -- "SNTX" for syntax error
+                            state <= s_respond_exception;
+                        else
+                            bus_mask_buf <= cur_str(dbus_w - 1 downto 0);
+                            if bsr_i2_reg(5) = u_TERM then
+                                state <= s_bus_transmit_1;
+                            else
+                                state <= s_bus_write_parse_body;
+                            end if;
+                        end if;
+                    when s_bus_read_parse_body =>
+                        if bsr_i2_reg(5) /= u_SEP then
+                            response_err_buf <= x"534e5458"; -- "SNTX" for syntax error
+                            state <= s_respond_exception;
+                        else
+                            case cur_str is
+                                when u_KEYWORD_ADDR =>
+                                    state <= s_bus_read_parse_address;
+                                when others =>
+                                    response_err_buf <= x"424f4459"; -- "BODY" for body error
+                                    state <= s_respond_exception;
+                            end case;
+                        end if;
+                    when s_bus_read_parse_address =>
+                        if bsr_i2_reg(5) /= u_SEP and bsr_i2_reg(5) /= u_TERM then
+                            response_err_buf <= x"534e5458"; -- "SNTX" for syntax error
+                            state <= s_respond_exception;
+                        else
+                            bus_addr_buf <= cur_str(abus_w - 1 downto 0);
+                            if bsr_i2_reg(5) = u_TERM then
+                                state <= s_bus_transmit_1;
+                            else
+                                state <= s_bus_read_parse_body;
+                            end if;
+                        end if;
+                    -- Sending bus commands in multiple steps. Refer to bus_protocol for details.
+                    when s_bus_transmit_1 =>
+                        bsr_i2_sl <= '0';
+                        rsp_sel_out <= bus_mod_buf;
+                        mbus_out <= bus_mod_buf;
+                        cbus_out <= bus_cmd_buf;
+                        abus_out <= bus_addr_buf;
+                        dbus_out <= bus_data_buf;
+                        if bus_cmd_buf(cbus_w - 1 downto cbus_w - 3) = WRITE_HEAD & '1' then -- Could cause problems in the future, assuming third MSB indicates whether a mask is added
+                            state <= s_bus_transmit_2;
+                        else
+                            state <= s_bus_listen;
+                        end if;
+                    when s_bus_transmit_2 =>
+                        cbus_out <= (others => '0');
+                        dbus_out <= bus_mask_buf;
+                        state <= s_bus_listen;
+                    when s_bus_listen =>
+                        cbus_out <= (others => '0');
+                        if rsp_stat_in = ROGER then
+                            if bus_cmd_buf(cbus_w - 1 downto cbus_w - 2) = READ_HEAD then
+                                response_data_buf <= rsp_in;
+                                response_data_attached <= '1';
+                            end if;
+                            state <= s_respond_acknowledgement;
+                        end if;
+                    when s_respond_acknowledgement =>
+                        -- Load an acknowledgement message
+                        bsr_i2_sl <= '0';
+                        bsr_o_ren <= '1';
+                        bsr_o_din(0) <= u_INIT;
+                        bsr_o_din(1) <= u_RESPONSE_ACKN(31 downto 24);
+                        bsr_o_din(2) <= u_RESPONSE_ACKN(23 downto 16);
+                        bsr_o_din(3) <= u_RESPONSE_ACKN(15 downto 8);
+                        bsr_o_din(4) <= u_RESPONSE_ACKN(7 downto 0);
+                        if response_data_attached = '1' then
+                            bsr_o_din(5) <= u_SEP;
+                            bsr_o_din(6) <= response_data_buf(31 downto 24);
+                            bsr_o_din(7) <= response_data_buf(23 downto 16);
+                            bsr_o_din(8) <= response_data_buf(15 downto 8);
+                            bsr_o_din(9) <= response_data_buf(7 downto 0);
+                            bsr_o_din(10) <= u_TERM;
+                        else
+                            bsr_o_din(5) <= u_TERM;
+                        end if;
+                        response_data_attached <= '0';
+                        state <= s_send;
+                    when s_respond_exception =>
+                        -- Load an exception message
+                        bsr_i2_sl <= '0';
+                        bsr_o_ren <= '1';
+                        bsr_o_din(0) <= u_INIT;
+                        bsr_o_din(1) <= u_RESPONSE_ERR(31 downto 24);
+                        bsr_o_din(2) <= u_RESPONSE_ERR(23 downto 16);
+                        bsr_o_din(3) <= u_RESPONSE_ERR(15 downto 8);
+                        bsr_o_din(4) <= u_RESPONSE_ERR(7 downto 0);
+                        if response_err_attached = '1' then
+                            bsr_o_din(5) <= u_SEP;
+                            bsr_o_din(6) <= response_err_buf(31 downto 24);
+                            bsr_o_din(7) <= response_err_buf(23 downto 16);
+                            bsr_o_din(8) <= response_err_buf(15 downto 8);
+                            bsr_o_din(9) <= response_err_buf(7 downto 0);
+                            bsr_o_din(10) <= u_TERM;
+                        else
+                            bsr_o_din(5) <= u_TERM;
+                        end if;
+                        state <= s_send;
+                    when s_send =>
+                        -- Send the message loaded in the output shift register
+                        bsr_o_ren <= '0';
+                        if bsr_o_reg(0) = u_TERM then
+                            txen_out <= '0';
+                            bsr_o_sl <= '0';
+                            state <= s_idle;
+                        else
+                            bsr_o_sl <= '1';
+                            txen_out <= '1';
+                        end if;
+                end case;
+            end if;
+        end if;
+    end process;
+
+    -- String matching
+    cur_str <= bsr_i2_reg(1) & bsr_i2_reg(2) & bsr_i2_reg(3) & bsr_i2_reg(4);
+
+    -- Input shift register 1
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            if bsr_i1_rst = '1' then
+                bsr_i1_reg <= (others => (others => '0'));
+            else
+                if bsr_i1_sr = '1' then
+                    for i in bsr_size - 1 downto 1 loop
+                        bsr_i1_reg(i) <= bsr_i1_reg(i - 1);
+                    end loop;
+                    bsr_i1_reg(0) <= bsr_i1_din;
+                elsif bsr_i1_sl = '1' then
+                    for i in 1 to bsr_size - 1 loop
+                        bsr_i1_reg(i - 1) <= bsr_i1_reg(i);
+                    end loop;
+                end if;
+            end if;
+        end if;
+    end process;
+    bsr_i1_din <= rxd_in;
+    bsr_i1_rst <= rst;
+
+    -- Input shift register 2
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            if bsr_i2_rst = '1' then
+                bsr_i2_reg <= (others => (others => '0'));
+            else
+                if bsr_i2_sr = '1' then
+                    for i in bsr_size - 1 downto 1 loop
+                        bsr_i2_reg(i) <= bsr_i2_reg(i - 1);
+                    end loop;
+                    bsr_i2_reg(0) <= bsr_i2_din;
+                elsif bsr_i2_sl = '1' then
+                    for i in 5 to bsr_size - 1 loop 
+                        bsr_i2_reg(i - 5) <= bsr_i2_reg(i); -- read 5 characters at a time
+                    end loop;
+                end if;
+            end if;
+        end if;
+    end process;
+    bsr_i2_din <= bsr_i1_reg(0);
+    bsr_i2_rst <= rst;
+    
+    -- Output shift register
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            if bsr_o_rst = '1' then
+                bsr_o_reg <= (others => (others => '0'));
+            else
+                if bsr_o_ren = '1' then
+                    bsr_o_reg <= bsr_o_din;
+                elsif bsr_o_sl = '1' then
+                    for i in 1 to bsr_size - 1 loop
+                        bsr_o_reg(i - 1) <= bsr_o_reg(i);
+                    end loop;
+                end if;
+            end if;
+        end if;
+    end process;
+    txd_out <= bsr_o_reg(0);
+    bsr_o_rst <= rst;
+end parser;
+
 -- This is a simple architecture that repeats any byte received.
 -- It is used for testing purposes.
+/*
 architecture repeater of central_control is
     type state_type is (idle, hold, receive, transmit, error);
     signal state    :   state_type := idle;
@@ -39,7 +461,7 @@ architecture repeater of central_control is
 
     signal cnt      :   unsigned(2 downto 0) := (others => '0');
 begin
-    process(clk, rst)
+    process(clk)
     begin
         if rising_edge(clk) then
             if rst = '1' then
@@ -111,3 +533,4 @@ begin
         end if;
     end process;
 end architecture repeater;
+*/

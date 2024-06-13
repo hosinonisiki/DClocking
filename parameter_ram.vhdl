@@ -69,6 +69,7 @@ begin
             if rst = '1' then
                 rval_out <= '0';
             else
+                rval_out <= ren_in;
                 if ren_in = '1' then
                     raddr := to_integer(unsigned(raddr_in(abus_w_val - 1 downto 0)));
                     rdata_out <= ram_data(raddr * dbus_w + dbus_w - 1 downto raddr * dbus_w);
@@ -145,6 +146,7 @@ begin
             if rst = '1' then
                 rval_out <= '0';
             else
+                rval_out <= ren_in;
                 if ren_in = '1' then
                     raddr := to_integer(unsigned(raddr_in(abus_w_val - 1 downto 0)));
                     rdata_out <= ram_data(raddr * dbus_w + dbus_w - 1 downto raddr * dbus_w);
@@ -221,6 +223,7 @@ begin
             if rst = '1' then
                 rval_out <= '0';
             else
+                rval_out <= ren_in;
                 if ren_in = '1' then
                     raddr := to_integer(unsigned(raddr_in(abus_w_val - 1 downto 0)));
                     rdata_out <= ram_data(raddr * dbus_w + dbus_w - 1 downto raddr * dbus_w);
@@ -297,6 +300,7 @@ begin
             if rst = '1' then
                 rval_out <= '0';
             else
+                rval_out <= ren_in;
                 if ren_in = '1' then
                     raddr := to_integer(unsigned(raddr_in(abus_w_val - 1 downto 0)));
                     rdata_out <= ram_data(raddr * dbus_w + dbus_w - 1 downto raddr * dbus_w);

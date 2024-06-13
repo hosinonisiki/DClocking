@@ -52,7 +52,7 @@ architecture structural of main_control is
 
     -- Instantiating Vivado IPs in this design.
     component fifo_generator_0
-        PORT(
+        port(
             clk : in std_logic;
             srst : in std_logic;
             din : in std_logic_vector(7 downto 0);
