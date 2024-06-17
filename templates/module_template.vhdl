@@ -26,8 +26,8 @@ entity module_template is
         dbus_in         :   in  std_logic_vector(dbus_w - 1 downto 0);
         abus_in         :   in  std_logic_vector(abus_w - 1 downto 0);
         cbus_in         :   in  std_logic_vector(cbus_w - 1 downto 0);
-        rsp_out         :   out std_logic_vector(rbus_w - 1 downto 0);
-        rsp_stat_out    :   out std_logic_vector(sbus_w - 1 downto 0)
+        rsp_data_out    :   out std_logic_vector(rdbus_w - 1 downto 0);
+        rsp_stat_out    :   out std_logic_vector(rsbus_w - 1 downto 0)
         -- data flow ports
     );
 end entity module_template;
@@ -40,13 +40,13 @@ architecture structural of module_template is
     signal handler_rst      :   std_logic := '1';
 
     signal wdata            :   std_logic_vector(dbus_w - 1 downto 0); -- Data to be written to the ram
-    signal waddr             :   std_logic_vector(abus_w - 1 downto 0); -- Address to write to
+    signal waddr            :   std_logic_vector(abus_w - 1 downto 0); -- Address to write to
     signal wmask            :   std_logic_vector(dbus_w - 1 downto 0); -- Data mask
     signal wval             :   std_logic; -- Valid signal
     signal wen              :   std_logic; -- Write enable signal. The writing process starts as soon as wen is active, but the data is only written once wval is active. 
                                        -- This is to make sure that parameters longer than dbus_w are written simultaneously.
     signal rdata            :   std_logic_vector(dbus_w - 1 downto 0); -- Data read from the ram
-    signal raddr             :   std_logic_vector(abus_w - 1 downto 0); -- Address to read from
+    signal raddr            :   std_logic_vector(abus_w - 1 downto 0); -- Address to read from
     signal rval             :   std_logic; -- Valid signal, active when the data is ready
     signal ren              :   std_logic; -- Read enable signal
 begin
@@ -89,15 +89,15 @@ begin
         dbus_in         =>  dbus_in,
         abus_in         =>  abus_in,
         cbus_in         =>  cbus_in,
-        rsp_out         =>  rsp_out,
+        rsp_data_out    =>  rsp_data_out,
         rsp_stat_out    =>  rsp_stat_out,
         wdata_out       =>  wdata,
-        waddr_out        =>  waddr,
+        waddr_out       =>  waddr,
         wmask_out       =>  wmask,
         wval_out        =>  wval,
         wen_out         =>  wen,
         rdata_in        =>  rdata,
-        raddr_out        =>  raddr,
+        raddr_out       =>  raddr,
         rval_in         =>  rval,
         ren_out         =>  ren,
         ram_rst_out     =>  ram_rst,

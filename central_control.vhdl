@@ -24,8 +24,8 @@ entity central_control is
         txen_out        :   out std_logic;
         txful_in        :   in  std_logic;
         rsp_sel_out     :   out std_logic_vector(mbus_w - 1 downto 0);
-        rsp_in          :   in  std_logic_vector(rbus_w - 1 downto 0);
-        rsp_stat_in     :   in  std_logic_vector(sbus_w - 1 downto 0);
+        rsp_data_in     :   in  std_logic_vector(rdbus_w - 1 downto 0);
+        rsp_stat_in     :   in  std_logic_vector(rsbus_w - 1 downto 0);
         dbus_out        :   out std_logic_vector(dbus_w - 1 downto 0);
         abus_out        :   out std_logic_vector(abus_w - 1 downto 0);
         mbus_out        :   out std_logic_vector(mbus_w - 1 downto 0);
@@ -319,7 +319,7 @@ begin
                         cbus_out <= (others => '0');
                         if rsp_stat_in = ROGER then
                             if bus_cmd_buf(cbus_w - 1 downto cbus_w - 2) = READ_HEAD then
-                                response_data_buf <= rsp_in;
+                                response_data_buf <= rsp_data_in;
                                 response_data_attached <= '1';
                             end if;
                             state <= s_respond_acknowledgement;

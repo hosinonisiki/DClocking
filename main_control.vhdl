@@ -21,8 +21,8 @@ entity main_control is
         mbus_out        :   out std_logic_vector(mbus_w - 1 downto 0);
         cbus_out        :   out std_logic_vector(cbus_w - 1 downto 0);
         rsp_sel_out     :   out std_logic_vector(mbus_w - 1 downto 0);
-        rsp_in          :   in  std_logic_vector(rbus_w - 1 downto 0);
-        rsp_stat_in     :   in  std_logic_vector(sbus_w - 1 downto 0)
+        rsp_data_in     :   in  std_logic_vector(rdbus_w - 1 downto 0);
+        rsp_stat_in     :   in  std_logic_vector(rsbus_w - 1 downto 0)
     );
 end entity main_control;
 
@@ -128,7 +128,7 @@ begin
         txen_out    =>  tx_wen,
         txful_in    =>  tx_full,
         rsp_sel_out =>  rsp_sel_out,
-        rsp_in      =>  rsp_in,
+        rsp_data_in =>  rsp_data_in,
         rsp_stat_in =>  rsp_stat_in,
         dbus_out    =>  dbus_out,
         abus_out    =>  abus_out,

@@ -15,16 +15,16 @@ entity response_mux is
         channel_count   :   integer
     );
     port(
-        rbus_in         :   in  rbus_type;
-        sbus_in         :   in  sbus_type;
+        rdbus_in        :   in  rdbus_type;
+        rsbus_in        :   in  rsbus_type;
         rsp_sel_in      :   in  std_logic_vector(mbus_w - 1 downto 0);
-        rsp_out         :   out std_logic_vector(rbus_w - 1 downto 0);
-        rsp_stat_out    :   out std_logic_vector(sbus_w - 1 downto 0)
+        rsp_data_out    :   out std_logic_vector(rdbus_w - 1 downto 0);
+        rsp_stat_out    :   out std_logic_vector(rsbus_w - 1 downto 0)
     );
 end entity response_mux;
 
 architecture behavioral of response_mux is
 begin
-    rsp_out         <= rbus_in(to_integer(unsigned(rsp_sel_in))) when unsigned(rsp_sel_in) <= to_unsigned(channel_count, mbus_w) else (others => '0');
-    rsp_stat_out    <= sbus_in(to_integer(unsigned(rsp_sel_in))) when unsigned(rsp_sel_in) <= to_unsigned(channel_count, mbus_w) else (others => '0');
+    rsp_data_out    <= rdbus_in(to_integer(unsigned(rsp_sel_in))) when unsigned(rsp_sel_in) <= to_unsigned(channel_count, mbus_w) else (others => '0');
+    rsp_stat_out    <= rsbus_in(to_integer(unsigned(rsp_sel_in))) when unsigned(rsp_sel_in) <= to_unsigned(channel_count, mbus_w) else (others => '0');
 end architecture behavioral;

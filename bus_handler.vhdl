@@ -18,8 +18,8 @@ entity bus_handler is
         dbus_in         :   in  std_logic_vector(dbus_w - 1 downto 0);
         abus_in         :   in  std_logic_vector(abus_w - 1 downto 0);
         cbus_in         :   in  std_logic_vector(cbus_w - 1 downto 0);
-        rsp_out         :   out std_logic_vector(rbus_w - 1 downto 0);
-        rsp_stat_out    :   out std_logic_vector(sbus_w - 1 downto 0);
+        rsp_data_out    :   out std_logic_vector(rdbus_w - 1 downto 0);
+        rsp_stat_out    :   out std_logic_vector(rsbus_w - 1 downto 0);
         wdata_out       :   out std_logic_vector(dbus_w - 1 downto 0);
         waddr_out       :   out std_logic_vector(abus_w - 1 downto 0);
         wmask_out       :   out std_logic_vector(dbus_w - 1 downto 0);
@@ -172,7 +172,7 @@ begin
                     -- All writes that currently exist only take one cycle to complete
                     rsp_stat_out <= ROGER;
                 when s_wait_response =>
-                    rsp_out <= rdata_in;
+                    rsp_data_out <= rdata_in;
                     if rval_in = '1' then
                         rsp_stat_out <= ROGER;
                     end if;

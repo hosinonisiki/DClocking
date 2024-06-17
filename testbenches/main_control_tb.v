@@ -4,7 +4,7 @@ module main_control_tb;
     reg clk, rst;
 
     reg rxd;
-    reg [31:0] rsp;
+    reg [31:0] rsp_data;
     reg [2:0] rsp_stat;
 
     wire txd;
@@ -22,7 +22,7 @@ module main_control_tb;
         .abus_out(abus),
         .mbus_out(mbus),
         .cbus_out(cbus),
-        .rsp_in(rsp),
+        .rsp_data_in(rsp_data),
         .rsp_stat_in(rsp_stat)
     );
 

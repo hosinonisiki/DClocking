@@ -13,8 +13,8 @@ package mypak is
     constant abus_w     :   integer := 5; -- Width of the address bus. This determines the size of individual memories in each module.
     constant mbus_w     :   integer := 5; -- Width of the module selection bus. This determines the max number of modules that can be connected to the bus.
     constant cbus_w     :   integer := 5; -- Width of the control bus.
-    constant rbus_w     :   integer := 32; -- Width of the response bus.
-    constant sbus_w     :   integer := 3; -- Width of the response status bus.
+    constant rdbus_w    :   integer := 32; -- Width of the response data bus.
+    constant rsbus_w    :   integer := 3; -- Width of the response status bus.
     constant core_param_size : integer := 2 ** abus_w * dbus_w; -- Upper limit of ram size for each module.
 
     constant log_dbus_w :   integer := 5; -- Log2 of the data bus width.
@@ -22,8 +22,8 @@ package mypak is
     constant module_count   : integer := 1; -- Number of modules connected to the bus.
     constant ROUT_ADDR      : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(1, mbus_w)); -- Address of the router module.
 
-    type rbus_type is array(0 to module_count) of std_logic_vector(rbus_w - 1 downto 0); -- 0 is reserved for no module.
-    type sbus_type is array(0 to module_count) of std_logic_vector(sbus_w - 1 downto 0);
+    type rdbus_type is array(0 to module_count) of std_logic_vector(rdbus_w - 1 downto 0); -- 0 is reserved for no module.
+    type rsbus_type is array(0 to module_count) of std_logic_vector(rsbus_w - 1 downto 0);
 
     constant clk_freq       :   integer := 200_000_000; -- Clock frequency in Hz.
     constant baudrate       :   integer := 57600; -- Baudrate for the UART.

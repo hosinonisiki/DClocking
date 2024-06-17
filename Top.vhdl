@@ -62,12 +62,12 @@ architecture structural of top is
     signal mbus         :   std_logic_vector(mbus_w - 1 downto 0) := (others => '0'); -- module selection bus, x"00" refers to no module selected
     signal cbus         :   std_logic_vector(cbus_w - 1 downto 0) := (others => '0'); -- control bus
 
-    signal rbus         :   rbus_type := (others => (others => '0')); -- response bus
-    signal sbus         :   sbus_type := (others => (others => '0')); -- response status bus
+    signal rdbus        :   rdbus_type := (others => (others => '0')); -- response data bus
+    signal rsbus        :   rsbus_type := (others => (others => '0')); -- response status bus
 
     signal rsp_sel      :   std_logic_vector(mbus_w - 1 downto 0) := (others => '0'); -- response select
-    signal rsp          :   std_logic_vector(rbus_w - 1 downto 0) := (others => '0'); -- response from sub modules
-    signal rsp_stat     :   std_logic_vector(sbus_w - 1 downto 0) := (others => '0'); -- response status from sub modules
+    signal rsp_data     :   std_logic_vector(rdbus_w - 1 downto 0) := (others => '0'); -- response data from sub modules
+    signal rsp_stat     :   std_logic_vector(rsbus_w - 1 downto 0) := (others => '0'); -- response status from sub modules
 
     signal adc_0        :   std_logic_vector(11 downto 0) := "000000000000";
     signal adc_1        :   std_logic_vector(11 downto 0) := "000000000000";
@@ -95,7 +95,7 @@ begin
         cbus_out        =>  cbus,
 
         rsp_sel_out     =>  rsp_sel,
-        rsp_in          =>  rsp,
+        rsp_data_in     =>  rsp_data,
         rsp_stat_in     =>  rsp_stat
     );
     mc_rst <= rst;
@@ -103,10 +103,10 @@ begin
     response_mux : entity work.response_mux generic map(
         channel_count   =>  module_count   
     )port map(
-        rbus_in         =>  rbus,
-        sbus_in         =>  sbus,
+        rdbus_in        =>  rdbus,
+        rsbus_in        =>  rsbus,
         rsp_sel_in      =>  rsp_sel,
-        rsp_out         =>  rsp,
+        rsp_data_out    =>  rsp_data,
         rsp_stat_out    =>  rsp_stat
     );
 
@@ -129,8 +129,8 @@ begin
             dbus_in         =>  dbus,
             abus_in         =>  abus,
             cbus_in         =>  cbus,
-            rsp_out         =>  rbus(1),
-            rsp_stat_out    =>  sbus(1),
+            rsp_data_out    =>  rdbus(1),
+            rsp_stat_out    =>  rsbus(1),
             
             sig_in          =>  sig_bank_in,
             sig_out         =>  sig_bank_out
