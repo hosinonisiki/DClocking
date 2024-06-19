@@ -47,5 +47,5 @@ package bus_protocol is
     constant READ : std_logic_vector(cbus_w - 3 downto 0) := "000"; -- Read from ADDRESS
 
     -- reply signals from slave to master
-    constant ROGER : std_logic_vector(sbus_w - 1 downto 0) := "001"; -- Acknowledge that the command was implemented
+    constant ROGER : std_logic_vector(rsbus_w - 1 downto 0) := "001"; -- Acknowledge that the command was implemented
 end package bus_protocol;

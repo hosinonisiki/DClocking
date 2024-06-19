@@ -16,6 +16,10 @@ entity main_control is
         rst             :   in  std_logic;
         txd_out         :   out std_logic;
         rxd_in          :   in  std_logic;
+        mosi_out        :   out std_logic;
+        miso_in         :   in  std_logic;
+        sclk_out        :   out std_logic;
+        ss_out          :   out std_logic_vector(15 downto 0);
         dbus_out        :   out std_logic_vector(dbus_w - 1 downto 0);
         abus_out        :   out std_logic_vector(abus_w - 1 downto 0);
         mbus_out        :   out std_logic_vector(mbus_w - 1 downto 0);
@@ -47,6 +51,14 @@ architecture structural of main_control is
     signal tx_notemp    :   std_logic;
     signal txd          :   std_logic_vector(7 downto 0); -- Data sent to transmitter
     signal tx_char      :   std_logic_vector(7 downto 0); -- Data read from control logic and sent to fifo
+
+    signal spi_rst      :   std_logic;
+    signal spi_ss_bin   :   std_logic_vector(3 downto 0); -- Binary spi ss signal
+    signal spi_en       :   std_logic;
+    signal spi_txd      :   std_logic_vector(31 downto 0);
+    signal spi_rxd      :   std_logic_vector(31 downto 0);
+    signal spi_val      :   std_logic;
+    signal spi_idle     :   std_logic;
 
     signal cc_rst       :   std_logic;
 
@@ -118,6 +130,26 @@ begin
     );
     tx_fifo_rst <= rst;
 
+    spi_trx : entity work.spi_trx generic map(
+        cpol => '0',
+        cpha => '0'
+    )port map(
+        clk         =>  clk,
+        rst         =>  spi_rst,
+        spi_en_in   =>  spi_en,
+        ss_in       =>  spi_ss_bin,
+        ss_out      =>  ss_out,
+        mosi        =>  mosi_out,
+        miso        =>  miso_in,
+        sclk_out    =>  sclk_out,
+        width       =>  "01111", -- held fix for now
+        din         =>  spi_txd,
+        dout        =>  spi_rxd,
+        dval_out    =>  spi_val,
+        idle_out    =>  spi_idle
+    );
+    spi_rst <= rst;
+
     central_control : entity work.central_control port map(
         clk         =>  clk,
         rst         =>  cc_rst,
@@ -127,6 +159,11 @@ begin
         txd_out     =>  tx_char,
         txen_out    =>  tx_wen,
         txful_in    =>  tx_full,
+        spi_ss_out  =>  spi_ss_bin,
+        spi_en_out  =>  spi_en,
+        spi_txd_out =>  spi_txd,
+        spi_rxd_in  =>  spi_rxd,
+        spi_val_in  =>  spi_val,
         rsp_sel_out =>  rsp_sel_out,
         rsp_data_in =>  rsp_data_in,
         rsp_stat_in =>  rsp_stat_in,

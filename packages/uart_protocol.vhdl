@@ -18,14 +18,16 @@ package uart_protocol is
     -- Each message sent from the PC to the FPGA is composed of several segments
     -- Each segment is composed of exactly 4 bytes
     -- Example:
-    -- :SPI_.DAC1.WRTE.ADDR.<4B data>.DATA.<4B data>.MASK<4B data>!
+    -- :SPI_.DAC1.<4B data>!
     -- :BUS_.ROUT.WRTE.ADDR.<4B data>.DATA.<4B data>.HOLD!
     -- :BUS_.ROUT.READ.ADDR.<4B data>.BYTE.<4B data>!
     -- :ACKN.<4B data>!
     -- :ERR_!
 
     constant u_SPACE_SPI    : std_logic_vector(31 downto 0) := x"5350495f"; -- ASCII 'SPI_'
-    constant u_DEVICE_DAC1  : std_logic_vector(31 downto 0) := x"44414331"; -- ASCII 'DAC1'
+        constant u_DEVICE_DAC1  : std_logic_vector(31 downto 0) := x"44414331"; -- ASCII 'DAC1'
+        constant u_DEVICE_DAC2  : std_logic_vector(31 downto 0) := x"44414332"; -- ASCII 'DAC2'
+        constant u_DEVICE_CLK1  : std_logic_vector(31 downto 0) := x"434c4b31"; -- ASCII 'CLK1'
 
     constant u_SPACE_BUS    : std_logic_vector(31 downto 0) := x"4255535f"; -- ASCII 'BUS_'
         constant u_DEVICE_ROUT  : std_logic_vector(31 downto 0) := x"524f5554"; -- ASCII 'ROUT'

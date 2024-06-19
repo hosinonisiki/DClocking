@@ -38,15 +38,20 @@ entity top is
         txd         :   out std_logic;
         rxd         :   in  std_logic;
 
-        adc_in_0    :   in  std_logic_vector(11 downto 0);
-        adc_in_1    :   in  std_logic_vector(11 downto 0);
-        adc_in_2    :   in  std_logic_vector(11 downto 0);
-        adc_in_3    :   in  std_logic_vector(11 downto 0);
+        mosi        :   out std_logic;
+        miso        :   in  std_logic;
+        sclk        :   out std_logic;
+        ss          :   out std_logic_vector(15 downto 0);
 
-        dac_out_0   :   out std_logic_vector(13 downto 0);
-        dac_out_1   :   out std_logic_vector(13 downto 0);
-        dac_out_2   :   out std_logic_vector(13 downto 0);
-        dac_out_3   :   out std_logic_vector(13 downto 0)
+        adc_in_a    :   in  std_logic_vector(11 downto 0);
+        adc_in_b    :   in  std_logic_vector(11 downto 0);
+        adc_in_c    :   in  std_logic_vector(11 downto 0);
+        adc_in_d    :   in  std_logic_vector(11 downto 0);
+
+        dac_out_a   :   out std_logic_vector(13 downto 0);
+        dac_out_b   :   out std_logic_vector(13 downto 0);
+        dac_out_c   :   out std_logic_vector(13 downto 0);
+        dac_out_d   :   out std_logic_vector(13 downto 0)
     );
     attribute dont_touch : string;
     attribute dont_touch of top : entity is "true";
@@ -69,15 +74,15 @@ architecture structural of top is
     signal rsp_data     :   std_logic_vector(rdbus_w - 1 downto 0) := (others => '0'); -- response data from sub modules
     signal rsp_stat     :   std_logic_vector(rsbus_w - 1 downto 0) := (others => '0'); -- response status from sub modules
 
-    signal adc_0        :   std_logic_vector(11 downto 0) := "000000000000";
-    signal adc_1        :   std_logic_vector(11 downto 0) := "000000000000";
-    signal adc_2        :   std_logic_vector(11 downto 0) := "000000000000";
-    signal adc_3        :   std_logic_vector(11 downto 0) := "000000000000";
+    signal adc_a        :   std_logic_vector(11 downto 0) := "000000000000";
+    signal adc_b        :   std_logic_vector(11 downto 0) := "000000000000";
+    signal adc_c        :   std_logic_vector(11 downto 0) := "000000000000";
+    signal adc_d        :   std_logic_vector(11 downto 0) := "000000000000";
 
-    signal dac_0        :   std_logic_vector(13 downto 0) := "00000000000000";
-    signal dac_1        :   std_logic_vector(13 downto 0) := "00000000000000";
-    signal dac_2        :   std_logic_vector(13 downto 0) := "00000000000000";
-    signal dac_3        :   std_logic_vector(13 downto 0) := "00000000000000";
+    signal dac_a        :   std_logic_vector(13 downto 0) := "00000000000000";
+    signal dac_b        :   std_logic_vector(13 downto 0) := "00000000000000";
+    signal dac_c        :   std_logic_vector(13 downto 0) := "00000000000000";
+    signal dac_d        :   std_logic_vector(13 downto 0) := "00000000000000";
 
     signal sig_bank_in  :   signal_array(63 downto 0);
     signal sig_bank_out :   signal_array(63 downto 0);
@@ -89,6 +94,12 @@ begin
         rst             =>  mc_rst,
         txd_out         =>  txd,
         rxd_in          =>  rxd,
+
+        mosi_out        =>  mosi,
+        miso_in         =>  miso,
+        sclk_out        =>  sclk,
+        ss_out          =>  ss,
+
         dbus_out        =>  dbus,
         abus_out        =>  abus,
         mbus_out        =>  mbus,
@@ -121,7 +132,7 @@ begin
     module_1_block : block
         signal bus_en       :   std_logic;
     begin
-        bus_en <= '1' when mbus = ROUT_ADDR else '0'; -- constant defined in mypak
+        bus_en <= '1' when mbus = BUS_ROUT_ADDR else '0'; -- constant defined in mypak
         module_1 : entity work.module_signal_router port map(
             clk             =>  clk,
             rst             =>  mod_rst(1),
@@ -138,30 +149,30 @@ begin
     end block module_1_block;
     
     -- signal banks provided by the router
-    sig_bank_in <= (0 => x"0" & adc_0,
-                    1 => x"0" & adc_1,
-                    2 => x"0" & adc_2,
-                    3 => x"0" & adc_3,
+    sig_bank_in <= (0 => x"0" & adc_a,
+                    1 => x"0" & adc_b,
+                    2 => x"0" & adc_c,
+                    3 => x"0" & adc_d,
                     others => (others => '0'));
 
-    dac_0 <= sig_bank_out(0)(13 downto 0);
-    dac_1 <= sig_bank_out(1)(13 downto 0);
-    dac_2 <= sig_bank_out(2)(13 downto 0);
-    dac_3 <= sig_bank_out(3)(13 downto 0);
+    dac_a <= sig_bank_out(0)(13 downto 0);
+    dac_b <= sig_bank_out(1)(13 downto 0);
+    dac_c <= sig_bank_out(2)(13 downto 0);
+    dac_d <= sig_bank_out(3)(13 downto 0);
 
     -- analog front
     process(clk)
     begin
         if rising_edge(clk) then
-            adc_0 <= adc_in_0;
-            adc_1 <= adc_in_1;
-            adc_2 <= adc_in_2;
-            adc_3 <= adc_in_3;
+            adc_a <= adc_in_a;
+            adc_b <= adc_in_b;
+            adc_c <= adc_in_c;
+            adc_d <= adc_in_d;
 
-            dac_out_0 <= dac_0;
-            dac_out_1 <= dac_1;
-            dac_out_2 <= dac_2;
-            dac_out_3 <= dac_3;
+            dac_out_a <= dac_a;
+            dac_out_b <= dac_b;
+            dac_out_c <= dac_c;
+            dac_out_d <= dac_d;
         end if;
     end process;
     

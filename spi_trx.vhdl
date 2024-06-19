@@ -21,8 +21,9 @@ entity spi_trx is
         mosi        :   out std_logic; -- Master out slave in
         miso        :   in  std_logic; -- Master in slave out
         sclk_out    :   out std_logic; -- SPI clock
-        din         :   in  std_logic_vector(7 downto 0); -- Data to be transmitted
-        dout        :   out std_logic_vector(7 downto 0); -- Received data
+        width       :   in  std_logic_vector(4 downto 0); -- Data width, 0-31 corresponds to 1-32 bits
+        din         :   in  std_logic_vector(31 downto 0); -- Data to be transmitted
+        dout        :   out std_logic_vector(31 downto 0); -- Received data
         dval_out    :   out std_logic; -- Data valid indicated with a high pulse
         idle_out    :   out std_logic -- SPI idle
     );
@@ -37,11 +38,11 @@ architecture behavioral of spi_trx is
 
     signal sclk         : std_logic; -- SPI clock
     signal cycle_cnt    : unsigned(7 downto 0); -- Counts for when to flip sclk
-    signal bit_cnt      : unsigned(2 downto 0); -- Counts for how many bits have been transmitted
+    signal bit_cnt      : unsigned(4 downto 0); -- Counts for how many bits have been transmitted
     signal sclk_edge    : std_logic; -- Indicates if sclk is at an edge
     signal sample_edge  : std_logic; -- Indicates if the coming edge is a sample edge
     
-    signal sr           : std_logic_vector(7 downto 0); -- Shift register, MSB first
+    signal sr           : std_logic_vector(31 downto 0); -- Shift register, MSB first
     signal sr_din       : std_logic; -- Bit in
 begin
     -- FSM
@@ -59,7 +60,7 @@ begin
                     when s_load =>
                         state <= s_transmit;
                     when s_transmit =>
-                        if sclk_edge = '1' and bit_cnt = "000" and sclk /= cpol then
+                        if sclk_edge = '1' and bit_cnt = "00000" and sclk /= cpol then
                             state <= s_end;
                         end if;
                     when s_end =>
@@ -107,10 +108,14 @@ begin
         if rising_edge(clk) then
             if state = s_transmit then
                 if sclk_edge = '1' and sclk = cpol then
-                    bit_cnt <= bit_cnt + "001";
+                    if bit_cnt = unsigned(width) then
+                        bit_cnt <= "00000";
+                    else
+                        bit_cnt <= bit_cnt + "00001";
+                    end if;
                 end if;
             else
-                bit_cnt <= "000";
+                bit_cnt <= "00000";
             end if;
         end if;
     end process;
@@ -136,12 +141,12 @@ begin
                 when s_load =>
                     sr <= din;
                 when s_transmit =>
-                    if sclk_edge = '1' and sample_edge = '0' and bit_cnt /= "000" then
-                        sr <= sr(6 downto 0) & sr_din;
+                    if sclk_edge = '1' and sample_edge = '0' and bit_cnt /= "00000" then
+                        sr <= sr(30 downto 0) & sr_din;
                     end if;
                 when s_end =>
                     if sclk_edge = '1' then
-                        sr <= sr(6 downto 0) & sr_din;
+                        sr <= sr(30 downto 0) & sr_din;
                     end if;
                 when others =>
             end case;
@@ -151,7 +156,7 @@ begin
     sclk_edge <= '1' when cycle_cnt = half_clk_period + x"FF" else '0';
     sample_edge <= not cpol xor cpha xor sclk;
 
-    mosi <= sr(7);
+    mosi <= sr(31);
     dout <= sr;
     sclk_out <= sclk;
     idle_out <= '1' when state = s_idle else '0';

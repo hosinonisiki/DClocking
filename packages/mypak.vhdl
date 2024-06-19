@@ -20,7 +20,12 @@ package mypak is
     constant log_dbus_w :   integer := 5; -- Log2 of the data bus width.
 
     constant module_count   : integer := 1; -- Number of modules connected to the bus.
-    constant ROUT_ADDR      : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(1, mbus_w)); -- Address of the router module.
+    constant BUS_ROUT_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(1, mbus_w)); -- Address of the router module.
+
+    -- Used in wrapper and central_control
+    constant SPI_DAC1_ADDR      : integer := 0; -- Address of chip DAC1, responsible for dac channel A and B.
+    constant SPI_DAC2_ADDR      : integer := 1; -- Address of chip DAC2, responsible for dac channel C and D.
+    constant SPI_CLK1_ADDR      : integer := 2; -- Address of chip CLK1, providing clocks for DAC1 and DAC2.
 
     type rdbus_type is array(0 to module_count) of std_logic_vector(rdbus_w - 1 downto 0); -- 0 is reserved for no module.
     type rsbus_type is array(0 to module_count) of std_logic_vector(rsbus_w - 1 downto 0);
