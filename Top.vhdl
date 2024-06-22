@@ -147,14 +147,53 @@ begin
             sig_out         =>  sig_bank_out
         );
     end block module_1_block;
-    
+
+    module_2_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_TRIG_ADDR else '0'; -- constant defined in mypak
+        module_2 : entity work.module_trigonometric port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(2),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(2),
+            rsp_stat_out    =>  rsbus(2),
+            
+            phase_in        =>  sig_bank_out(4),
+            sin_out         =>  sig_bank_in(0),
+            cos_out         =>  sig_bank_in(1)
+        );
+    end block module_2_block;
+
+    module_3_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_ACCM_ADDR else '0'; -- constant defined in mypak
+        module_3 : entity work.module_accumulator port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(3),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(3),
+            rsp_stat_out    =>  rsbus(3),
+            
+            acc_out         =>  sig_bank_in(4)
+        );
+    end block module_3_block;
+
     -- signal banks provided by the router
+    /*
     sig_bank_in <= (0 => x"0" & adc_a,
                     1 => x"0" & adc_b,
                     2 => x"0" & adc_c,
                     3 => x"0" & adc_d,
                     others => (others => '0'));
-
+    */
     dac_a <= sig_bank_out(0)(13 downto 0);
     dac_b <= sig_bank_out(1)(13 downto 0);
     dac_c <= sig_bank_out(2)(13 downto 0);

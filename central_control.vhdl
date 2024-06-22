@@ -25,6 +25,7 @@ entity central_control is
         txful_in        :   in  std_logic;
         spi_ss_out      :   out std_logic_vector(3 downto 0);
         spi_en_out      :   out std_logic;
+        spi_width_out   :   out std_logic_vector(4 downto 0);
         spi_txd_out     :   out std_logic_vector(31 downto 0);
         spi_rxd_in      :   in  std_logic_vector(31 downto 0);
         spi_val_in      :   in  std_logic;
@@ -40,7 +41,7 @@ end entity central_control;
 
 architecture parser of central_control is
     type state_type is (s_idle, s_fetch, s_receive, s_flip, s_parse_space, s_spi_parse_device,
-                        s_spi_parse_data, s_spi_transmit, s_spi_listen,
+                        s_spi_parse_data, s_spi_parse_width, s_spi_transmit, s_spi_listen,
                         s_bus_parse_device, s_bus_parse_head, s_bus_control_parse_body,
                         s_bus_write_parse_body, s_bus_write_parse_address,
                         s_bus_write_parse_data, s_bus_write_parse_mask,
@@ -64,8 +65,9 @@ architecture parser of central_control is
     signal bus_mask_buf : std_logic_vector(dbus_w - 1 downto 0); -- Buffer for bus mask
 
     -- Buffers for spi commands
-    signal spi_ss_buf   : std_logic_vector(3 downto 0); -- Buffer for spi slave select
-    signal spi_data_buf : std_logic_vector(31 downto 0); -- Buffer for spi data
+    signal spi_ss_buf       : std_logic_vector(3 downto 0); -- Buffer for spi slave select
+    signal spi_width_buf    : std_logic_vector(4 downto 0); -- Buffer for spi width
+    signal spi_data_buf     : std_logic_vector(31 downto 0); -- Buffer for spi data
 
     constant bsr_size   : integer := 64; -- Size of the bidirectional shift registers
     type bsr_type is array(0 to bsr_size - 1) of std_logic_vector(7 downto 0);
@@ -168,17 +170,26 @@ begin
                             case cur_str is
                                 when u_DEVICE_DAC1 =>
                                     spi_ss_buf <= std_logic_vector(to_unsigned(SPI_DAC1_ADDR, 4));
-                                    state <= s_spi_parse_data;
+                                    state <= s_spi_parse_width;
                                 when u_DEVICE_DAC2 =>
                                     spi_ss_buf <= std_logic_vector(to_unsigned(SPI_DAC2_ADDR, 4));
-                                    state <= s_spi_parse_data;
+                                    state <= s_spi_parse_width;
                                 when u_DEVICE_CLK1 =>
                                     spi_ss_buf <= std_logic_vector(to_unsigned(SPI_CLK1_ADDR, 4));
-                                    state <= s_spi_parse_data;
+                                    state <= s_spi_parse_width;
                                 when others =>
                                     response_err_buf <= x"44564345"; -- "DVCE" for device error
                                     state <= s_respond_exception;
                             end case;
+                        end if;
+                    when s_spi_parse_width =>
+                        -- Parse the width
+                        if bsr_i2_reg(5) /= u_SEP then
+                            response_err_buf <= x"534e5458"; -- "SNTX" for syntax error
+                            state <= s_respond_exception;
+                        else
+                            spi_width_buf <= cur_str(4 downto 0);
+                            state <= s_spi_parse_data;
                         end if;
                     when s_spi_parse_data =>
                         -- Parse the data. No need to specify whether it is a reading or writing operation cuz spi is full duplex
@@ -193,6 +204,7 @@ begin
                         bsr_i2_sl <= '0';
                         spi_en_out <= '1';
                         spi_ss_out <= spi_ss_buf;
+                        spi_width_out <= spi_width_buf;
                         spi_txd_out <= spi_data_buf;
                         state <= s_spi_listen;
                     when s_spi_listen =>
@@ -211,6 +223,12 @@ begin
                             case cur_str is
                                 when u_DEVICE_ROUT =>
                                     bus_mod_buf <= BUS_ROUT_ADDR;
+                                    state <= s_bus_parse_head;
+                                when u_DEVICE_TRIG =>
+                                    bus_mod_buf <= BUS_TRIG_ADDR;
+                                    state <= s_bus_parse_head;
+                                when u_DEVICE_ACCM =>
+                                    bus_mod_buf <= BUS_ACCM_ADDR;
                                     state <= s_bus_parse_head;
                                 when others =>
                                     response_err_buf <= x"44564345"; -- "DVCE" for device error

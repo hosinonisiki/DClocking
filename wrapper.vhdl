@@ -55,6 +55,7 @@ end entity wrapper;
 
 architecture peripheral_wrapper of wrapper is
     signal sys_clk : std_logic;
+    signal sys_clk_buf : std_logic;
     signal sys_rst : std_logic;
     signal sys_rst_bar : std_logic;
 
@@ -95,7 +96,9 @@ architecture peripheral_wrapper of wrapper is
     signal dac_c_d_dci_n_h : std_logic;
     signal dac_c_d_dci_n_l : std_logic;
     signal dac_a_b_dco : std_logic;
+    signal dac_a_b_dco_buf : std_logic;
     signal dac_c_d_dco : std_logic;
+    signal dac_c_d_dco_buf : std_logic;
     signal dac_a_b_spi_ss : std_logic;
     signal dac_c_d_spi_ss : std_logic;
     signal dac_clk_spi_ss : std_logic;
@@ -140,10 +143,10 @@ begin
     -- leds
     led_1 <= not uart_rxd; -- detects input bit flow
     led_2 <= not uart_txd; -- detects output bit flow
-    led_3 <= '1'; -- detects if the system is running
-    led_4 <= sys_rst_bar; -- detects if the system is reset
-    panel_led_1 <= '1';
-    panel_led_2 <= '0';
+    led_3 <= spi_sclk; -- detects spi clock
+    led_4 <= not (and spi_ss); -- detects if any spi chip is selected
+    panel_led_1 <= '1'; -- detects if the system is running
+    panel_led_2 <= sys_rst_bar; -- detects if the system is reset
 
     -- Interface to FL9781
     -- Align data transferred with lvds data clock
@@ -176,9 +179,13 @@ begin
     -- IO buffers
     -- clk
     sys_clk_ibufds : IBUFDS port map(
-        O => sys_clk,
+        O => sys_clk_buf,
         I => sys_clk_p,
         IB => sys_clk_n
+    );
+    sys_clk_bufg : BUFG port map(
+        O => sys_clk,
+        I => sys_clk_buf
     );
 
     --rst
@@ -214,17 +221,17 @@ begin
         I => panel_led_2
     );
 
-    -- FL9781
+    -- FL9781, using dco returned from the chip to clock out data
     dac_a_b_dci_p_oddre1 : ODDRE1 port map(
         Q => dac_a_b_dci_p_ddr_o,
-        C => sys_clk,
+        C => dac_a_b_dco,
         D1 => dac_a_b_dci_p_h,
         D2 => dac_a_b_dci_p_l,
         SR => sys_rst_bar
     );
     dac_a_b_dci_n_oddre1 : ODDRE1 port map(
         Q => dac_a_b_dci_n_ddr_o,
-        C => sys_clk,
+        C => dac_a_b_dco,
         D1 => dac_a_b_dci_n_h,
         D2 => dac_a_b_dci_n_l,
         SR => sys_rst_bar
@@ -232,7 +239,7 @@ begin
     dac_a_b_data_p_oddre1_gen : for i in 0 to 13 generate
         dac_a_b_data_p_oddre1 : ODDRE1 port map(
             Q => dac_a_b_data_p_ddr_o(i),
-            C => sys_clk,
+            C => dac_a_b_dco,
             D1 => dac_a_b_data_p_h(i),
             D2 => dac_a_b_data_p_l(i),
             SR => sys_rst_bar
@@ -241,7 +248,7 @@ begin
     dac_a_b_data_n_oddre1_gen : for i in 0 to 13 generate
         dac_a_b_data_n_oddre1 : ODDRE1 port map(
             Q => dac_a_b_data_n_ddr_o(i),
-            C => sys_clk,
+            C => dac_a_b_dco,
             D1 => dac_a_b_data_n_h(i),
             D2 => dac_a_b_data_n_l(i),
             SR => sys_rst_bar
@@ -249,14 +256,14 @@ begin
     end generate dac_a_b_data_n_oddre1_gen;
     dac_c_d_dci_p_oddre1 : ODDRE1 port map(
         Q => dac_c_d_dci_p_ddr_o,
-        C => sys_clk,
+        C => dac_c_d_dco,
         D1 => dac_c_d_dci_p_h,
         D2 => dac_c_d_dci_p_l,
         SR => sys_rst_bar
     );
     dac_c_d_dci_n_oddre1 : ODDRE1 port map(
         Q => dac_c_d_dci_n_ddr_o,
-        C => sys_clk,
+        C => dac_c_d_dco,
         D1 => dac_c_d_dci_n_h,
         D2 => dac_c_d_dci_n_l,
         SR => sys_rst_bar
@@ -264,7 +271,7 @@ begin
     dac_c_d_data_p_oddre1_gen : for i in 0 to 13 generate
         dac_c_d_data_p_oddre1 : ODDRE1 port map(
             Q => dac_c_d_data_p_ddr_o(i),
-            C => sys_clk,
+            C => dac_c_d_dco,
             D1 => dac_c_d_data_p_h(i),
             D2 => dac_c_d_data_p_l(i),
             SR => sys_rst_bar
@@ -273,7 +280,7 @@ begin
     dac_c_d_data_n_oddre1_gen : for i in 0 to 13 generate
         dac_c_d_data_n_oddre1 : ODDRE1 port map(
             Q => dac_c_d_data_n_ddr_o(i),
-            C => sys_clk,
+            C => dac_c_d_dco,
             D1 => dac_c_d_data_n_h(i),
             D2 => dac_c_d_data_n_l(i),
             SR => sys_rst_bar
@@ -304,14 +311,22 @@ begin
         I => dac_eeprom_iic_scl
     );
     dac_a_b_dco_ibufds : IBUFDS port map(
-        O => dac_a_b_dco,
+        O => dac_a_b_dco_buf,
         I => dac_a_b_dco_p_i,
         IB => dac_a_b_dco_n_i
     );
+    dac_a_b_dco_bufg : BUFG port map(
+        O => dac_a_b_dco,
+        I => dac_a_b_dco_buf
+    );
     dac_c_d_dco_ibufds : IBUFDS port map(
-        O => dac_c_d_dco,
+        O => dac_c_d_dco_buf,
         I => dac_c_d_dco_p_i,
         IB => dac_c_d_dco_n_i
+    );
+    dac_c_d_dco_bufg : BUFG port map(
+        O => dac_c_d_dco,
+        I => dac_c_d_dco_buf
     );
     dac_spi_miso_ibuf : IBUF port map(
         O => dac_spi_miso,

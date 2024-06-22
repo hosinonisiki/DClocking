@@ -55,6 +55,7 @@ architecture structural of main_control is
     signal spi_rst      :   std_logic;
     signal spi_ss_bin   :   std_logic_vector(3 downto 0); -- Binary spi ss signal
     signal spi_en       :   std_logic;
+    signal spi_width    :   std_logic_vector(4 downto 0);
     signal spi_txd      :   std_logic_vector(31 downto 0);
     signal spi_rxd      :   std_logic_vector(31 downto 0);
     signal spi_val      :   std_logic;
@@ -142,7 +143,7 @@ begin
         mosi        =>  mosi_out,
         miso        =>  miso_in,
         sclk_out    =>  sclk_out,
-        width       =>  "01111", -- held fix for now
+        width       =>  spi_width,
         din         =>  spi_txd,
         dout        =>  spi_rxd,
         dval_out    =>  spi_val,
@@ -151,26 +152,27 @@ begin
     spi_rst <= rst;
 
     central_control : entity work.central_control port map(
-        clk         =>  clk,
-        rst         =>  cc_rst,
-        rxd_in      =>  rx_char,
-        rxen_out    =>  rx_ren,
-        rxemp_in    =>  rx_empty,
-        txd_out     =>  tx_char,
-        txen_out    =>  tx_wen,
-        txful_in    =>  tx_full,
-        spi_ss_out  =>  spi_ss_bin,
-        spi_en_out  =>  spi_en,
-        spi_txd_out =>  spi_txd,
-        spi_rxd_in  =>  spi_rxd,
-        spi_val_in  =>  spi_val,
-        rsp_sel_out =>  rsp_sel_out,
-        rsp_data_in =>  rsp_data_in,
-        rsp_stat_in =>  rsp_stat_in,
-        dbus_out    =>  dbus_out,
-        abus_out    =>  abus_out,
-        mbus_out    =>  mbus_out,
-        cbus_out    =>  cbus_out
+        clk             =>  clk,
+        rst             =>  cc_rst,
+        rxd_in          =>  rx_char,
+        rxen_out        =>  rx_ren,
+        rxemp_in        =>  rx_empty,
+        txd_out         =>  tx_char,
+        txen_out        =>  tx_wen,
+        txful_in        =>  tx_full,
+        spi_ss_out      =>  spi_ss_bin,
+        spi_en_out      =>  spi_en,
+        spi_width_out   =>  spi_width,
+        spi_txd_out     =>  spi_txd,
+        spi_rxd_in      =>  spi_rxd,
+        spi_val_in      =>  spi_val,
+        rsp_sel_out     =>  rsp_sel_out,
+        rsp_data_in     =>  rsp_data_in,
+        rsp_stat_in     =>  rsp_stat_in,
+        dbus_out        =>  dbus_out,
+        abus_out        =>  abus_out,
+        mbus_out        =>  mbus_out,
+        cbus_out        =>  cbus_out
     );
     cc_rst <= rst;
 end architecture structural;

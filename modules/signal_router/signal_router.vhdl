@@ -77,7 +77,7 @@ architecture structural of signal_router is
     signal sig_hout     :   signal_array(15 downto 0);
 begin
     use_input_buffer : if io_buf = buf_for_io or io_buf = buf_i_only generate
-        process(clk, rst)
+        process(clk)
         begin
             if rising_edge(clk) then
                 if rst = '1' then
@@ -94,7 +94,7 @@ begin
     end generate;
 
     use_output_buffer : if io_buf = buf_for_io or io_buf = buf_o_only generate
-        process(clk, rst)
+        process(clk)
         begin
             if rising_edge(clk) then
                 if rst = '1' then
