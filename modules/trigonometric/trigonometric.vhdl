@@ -17,23 +17,23 @@ entity trigonometric is
         io_buf : buf_type := buf_for_io
     );
     port(
-        clk : in std_logic;
-        rst : in std_logic;
-        core_param_in : in std_logic_vector(63 downto 0);
-        phase_in : in std_logic_vector(15 downto 0);
-        sin_out : out std_logic_vector(15 downto 0);
-        cos_out : out std_logic_vector(15 downto 0)
+        clk             :   in  std_logic;
+        rst             :   in  std_logic;
+        core_param_in   :   in  std_logic_vector(63 downto 0);
+        phase_in        :   in  std_logic_vector(15 downto 0);
+        sin_out         :   out std_logic_vector(15 downto 0);
+        cos_out         :   out std_logic_vector(15 downto 0)
     );
 end entity trigonometric;
 
 architecture behavioral of trigonometric is
-    signal phase_in_buf : signed(15 downto 0);
-    signal sin_out_buf : signed(15 downto 0);
-    signal cos_out_buf : signed(15 downto 0);
+    signal phase_in_buf     :   signed(15 downto 0);
+    signal sin_out_buf      :   signed(15 downto 0);
+    signal cos_out_buf      :   signed(15 downto 0);
 
     type signed_array is array(natural range <>) of signed(23 downto 0);
     -- Storing a variant for 18 iterations
-    constant a : signed_array(0 to 18) := (
+    constant a              :   signed_array(0 to 18) := (
         x"200000",
         x"12e405",
         x"09fb38",
@@ -54,12 +54,12 @@ architecture behavioral of trigonometric is
         x"000014",
         x"00000a"
     ); -- angle values of arctan(2^(-i))
-    signal c, s, z : signed_array(0 to 18); -- cos, sin and angle residue
-    signal c_buf, s_buf, z_buf : signed_array(0 to 8); -- buffers inserted to pipeline
+    signal c, s, z          :   signed_array(0 to 18); -- cos, sin and angle residue
+    signal c_buf, s_buf, z_buf  :   signed_array(0 to 8); -- buffers inserted to pipeline
 
     type sign_array is array(natural range <>) of std_logic;
-    signal d, x : sign_array(0 to 18); -- d stores the sign of residue. x stores quandrant information of the input
-    signal d_buf, x_buf : sign_array(0 to 8); -- buffers inserted to pipeline
+    signal d, x             :   sign_array(0 to 18); -- d stores the sign of residue. x stores quandrant information of the input
+    signal d_buf, x_buf     :   sign_array(0 to 8); -- buffers inserted to pipeline
 begin
     use_input_buffer : if io_buf = buf_for_io or io_buf = buf_i_only generate
         process(clk)

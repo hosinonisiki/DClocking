@@ -186,6 +186,25 @@ begin
         );
     end block module_3_block;
 
+    module_4_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_SCLR_ADDR else '0'; -- constant defined in mypak
+        module_4 : entity work.module_scaler port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(4),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(4),
+            rsp_stat_out    =>  rsbus(4),
+            
+            sig_out         =>  sig_bank_in(5),
+            sig_in          =>  sig_bank_out(5)
+        );
+    end block module_4_block;
+
     -- signal banks provided by the router
     /*
     sig_bank_in <= (0 => x"0" & adc_a,
@@ -194,10 +213,10 @@ begin
                     3 => x"0" & adc_d,
                     others => (others => '0'));
     */
-    dac_a <= sig_bank_out(0)(13 downto 0);
-    dac_b <= sig_bank_out(1)(13 downto 0);
-    dac_c <= sig_bank_out(2)(13 downto 0);
-    dac_d <= sig_bank_out(3)(13 downto 0);
+    dac_a <= sig_bank_out(0)(15 downto 2);
+    dac_b <= sig_bank_out(1)(15 downto 2);
+    dac_c <= sig_bank_out(2)(15 downto 2);
+    dac_d <= sig_bank_out(3)(15 downto 2);
 
     -- analog front
     process(clk)

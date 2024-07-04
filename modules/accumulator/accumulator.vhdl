@@ -13,16 +13,16 @@ entity accumulator is
         io_buf : buf_type := buf_for_io
     );
     port(
-        clk : in std_logic;
-        rst : in std_logic;
-        core_param_in : in std_logic_vector(63 downto 0);
-        acc_out : out std_logic_vector(15 downto 0)
+        clk             :   in  std_logic;
+        rst             :   in  std_logic;
+        core_param_in   :   in  std_logic_vector(63 downto 0);
+        acc_out         :   out std_logic_vector(15 downto 0)
     );
 end entity accumulator;
 
 architecture behavioral of accumulator is
-    signal acc_out_buf : unsigned(15 downto 0);
-    signal acc : unsigned(63 downto 0);
+    signal acc_out_buf  :   unsigned(15 downto 0);
+    signal acc          :   unsigned(63 downto 0);
 begin
     use_output_buffer : if io_buf = buf_for_io or io_buf = buf_o_only generate
         process(clk)

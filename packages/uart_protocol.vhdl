@@ -33,6 +33,7 @@ package uart_protocol is
         constant u_DEVICE_ROUT  : std_logic_vector(31 downto 0) := x"524f5554"; -- ASCII 'ROUT'
         constant u_DEVICE_TRIG  : std_logic_vector(31 downto 0) := x"54524947"; -- ASCII 'TRIG'
         constant u_DEVICE_ACCM  : std_logic_vector(31 downto 0) := x"4143434d"; -- ASCII 'ACCM'
+        constant u_DEVICE_SCLR  : std_logic_vector(31 downto 0) := x"53434c52"; -- ASCII 'SCLR'
         constant u_COMMAND_CTRL : std_logic_vector(31 downto 0) := x"4354524c"; -- ASCII 'CTRL'
             constant u_KEYWORD_SETC : std_logic_vector(31 downto 0) := x"53455443"; -- ASCII 'SETC'
             constant u_KEYWORD_SETR : std_logic_vector(31 downto 0) := x"53455452"; -- ASCII 'SETR'

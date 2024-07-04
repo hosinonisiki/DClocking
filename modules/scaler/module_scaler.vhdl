@@ -18,7 +18,7 @@ use ieee.numeric_std.all;
 
 use work.mypak.all;
 
-entity module_accumulator is
+entity module_scaler is
     port(
         clk             :   in  std_logic;
         rst             :   in  std_logic;
@@ -29,11 +29,12 @@ entity module_accumulator is
         rsp_data_out    :   out std_logic_vector(rdbus_w - 1 downto 0);
         rsp_stat_out    :   out std_logic_vector(rsbus_w - 1 downto 0);
         -- data flow ports
-        acc_out : out std_logic_vector(15 downto 0)
+        sig_in : in std_logic_vector(15 downto 0);
+        sig_out : out std_logic_vector(15 downto 0)
     );
-end entity module_accumulator;
+end entity module_scaler;
 
-architecture structural of module_accumulator is
+architecture structural of module_scaler is
     signal core_param       :   std_logic_vector(63 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
     signal core_rst         :   std_logic := '1';
 
@@ -52,16 +53,17 @@ architecture structural of module_accumulator is
     signal ren              :   std_logic; -- Read enable signal
 begin
     
-    core_entity : entity work.accumulator port map(
+    core_entity : entity work.scaler port map(
         clk             =>  clk,
         rst             =>  core_rst,
         core_param_in   =>  core_param,
         -- data flow ports
-        acc_out         =>  acc_out
+        sig_in          =>  sig_in,
+        sig_out         =>  sig_out
     );
 
     parameter_ram : entity work.parameter_ram_64 generic map(
-        ram_default     =>  x"0000000000000000"
+        ram_default     =>  x"0000000000010000"
     )port map(
         clk             =>  clk,
         rst             =>  ram_rst,

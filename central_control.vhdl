@@ -40,6 +40,10 @@ entity central_control is
 end entity central_control;
 
 architecture parser of central_control is
+    constant is_debug   : std_logic := '0'; -- Debug mode
+    signal debug_txd_mux    : std_logic; -- Mux for txd_out in debug mode
+    signal debug_txd_buf    : std_logic_vector(7 downto 0); -- Buffer for txd_out in debug mode
+
     type state_type is (s_idle, s_fetch, s_receive, s_flip, s_parse_space, s_spi_parse_device,
                         s_spi_parse_data, s_spi_parse_width, s_spi_transmit, s_spi_listen,
                         s_bus_parse_device, s_bus_parse_head, s_bus_control_parse_body,
@@ -119,6 +123,10 @@ begin
                             rxen_out <= '1';
                             state <= s_fetch;
                         end if;
+                        if is_debug = '1' then
+                            debug_txd_mux <= '0';
+                            txen_out <= '0';
+                        end if;
                     when s_fetch =>
                         -- Wait for the fifo to return, while preparing the shift register
                         rxen_out <= '0';
@@ -135,6 +143,12 @@ begin
                         else
                             state <= s_idle;
                         end if;
+                        -- When in debug mode, respond with the received character
+                        if is_debug = '1' then
+                            debug_txd_buf <= rxd_in;
+                            debug_txd_mux <= '1';
+                            txen_out <= '1';
+                        end if;
                     when s_flip =>
                         -- If the character is an initiator, start parsing the message
                         if bsr_i1_reg(0) = u_INIT then
@@ -142,6 +156,10 @@ begin
                             bsr_i2_sr <= '0';
                             bsr_i2_sl <= '1';
                             state <= s_parse_space;
+                        end if;
+                        if is_debug = '1' then
+                            debug_txd_mux <= '0';
+                            txen_out <= '0';
                         end if;
                     when s_parse_space =>
                         -- segment lies on bsr_i2_reg(1 to 5)
@@ -229,6 +247,9 @@ begin
                                     state <= s_bus_parse_head;
                                 when u_DEVICE_ACCM =>
                                     bus_mod_buf <= BUS_ACCM_ADDR;
+                                    state <= s_bus_parse_head;
+                                when u_DEVICE_SCLR =>
+                                    bus_mod_buf <= BUS_SCLR_ADDR;
                                     state <= s_bus_parse_head;
                                 when others =>
                                     response_err_buf <= x"44564345"; -- "DVCE" for device error
@@ -515,7 +536,12 @@ begin
             end if;
         end if;
     end process;
-    txd_out <= bsr_o_reg(0);
+    txd_gen : if is_debug = '0' generate
+        txd_out <= bsr_o_reg(0);
+    end generate txd_gen;
+    debug_txd_gen : if is_debug = '1' generate
+        txd_out <= bsr_o_reg(0) when debug_txd_mux = '0' else debug_txd_buf;
+    end generate debug_txd_gen;
     bsr_o_rst <= rst;
 end parser;
 

@@ -19,10 +19,11 @@ package mypak is
 
     constant log_dbus_w :   integer := 5; -- Log2 of the data bus width.
 
-    constant module_count   : integer := 3; -- Number of modules connected to the bus.
+    constant module_count   : integer := 4; -- Number of modules connected to the bus.
     constant BUS_ROUT_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(1, mbus_w)); -- Address of the router module.
     constant BUS_TRIG_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(2, mbus_w)); -- Address of the trigonometric module.
     constant BUS_ACCM_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(3, mbus_w)); -- Address of the accumulator module.
+    constant BUS_SCLR_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(4, mbus_w)); -- Address of the scalar module.
 
     -- Used in wrapper and central_control
     constant SPI_DAC1_ADDR      : integer := 0; -- Address of chip DAC1, responsible for dac channel A and B.

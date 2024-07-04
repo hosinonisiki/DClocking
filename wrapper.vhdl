@@ -79,22 +79,22 @@ architecture peripheral_wrapper of wrapper is
     signal spi_sclk : std_logic;
     signal spi_ss   : std_logic_vector(15 downto 0);
 
-    signal dac_a_b_data_p_h : std_logic_vector(13 downto 0);
-    signal dac_a_b_data_p_l : std_logic_vector(13 downto 0);
-    signal dac_a_b_data_n_h : std_logic_vector(13 downto 0);
-    signal dac_a_b_data_n_l : std_logic_vector(13 downto 0);
-    signal dac_c_d_data_p_h : std_logic_vector(13 downto 0);
-    signal dac_c_d_data_p_l : std_logic_vector(13 downto 0);
-    signal dac_c_d_data_n_h : std_logic_vector(13 downto 0);
-    signal dac_c_d_data_n_l : std_logic_vector(13 downto 0);
-    signal dac_a_b_dci_p_h : std_logic;
-    signal dac_a_b_dci_p_l : std_logic;
-    signal dac_a_b_dci_n_h : std_logic;
-    signal dac_a_b_dci_n_l : std_logic;
-    signal dac_c_d_dci_p_h : std_logic;
-    signal dac_c_d_dci_p_l : std_logic;
-    signal dac_c_d_dci_n_h : std_logic;
-    signal dac_c_d_dci_n_l : std_logic;
+    signal dac_a_b_data_h_buf : std_logic_vector(13 downto 0);
+    signal dac_a_b_data_l_buf : std_logic_vector(13 downto 0);
+    signal dac_c_d_data_h_buf : std_logic_vector(13 downto 0);
+    signal dac_c_d_data_l_buf : std_logic_vector(13 downto 0);
+    signal dac_a_b_data_h : std_logic_vector(13 downto 0);
+    signal dac_a_b_data_l : std_logic_vector(13 downto 0);
+    signal dac_c_d_data_h : std_logic_vector(13 downto 0);
+    signal dac_c_d_data_l : std_logic_vector(13 downto 0);
+    signal dac_a_b_data : std_logic_vector(13 downto 0);
+    signal dac_c_d_data : std_logic_vector(13 downto 0);
+    signal dac_a_b_dci_h : std_logic;
+    signal dac_a_b_dci_l : std_logic;
+    signal dac_c_d_dci_h : std_logic;
+    signal dac_c_d_dci_l : std_logic;
+    signal dac_a_b_dci : std_logic;
+    signal dac_c_d_dci : std_logic;
     signal dac_a_b_dco : std_logic;
     signal dac_a_b_dco_buf : std_logic;
     signal dac_c_d_dco : std_logic;
@@ -112,6 +112,23 @@ architecture peripheral_wrapper of wrapper is
     signal dac_b_data_buf : std_logic_vector(13 downto 0);
     signal dac_c_data_buf : std_logic_vector(13 downto 0);
     signal dac_d_data_buf : std_logic_vector(13 downto 0);
+
+    signal dac_a_data_fifo_rst_busy : std_logic;
+    signal dac_a_data_fifo_empty : std_logic;
+    signal dac_a_data_fifo_ren : std_logic;
+    signal dac_a_data_fifo_ren_1 : std_logic;
+    signal dac_b_data_fifo_rst_busy : std_logic;
+    signal dac_b_data_fifo_empty : std_logic;
+    signal dac_b_data_fifo_ren : std_logic;
+    signal dac_b_data_fifo_ren_1 : std_logic;
+    signal dac_c_data_fifo_rst_busy : std_logic;
+    signal dac_c_data_fifo_empty : std_logic;
+    signal dac_c_data_fifo_ren : std_logic;
+    signal dac_c_data_fifo_ren_1 : std_logic;
+    signal dac_d_data_fifo_rst_busy : std_logic;
+    signal dac_d_data_fifo_empty : std_logic;
+    signal dac_d_data_fifo_ren : std_logic;
+    signal dac_d_data_fifo_ren_1 : std_logic;
 begin
     top : entity work.top port map(
         clk => sys_clk,
@@ -150,22 +167,101 @@ begin
 
     -- Interface to FL9781
     -- Align data transferred with lvds data clock
-    dac_a_b_data_p_h <= dac_a_data_buf;
-    dac_a_b_data_p_l <= dac_b_data_buf;
-    dac_a_b_data_n_h <= not dac_a_data_buf;
-    dac_a_b_data_n_l <= not dac_b_data_buf;
-    dac_c_d_data_p_h <= dac_c_data_buf;
-    dac_c_d_data_p_l <= dac_d_data_buf;
-    dac_c_d_data_n_h <= not dac_c_data_buf;
-    dac_c_d_data_n_l <= not dac_d_data_buf;
-    dac_a_b_dci_p_h <= '1';
-    dac_a_b_dci_p_l <= '0';
-    dac_a_b_dci_n_h <= '0';
-    dac_a_b_dci_n_l <= '1';
-    dac_c_d_dci_p_h <= '1';
-    dac_c_d_dci_p_l <= '0';
-    dac_c_d_dci_n_h <= '0';
-    dac_c_d_dci_n_l <= '1';
+    -- Transfer data from slow system clock to fast dac clock by employing asynchronous fifo
+    -- Read latency is known to be 1 cycle, so don't care valid signal
+    dac_a_data_fifo : entity work.async_fifo generic map(
+        width => 14
+    )port map(
+        wclk => sys_clk,
+        rclk => dac_a_b_dco,
+        rst => sys_rst_bar,
+        wdata_in => dac_a_data_buf,
+        wen_in => not dac_a_data_fifo_rst_busy,
+        rdata_out => dac_a_b_data_h_buf,
+        ren_in => dac_a_data_fifo_ren,
+        rval_out => open,
+        rst_busy_out => dac_a_data_fifo_rst_busy,
+        empty_out => dac_a_data_fifo_empty
+    );
+    -- Period ratio is approximately 2:5, so skip each other cycle to flatten the data rate
+    -- Thus deassert the read enable signal when ren stage 1 register is high
+    dac_a_data_fifo_ren <= not dac_a_data_fifo_empty and not dac_a_data_fifo_rst_busy and not dac_a_data_fifo_ren_1;
+    dac_b_data_fifo : entity work.async_fifo generic map(
+        width => 14
+    )port map(
+        wclk => sys_clk,
+        rclk => dac_a_b_dco,
+        rst => sys_rst_bar,
+        wdata_in => dac_b_data_buf,
+        wen_in => not dac_b_data_fifo_rst_busy,
+        rdata_out => dac_a_b_data_l_buf,
+        ren_in => dac_b_data_fifo_ren,
+        rval_out => open,
+        rst_busy_out => dac_b_data_fifo_rst_busy,
+        empty_out => dac_b_data_fifo_empty
+    );
+    dac_b_data_fifo_ren <= not dac_b_data_fifo_empty and not dac_b_data_fifo_rst_busy and not dac_b_data_fifo_ren_1;
+    process(dac_a_b_dco)
+    begin
+        if rising_edge(dac_a_b_dco) then
+            dac_a_data_fifo_ren_1 <= dac_a_data_fifo_ren;
+            dac_b_data_fifo_ren_1 <= dac_b_data_fifo_ren;
+            if dac_a_data_fifo_ren_1 = '1' then
+                dac_a_b_data_h <= dac_a_b_data_h_buf;
+            end if;
+            if dac_b_data_fifo_ren_1 = '1' then
+                dac_a_b_data_l <= dac_a_b_data_l_buf;
+            end if;
+        end if;
+    end process;
+    dac_c_data_fifo : entity work.async_fifo generic map(
+        width => 14
+    )port map(
+        wclk => sys_clk,
+        rclk => dac_c_d_dco,
+        rst => sys_rst_bar,
+        wdata_in => dac_c_data_buf,
+        wen_in => not dac_c_data_fifo_rst_busy,
+        rdata_out => dac_c_d_data_h_buf,
+        ren_in => dac_c_data_fifo_ren,
+        rval_out => open,
+        rst_busy_out => dac_c_data_fifo_rst_busy,
+        empty_out => dac_c_data_fifo_empty
+    );
+    dac_c_data_fifo_ren <= not dac_c_data_fifo_empty and not dac_c_data_fifo_rst_busy and not dac_c_data_fifo_ren_1;
+    dac_d_data_fifo : entity work.async_fifo generic map(
+        width => 14
+    )port map(
+        wclk => sys_clk,
+        rclk => dac_c_d_dco,
+        rst => sys_rst_bar,
+        wdata_in => dac_d_data_buf,
+        wen_in => not dac_d_data_fifo_rst_busy,
+        rdata_out => dac_c_d_data_l_buf,
+        ren_in => dac_d_data_fifo_ren,
+        rval_out => open,
+        rst_busy_out => dac_d_data_fifo_rst_busy,
+        empty_out => dac_d_data_fifo_empty
+    );
+    dac_d_data_fifo_ren <= not dac_d_data_fifo_empty and not dac_d_data_fifo_rst_busy and not dac_d_data_fifo_ren_1;
+    process(dac_c_d_dco)
+    begin
+        if rising_edge(dac_c_d_dco) then
+            dac_c_data_fifo_ren_1 <= dac_c_data_fifo_ren;
+            dac_d_data_fifo_ren_1 <= dac_d_data_fifo_ren;
+            if dac_c_data_fifo_ren_1 = '1' then
+                dac_c_d_data_h <= dac_c_d_data_h_buf;
+            end if;
+            if dac_d_data_fifo_ren_1 = '1' then
+                dac_c_d_data_l <= dac_c_d_data_l_buf;
+            end if;
+        end if;
+    end process;
+
+    dac_a_b_dci_h <= '1';
+    dac_a_b_dci_l <= '0';
+    dac_c_d_dci_h <= '1';
+    dac_c_d_dci_l <= '0';
     dac_a_b_spi_ss <= spi_ss(SPI_DAC1_ADDR);
     dac_c_d_spi_ss <= spi_ss(SPI_DAC2_ADDR);
     dac_clk_spi_ss <= spi_ss(SPI_CLK1_ADDR);
@@ -222,70 +318,62 @@ begin
     );
 
     -- FL9781, using dco returned from the chip to clock out data
-    dac_a_b_dci_p_oddre1 : ODDRE1 port map(
-        Q => dac_a_b_dci_p_ddr_o,
+    dac_a_b_dci_oddre1 : ODDRE1 port map(
+        Q => dac_a_b_dci,
         C => dac_a_b_dco,
-        D1 => dac_a_b_dci_p_h,
-        D2 => dac_a_b_dci_p_l,
+        D1 => dac_a_b_dci_h,
+        D2 => dac_a_b_dci_l,
         SR => sys_rst_bar
     );
-    dac_a_b_dci_n_oddre1 : ODDRE1 port map(
-        Q => dac_a_b_dci_n_ddr_o,
-        C => dac_a_b_dco,
-        D1 => dac_a_b_dci_n_h,
-        D2 => dac_a_b_dci_n_l,
-        SR => sys_rst_bar
+    dac_a_b_dci_obufds : OBUFDS port map(
+        O => dac_a_b_dci_p_ddr_o,
+        OB => dac_a_b_dci_n_ddr_o,
+        I => dac_a_b_dci
     );
-    dac_a_b_data_p_oddre1_gen : for i in 0 to 13 generate
-        dac_a_b_data_p_oddre1 : ODDRE1 port map(
-            Q => dac_a_b_data_p_ddr_o(i),
+    dac_a_b_data_oddre1_gen : for i in 0 to 13 generate
+        dac_a_b_data_oddre1 : ODDRE1 port map(
+            Q => dac_a_b_data(i),
             C => dac_a_b_dco,
-            D1 => dac_a_b_data_p_h(i),
-            D2 => dac_a_b_data_p_l(i),
+            D1 => dac_a_b_data_h(i),
+            D2 => dac_a_b_data_l(i),
             SR => sys_rst_bar
         );
-    end generate dac_a_b_data_p_oddre1_gen;
-    dac_a_b_data_n_oddre1_gen : for i in 0 to 13 generate
-        dac_a_b_data_n_oddre1 : ODDRE1 port map(
-            Q => dac_a_b_data_n_ddr_o(i),
-            C => dac_a_b_dco,
-            D1 => dac_a_b_data_n_h(i),
-            D2 => dac_a_b_data_n_l(i),
-            SR => sys_rst_bar
+    end generate dac_a_b_data_oddre1_gen;
+    dac_a_b_data_obufds_gen : for i in 0 to 13 generate
+        dac_a_b_data_obufds : OBUFDS port map(
+            O => dac_a_b_data_p_ddr_o(i),
+            OB => dac_a_b_data_n_ddr_o(i),
+            I => dac_a_b_data(i)
         );
-    end generate dac_a_b_data_n_oddre1_gen;
-    dac_c_d_dci_p_oddre1 : ODDRE1 port map(
-        Q => dac_c_d_dci_p_ddr_o,
+    end generate dac_a_b_data_obufds_gen;
+    dac_c_d_dci_oddre1 : ODDRE1 port map(
+        Q => dac_c_d_dci,
         C => dac_c_d_dco,
-        D1 => dac_c_d_dci_p_h,
-        D2 => dac_c_d_dci_p_l,
+        D1 => dac_c_d_dci_h,
+        D2 => dac_c_d_dci_l,
         SR => sys_rst_bar
     );
-    dac_c_d_dci_n_oddre1 : ODDRE1 port map(
-        Q => dac_c_d_dci_n_ddr_o,
-        C => dac_c_d_dco,
-        D1 => dac_c_d_dci_n_h,
-        D2 => dac_c_d_dci_n_l,
-        SR => sys_rst_bar
+    dac_c_d_dci_obufds : OBUFDS port map(
+        O => dac_c_d_dci_p_ddr_o,
+        OB => dac_c_d_dci_n_ddr_o,
+        I => dac_c_d_dci
     );
-    dac_c_d_data_p_oddre1_gen : for i in 0 to 13 generate
-        dac_c_d_data_p_oddre1 : ODDRE1 port map(
-            Q => dac_c_d_data_p_ddr_o(i),
+    dac_c_d_data_oddre1_gen : for i in 0 to 13 generate
+        dac_c_d_data_oddre1 : ODDRE1 port map(
+            Q => dac_c_d_data(i),
             C => dac_c_d_dco,
-            D1 => dac_c_d_data_p_h(i),
-            D2 => dac_c_d_data_p_l(i),
+            D1 => dac_c_d_data_h(i),
+            D2 => dac_c_d_data_l(i),
             SR => sys_rst_bar
         );
-    end generate dac_c_d_data_p_oddre1_gen;
-    dac_c_d_data_n_oddre1_gen : for i in 0 to 13 generate
-        dac_c_d_data_n_oddre1 : ODDRE1 port map(
-            Q => dac_c_d_data_n_ddr_o(i),
-            C => dac_c_d_dco,
-            D1 => dac_c_d_data_n_h(i),
-            D2 => dac_c_d_data_n_l(i),
-            SR => sys_rst_bar
+    end generate dac_c_d_data_oddre1_gen;
+    dac_c_d_data_obufds_gen : for i in 0 to 13 generate
+        dac_c_d_data_obufds : OBUFDS port map(
+            O => dac_c_d_data_p_ddr_o(i),
+            OB => dac_c_d_data_n_ddr_o(i),
+            I => dac_c_d_data(i)
         );
-    end generate dac_c_d_data_n_oddre1_gen;
+    end generate dac_c_d_data_obufds_gen;
     dac_a_b_spi_ss_obuf : OBUF port map(
         O => dac_a_b_spi_ss_o,
         I => dac_a_b_spi_ss
