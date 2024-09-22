@@ -29,7 +29,8 @@ entity async_fifo is
         ren_in          :   in std_logic;
         rval_out        :   out std_logic;
         rst_busy_out    :   out std_logic;
-        empty_out       :   out std_logic
+        empty_out       :   out std_logic;
+        full_out        :   out std_logic
     );
 end entity async_fifo;
 
@@ -47,7 +48,7 @@ begin
         FIFO_WRITE_DEPTH => depth,   -- DECIMAL
         FULL_RESET_VALUE => 0,      -- DECIMAL
         PROG_EMPTY_THRESH => 10,    -- DECIMAL
-        PROG_FULL_THRESH => 10,     -- DECIMAL
+        PROG_FULL_THRESH => 2028,     -- DECIMAL
         RD_DATA_COUNT_WIDTH => 1,   -- DECIMAL
         READ_DATA_WIDTH => width,      -- DECIMAL
         READ_MODE => "std",         -- String
@@ -67,7 +68,7 @@ begin
         full => open,
         overflow => open,
         prog_empty => empty_out,
-        prog_full => open,
+        prog_full => full_out,
         rd_data_count => open,
         rd_rst_busy => rd_rst_busy,
         sbiterr => open,

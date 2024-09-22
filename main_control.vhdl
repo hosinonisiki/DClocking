@@ -20,6 +20,7 @@ entity main_control is
         miso_in         :   in  std_logic;
         sclk_out        :   out std_logic;
         ss_out          :   out std_logic_vector(15 downto 0);
+        io_tri_out      :   out std_logic;
         dbus_out        :   out std_logic_vector(dbus_w - 1 downto 0);
         abus_out        :   out std_logic_vector(abus_w - 1 downto 0);
         mbus_out        :   out std_logic_vector(mbus_w - 1 downto 0);
@@ -55,7 +56,7 @@ architecture structural of main_control is
     signal spi_rst      :   std_logic;
     signal spi_ss_bin   :   std_logic_vector(3 downto 0); -- Binary spi ss signal
     signal spi_en       :   std_logic;
-    signal spi_width    :   std_logic_vector(4 downto 0);
+    signal spi_control  :   std_logic_vector(31 downto 0);
     signal spi_txd      :   std_logic_vector(31 downto 0);
     signal spi_rxd      :   std_logic_vector(31 downto 0);
     signal spi_val      :   std_logic;
@@ -143,7 +144,8 @@ begin
         mosi        =>  mosi_out,
         miso        =>  miso_in,
         sclk_out    =>  sclk_out,
-        width       =>  spi_width,
+        control_in  =>  spi_control,
+        io_tri_out  =>  io_tri_out,
         din         =>  spi_txd,
         dout        =>  spi_rxd,
         dval_out    =>  spi_val,
@@ -162,7 +164,7 @@ begin
         txful_in        =>  tx_full,
         spi_ss_out      =>  spi_ss_bin,
         spi_en_out      =>  spi_en,
-        spi_width_out   =>  spi_width,
+        spi_control_out =>  spi_control,
         spi_txd_out     =>  spi_txd,
         spi_rxd_in      =>  spi_rxd,
         spi_val_in      =>  spi_val,

@@ -25,7 +25,7 @@ entity central_control is
         txful_in        :   in  std_logic;
         spi_ss_out      :   out std_logic_vector(3 downto 0);
         spi_en_out      :   out std_logic;
-        spi_width_out   :   out std_logic_vector(4 downto 0);
+        spi_control_out :   out std_logic_vector(31 downto 0);
         spi_txd_out     :   out std_logic_vector(31 downto 0);
         spi_rxd_in      :   in  std_logic_vector(31 downto 0);
         spi_val_in      :   in  std_logic;
@@ -40,12 +40,12 @@ entity central_control is
 end entity central_control;
 
 architecture parser of central_control is
-    constant is_debug   : std_logic := '0'; -- Debug mode
+    -- Debug variables
     signal debug_txd_mux    : std_logic; -- Mux for txd_out in debug mode
     signal debug_txd_buf    : std_logic_vector(7 downto 0); -- Buffer for txd_out in debug mode
 
     type state_type is (s_idle, s_fetch, s_receive, s_flip, s_parse_space, s_spi_parse_device,
-                        s_spi_parse_data, s_spi_parse_width, s_spi_transmit, s_spi_listen,
+                        s_spi_parse_data, s_spi_parse_control, s_spi_transmit, s_spi_listen,
                         s_bus_parse_device, s_bus_parse_head, s_bus_control_parse_body,
                         s_bus_write_parse_body, s_bus_write_parse_address,
                         s_bus_write_parse_data, s_bus_write_parse_mask,
@@ -53,6 +53,8 @@ architecture parser of central_control is
                         s_bus_transmit_2, s_bus_listen, s_respond_acknowledgement,
                         s_respond_exception, s_send);
     signal state        : state_type := s_idle;
+
+    signal char_count   : unsigned(7 downto 0); -- Count of characters in a message
 
     signal cur_str      : std_logic_vector(31 downto 0); -- Current string being parsed
 
@@ -70,7 +72,7 @@ architecture parser of central_control is
 
     -- Buffers for spi commands
     signal spi_ss_buf       : std_logic_vector(3 downto 0); -- Buffer for spi slave select
-    signal spi_width_buf    : std_logic_vector(4 downto 0); -- Buffer for spi width
+    signal spi_control_buf  : std_logic_vector(31 downto 0); -- Buffer for spi control
     signal spi_data_buf     : std_logic_vector(31 downto 0); -- Buffer for spi data
 
     constant bsr_size   : integer := 64; -- Size of the bidirectional shift registers
@@ -133,6 +135,8 @@ begin
                         bsr_i1_sr <= '1';
                         state <= s_receive;
                     when s_receive =>
+                        -- Zero the chracter counter
+                        char_count <= (others => '0');
                         -- Receive the character with the shift register
                         bsr_i1_sr <= '0';
                         -- If the character is a terminator, start flipping the message
@@ -150,12 +154,18 @@ begin
                             txen_out <= '1';
                         end if;
                     when s_flip =>
+                        -- Count the length of the message
+                        char_count <= char_count + x"01";
                         -- If the character is an initiator, start parsing the message
                         if bsr_i1_reg(0) = u_INIT then
                             bsr_i1_sl <= '0';
                             bsr_i2_sr <= '0';
                             bsr_i2_sl <= '1';
                             state <= s_parse_space;
+                        elsif char_count = to_unsigned(bsr_size - 1, 8) then
+                            -- If the message is too long, or the initiator is missing, throw an exception
+                            response_err_buf <= x"4c4f4e47"; -- "LONG" for long message
+                            state <= s_respond_exception;
                         end if;
                         if is_debug = '1' then
                             debug_txd_mux <= '0';
@@ -188,25 +198,31 @@ begin
                             case cur_str is
                                 when u_DEVICE_DAC1 =>
                                     spi_ss_buf <= std_logic_vector(to_unsigned(SPI_DAC1_ADDR, 4));
-                                    state <= s_spi_parse_width;
+                                    state <= s_spi_parse_control;
                                 when u_DEVICE_DAC2 =>
                                     spi_ss_buf <= std_logic_vector(to_unsigned(SPI_DAC2_ADDR, 4));
-                                    state <= s_spi_parse_width;
+                                    state <= s_spi_parse_control;
                                 when u_DEVICE_CLK1 =>
                                     spi_ss_buf <= std_logic_vector(to_unsigned(SPI_CLK1_ADDR, 4));
-                                    state <= s_spi_parse_width;
+                                    state <= s_spi_parse_control;
+                                when u_DEVICE_ADC1 =>
+                                    spi_ss_buf <= std_logic_vector(to_unsigned(SPI_ADC1_ADDR, 4));
+                                    state <= s_spi_parse_control;
+                                when u_DEVICE_ADC2 =>
+                                    spi_ss_buf <= std_logic_vector(to_unsigned(SPI_ADC2_ADDR, 4));
+                                    state <= s_spi_parse_control;
                                 when others =>
                                     response_err_buf <= x"44564345"; -- "DVCE" for device error
                                     state <= s_respond_exception;
                             end case;
                         end if;
-                    when s_spi_parse_width =>
-                        -- Parse the width
+                    when s_spi_parse_control =>
+                        -- Parse the control
                         if bsr_i2_reg(5) /= u_SEP then
                             response_err_buf <= x"534e5458"; -- "SNTX" for syntax error
                             state <= s_respond_exception;
                         else
-                            spi_width_buf <= cur_str(4 downto 0);
+                            spi_control_buf <= cur_str(31 downto 0);
                             state <= s_spi_parse_data;
                         end if;
                     when s_spi_parse_data =>
@@ -222,7 +238,7 @@ begin
                         bsr_i2_sl <= '0';
                         spi_en_out <= '1';
                         spi_ss_out <= spi_ss_buf;
-                        spi_width_out <= spi_width_buf;
+                        spi_control_out <= spi_control_buf;
                         spi_txd_out <= spi_data_buf;
                         state <= s_spi_listen;
                     when s_spi_listen =>

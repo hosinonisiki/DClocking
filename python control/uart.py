@@ -10,6 +10,8 @@ class MySerial(Serial):
         self.write(message)
         response = self.read_until(b"!")
         print(response)
+        response = self.read_until(b"!")
+        print(response)
         return  
 
    

@@ -42,6 +42,7 @@ entity top is
         miso        :   in  std_logic;
         sclk        :   out std_logic;
         ss          :   out std_logic_vector(15 downto 0);
+        io_tri      :   out std_logic;
 
         adc_in_a    :   in  std_logic_vector(11 downto 0);
         adc_in_b    :   in  std_logic_vector(11 downto 0);
@@ -99,6 +100,7 @@ begin
         miso_in         =>  miso,
         sclk_out        =>  sclk,
         ss_out          =>  ss,
+        io_tri_out      =>  io_tri,
 
         dbus_out        =>  dbus,
         abus_out        =>  abus,
@@ -206,13 +208,12 @@ begin
     end block module_4_block;
 
     -- signal banks provided by the router
-    /*
-    sig_bank_in <= (0 => x"0" & adc_a,
-                    1 => x"0" & adc_b,
-                    2 => x"0" & adc_c,
-                    3 => x"0" & adc_d,
-                    others => (others => '0'));
-    */
+    
+    sig_bank_in(6) <= adc_a & x"0";
+    sig_bank_in(7) <= adc_b & x"0";
+    sig_bank_in(8) <= adc_c & x"0";
+    sig_bank_in(9) <= adc_d & x"0";
+    
     dac_a <= sig_bank_out(0)(15 downto 2);
     dac_b <= sig_bank_out(1)(15 downto 2);
     dac_c <= sig_bank_out(2)(15 downto 2);

@@ -28,6 +28,7 @@ architecture behavioral of scaler is
     signal scale        :   signed(31 downto 0);
     signal bias         :   signed(15 downto 0);
     signal product      :   signed(47 downto 0);
+    signal product_1    :   signed(47 downto 0);
 begin
     use_output_buffer : if io_buf = buf_for_io or io_buf = buf_o_only generate
         process(clk)
@@ -66,5 +67,12 @@ begin
     scale <= signed(core_param_in(31 downto 0));
     bias <= signed(core_param_in(47 downto 32));
     product <= sig_in_buf * scale;
-    sig_out_buf <= product(31 downto 16) + bias;
+    sig_out_buf <= product_1(31 downto 16) + bias;
+
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            product_1 <= product;
+        end if;
+    end process;
 end architecture behavioral;

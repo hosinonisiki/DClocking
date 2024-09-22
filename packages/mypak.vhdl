@@ -6,6 +6,8 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 package mypak is
+    constant is_debug   :   std_logic := '1'; -- Debug mode flag.
+
 
     type buf_type is (buf_for_io, buf_i_only, buf_o_only, buf_none); -- Universal io buffer type for the core modules.
 
@@ -29,11 +31,13 @@ package mypak is
     constant SPI_DAC1_ADDR      : integer := 0; -- Address of chip DAC1, responsible for dac channel A and B.
     constant SPI_DAC2_ADDR      : integer := 1; -- Address of chip DAC2, responsible for dac channel C and D.
     constant SPI_CLK1_ADDR      : integer := 2; -- Address of chip CLK1, providing clocks for DAC1 and DAC2.
+    constant SPI_ADC1_ADDR      : integer := 3; -- Address of chip ADC1, responsible for adc channel A and B.
+    constant SPI_ADC2_ADDR      : integer := 4; -- Address of chip ADC2, responsible for adc channel C and D.
 
     type rdbus_type is array(0 to module_count) of std_logic_vector(rdbus_w - 1 downto 0); -- 0 is reserved for no module.
     type rsbus_type is array(0 to module_count) of std_logic_vector(rsbus_w - 1 downto 0);
 
-    constant clk_freq       :   integer := 200_000_000; -- Clock frequency in Hz.
+    constant clk_freq       :   integer := 250_000_000; -- Clock frequency in Hz.
     constant baudrate       :   integer := 57600; -- Baudrate for the UART.
 
     constant spi_clk_freq   :   integer := 10_000_000; -- SPI clock frequency in Hz.

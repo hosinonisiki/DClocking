@@ -21,7 +21,8 @@ entity spi_trx is
         mosi        :   out std_logic; -- Master out slave in
         miso        :   in  std_logic; -- Master in slave out
         sclk_out    :   out std_logic; -- SPI clock
-        width       :   in  std_logic_vector(4 downto 0); -- Data width, 0-31 corresponds to 1-32 bits
+        control_in  :   in  std_logic_vector(31 downto 0); -- Control signal, contains parameters for current spi transmission
+        io_tri_out  :   out std_logic; -- Tri-state iobuf control for bidirectional wire
         din         :   in  std_logic_vector(31 downto 0); -- Data to be transmitted
         dout        :   out std_logic_vector(31 downto 0); -- Received data
         dval_out    :   out std_logic; -- Data valid indicated with a high pulse
@@ -41,6 +42,10 @@ architecture behavioral of spi_trx is
     signal bit_cnt      : unsigned(4 downto 0); -- Counts for how many bits have been transmitted
     signal sclk_edge    : std_logic; -- Indicates if sclk is at an edge
     signal sample_edge  : std_logic; -- Indicates if the coming edge is a sample edge
+
+    signal width        : unsigned(4 downto 0); -- Width of the spi transmission. 0-31 represents 1-32 bits
+    signal write_count  : unsigned(4 downto 0); -- Counter for write bits. 0-31 represents 1-32 bits
+    -- Used for some spi transmissions that requires a bidirectional wire, where the state of iobuffer must be controlled
     
     signal sr           : std_logic_vector(31 downto 0); -- Shift register, MSB first
     signal sr_din       : std_logic; -- Bit in
@@ -108,7 +113,7 @@ begin
         if rising_edge(clk) then
             if state = s_transmit then
                 if sclk_edge = '1' and sclk = cpol then
-                    if bit_cnt = unsigned(width) then
+                    if bit_cnt = width then
                         bit_cnt <= "00000";
                     else
                         bit_cnt <= bit_cnt + "00001";
@@ -129,6 +134,19 @@ begin
                 end if;
             else
                 sclk <= cpol;
+            end if;
+        end if;
+    end process;
+
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            if state = s_transmit then
+                if sclk_edge = '1' and sample_edge = '0' and bit_cnt = write_count + "00001" then
+                    io_tri_out <= '1';
+                end if;
+            else
+                io_tri_out <= '0';
             end if;
         end if;
     end process;
@@ -160,6 +178,9 @@ begin
     dout <= sr;
     sclk_out <= sclk;
     idle_out <= '1' when state = s_idle else '0';
+
+    width <= unsigned(control_in(4 downto 0));
+    write_count <= unsigned(control_in(12 downto 8));
 
     -- ss binary to one-hot conversion
     one_hot : for i in 0 to 15 generate

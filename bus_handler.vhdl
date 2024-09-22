@@ -24,7 +24,7 @@ entity bus_handler is
         waddr_out       :   out std_logic_vector(abus_w - 1 downto 0);
         wmask_out       :   out std_logic_vector(dbus_w - 1 downto 0);
         wval_out        :   out std_logic;
-        wen_out         :   inout std_logic;
+        wen_out         :   out std_logic;
         rdata_in        :   in  std_logic_vector(dbus_w - 1 downto 0);
         raddr_out       :   out std_logic_vector(abus_w - 1 downto 0);
         rval_in         :   in  std_logic;
@@ -44,6 +44,7 @@ architecture behaviorial of bus_handler is
     signal data_buf         :   std_logic_vector(dbus_w - 1 downto 0);
 
     signal wval_reg         :   std_logic := '0';
+    signal wen              :   std_logic;
 begin
     -- FSM
     process(clk, rst)
@@ -118,7 +119,7 @@ begin
         if rising_edge(clk) then
             case state is
                 when s_idle =>
-                    wen_out <= '0';
+                    wen <= '0';
                 when s_handle_write =>
                     wdata_out <= data_buf;
                     waddr_out <= addr_buf;
@@ -132,12 +133,13 @@ begin
                     else
                         wval_reg <= '1';
                     end if;
-                    wen_out <= '1';
+                    wen <= '1';
                 when others =>
             end case;
         end if;
     end process;
-    wval_out <= wval_reg and not wen_out; -- Ensure that wval and wen won't be high at the same time
+    wen_out <= wen;
+    wval_out <= wval_reg and not wen; -- Ensure that wval and wen won't be high at the same time
                                           -- This ensures a correct data flow
     
     -- handle reads

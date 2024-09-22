@@ -28,6 +28,8 @@ package uart_protocol is
         constant u_DEVICE_DAC1  : std_logic_vector(31 downto 0) := x"44414331"; -- ASCII 'DAC1'
         constant u_DEVICE_DAC2  : std_logic_vector(31 downto 0) := x"44414332"; -- ASCII 'DAC2'
         constant u_DEVICE_CLK1  : std_logic_vector(31 downto 0) := x"434c4b31"; -- ASCII 'CLK1'
+        constant u_DEVICE_ADC1  : std_logic_vector(31 downto 0) := x"41444331"; -- ASCII 'ADC1'
+        constant u_DEVICE_ADC2  : std_logic_vector(31 downto 0) := x"41444332"; -- ASCII 'ADC2'
 
     constant u_SPACE_BUS    : std_logic_vector(31 downto 0) := x"4255535f"; -- ASCII 'BUS_'
         constant u_DEVICE_ROUT  : std_logic_vector(31 downto 0) := x"524f5554"; -- ASCII 'ROUT'
@@ -45,6 +47,11 @@ package uart_protocol is
             constant u_KEYWORD_DATA : std_logic_vector(31 downto 0) := x"44415441"; -- ASCII 'DATA'
             constant u_KEYWORD_MASK : std_logic_vector(31 downto 0) := x"4d41534b"; -- ASCII 'MASK'
             constant u_KEYWORD_HOLD : std_logic_vector(31 downto 0) := x"484f4c44"; -- ASCII 'HOLD'
+        -- Further commands for the ethernet trx may be necessary
+        -- since they can't be mapped to simple read/write operations.
+        -- For example, the module should reject new transmission
+        -- requests while the current one is ongoing. This also
+        -- calls for custom bus handlers.
 
     constant u_RESPONSE_ACKN : std_logic_vector(31 downto 0) := x"41434b4e"; -- ASCII 'ACKN'
     constant u_RESPONSE_ERR  : std_logic_vector(31 downto 0) := x"4552525f"; -- ASCII 'ERR_'
