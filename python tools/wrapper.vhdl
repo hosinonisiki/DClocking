@@ -263,6 +263,8 @@ end entity wrapper;
 architecture peripheral_wrapper of wrapper is
     signal sys_clk : std_logic;
     signal sys_clk_buf : std_logic;
+    signal sys_clk_125M : std_logic;
+    signal sys_clk_125M_buf : std_logic;
     signal sys_rst : std_logic;
     signal sys_rst_bar : std_logic;
 
@@ -527,13 +529,23 @@ architecture peripheral_wrapper of wrapper is
     -- Shift clock frequency from 200MHz to 250MHz, which is one half of fast dac frequency.
     signal sys_clk_locked : std_logic;
     component sys_clk_mmcm
-        port (
+        port(
             clk_out1            : out    std_logic;
             clk_out2            : out    std_logic;
             reset               : in     std_logic;
             locked              : out    std_logic;
             clk_in1_p           : in     std_logic;
             clk_in1_n           : in     std_logic
+        );
+    end component;
+    component sys_clk_pll
+        port(
+            clk_out1          : out    std_logic;
+            clk_out2          : out    std_logic;
+            reset             : in     std_logic;
+            locked            : out    std_logic;
+            clk_in1_p         : in     std_logic;
+            clk_in1_n         : in     std_logic
         );
     end component;
 begin
@@ -840,8 +852,9 @@ begin
     -- io management
 
     -- clk
-    sys_clk_mmcm_inst : sys_clk_mmcm port map(
+    sys_clk_pll_inst : sys_clk_pll port map(
         clk_out1 => sys_clk_buf,
+        clk_out2 => sys_clk_125M_buf,
         reset => '0',
         locked => sys_clk_locked,
         clk_in1_p => sys_clk_p,
@@ -851,6 +864,11 @@ begin
         O => sys_clk,
         CE => sys_clk_locked,
         I => sys_clk_buf
+    );
+    sys_clk_125M_bufgce : BUFGCE port map(
+        O => sys_clk_125M,
+        CE => sys_clk_locked,
+        I => sys_clk_125M_buf
     );
 
     -- rst
