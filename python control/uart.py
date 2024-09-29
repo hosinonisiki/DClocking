@@ -12,7 +12,9 @@ class MySerial(Serial):
         print(response)
         response = self.read_until(b"!")
         print(response)
-        return  
+        if response[:5] != b":ACKN":
+            raise Exception("Error in transmission")
+        return response
 
    
 if __name__ == "__main__":

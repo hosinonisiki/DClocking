@@ -19,38 +19,52 @@ class ModuleSignalRouter(module.ModuleBase):
     channel_count = 96
     port_count = 64
 
-    def __init__(self, bus):
+    def __init__(self, bus, full_connection = True):
         super().__init__(bus, "ROUT")
-        self.routing_config = list(range(10)) * 8 + list(range(16))
-        self.routing_enable = [1] * self.channel_count
-        self.port_config = list(range(64))
-        self.port_enable = [1] * 64
-        self.bits = self.encode()
-        self.last_bits = self.bits
+        self.full_connection = full_connection
+        if full_connection:
+            self.port_config = list(range(64))
+            self.port_enable = [1] * 64
+            self.encode()
+            self.last_bits = self.bits
+        else:
+            self.routing_config = list(range(10)) * 8 + list(range(16))
+            self.routing_enable = [1] * self.channel_count
+            self.port_config = list(range(64))
+            self.port_enable = [1] * 64
+            self.encode()
+            self.last_bits = self.bits
 
     def reset(self):
         super().reset()
-        self.routing_config = list(range(10)) * 8 + list(range(16))
-        self.routing_enable = [1] * self.channel_count
-        self.port_config = list(range(64))
-        self.port_enable = [1] * 64
-        self.bits = self.encode()
-        self.last_bits = self.bits
+        if self.full_connection:
+            self.port_config = list(range(64))
+            self.port_enable = [1] * 64
+            self.encode()
+            self.last_bits = self.bits
+        else:
+            self.routing_config = list(range(10)) * 8 + list(range(16))
+            self.routing_enable = [1] * self.channel_count
+            self.port_config = list(range(64))
+            self.port_enable = [1] * 64
+            self.encode()
+            self.last_bits = self.bits
 
     # Do not expose internal routing methods
     def _set_routing(self, channel, source):
+        assert not self.full_connection
         self.routing_config[channel] = source
-        self.bits = self.encode()
 
     def _enable(self, channel):
+        assert not self.full_connection
         self.routing_enable[channel] = 1
-        self.bits = self.encode()
 
     def _disable(self, channel):
+        assert not self.full_connection
         self.routing_enable[channel] = 0
-        self.bits = self.encode()
 
     def implement_routing(self):
+        assert not self.full_connection, "Full connection mode does not require routing implementation."
         # Check if the routing configuration can be realized
         need_forward = [0] * 8
         receive_forward = [0] * 8
@@ -94,8 +108,6 @@ class ModuleSignalRouter(module.ModuleBase):
 
     def set_routing(self, port, source):
         self.port_config[port] = source
-        self.bits = self.encode()
-        self.upload()
 
     def enable(self, port):
         self.port_enable[port] = 1
@@ -104,20 +116,35 @@ class ModuleSignalRouter(module.ModuleBase):
         self.port_enable[port] = 0
 
     def encode(self):
-        bits = ""
-        for i in range(self.channel_count):
-            bits = bin(self.routing_config[i])[2:].zfill(4) + bits
-            bits = str(self.routing_enable[i]) + bits
-        bits = bits.zfill(512)
-        return bits
+        if self.full_connection:
+            bits = ""
+            for i in range(self.port_count):
+                bits = bin(self.port_config[i])[2:].zfill(6) + bits
+                bits = str(self.port_enable[i]) + bits
+                bits = "0" + bits
+            bits = bits.zfill(512)
+        else:
+            bits = ""
+            for i in range(self.channel_count):
+                bits = bin(self.routing_config[i])[2:].zfill(4) + bits
+                bits = str(self.routing_enable[i]) + bits
+            bits = bits.zfill(512)
+        self.bits = bits
+        return
+    
+    def get_bytes(self):
+        self.encode()
+        return "".join([hex(int(self.bits[i * 8: (i + 1) * 8], 2))[2:] for i in range(64)])
     
     def upload(self):
+        self.encode()
         for i in range(15, -1, -1):
             if self.bits[i * 32: (i + 1) * 32] != self.last_bits[i * 32: (i + 1) * 32]:
                 self.write((15 - i), int(self.bits[i * 32: (i + 1) * 32], 2))
         self.last_bits = self.bits
 
     def plot(self):
+        assert not self.full_connection, "Full connection mode does not require routing visualization."
         # Draw a schematic to show the connectivity
         fig, ax = plt.subplots(1, 1, figsize=(15, 7))
 
@@ -161,5 +188,5 @@ if __name__ == "__main__":
     r.set_routing(1, 48)
     r.set_routing(19, 11)
     r.set_routing(36, 13)
-    r.implement_routing()
-    r.plot()
+    #r.implement_routing()
+    #r.plot()
