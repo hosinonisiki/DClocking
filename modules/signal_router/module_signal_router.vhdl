@@ -53,7 +53,7 @@ architecture structural of module_signal_router is
     signal ren              :   std_logic; -- Read enable signal
 begin
     
-    core_entity : entity work.signal_router(full) port map(
+    core_entity : entity work.signal_router(structural) port map(
         clk             =>  clk,
         rst             =>  core_rst,
         core_param_in   =>  core_param,
@@ -106,3 +106,79 @@ begin
     handler_rst <= rst;
 
 end architecture structural;
+
+-- Since synthesis will wipe out unused channels,
+-- enabling full connections so far will not ocuupy
+-- too many resources.
+architecture full of module_signal_router is
+    signal core_param       :   std_logic_vector(511 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
+    signal core_rst         :   std_logic := '1';
+
+    signal ram_rst          :   std_logic := '1';
+    signal handler_rst      :   std_logic := '1';
+
+    signal wdata            :   std_logic_vector(dbus_w - 1 downto 0); -- Data to be written to the ram
+    signal waddr            :   std_logic_vector(abus_w - 1 downto 0); -- Address to write to
+    signal wmask            :   std_logic_vector(dbus_w - 1 downto 0); -- Data mask
+    signal wval             :   std_logic; -- Valid signal
+    signal wen              :   std_logic; -- Write enable signal. The writing process starts as soon as wen is active, but the data is only written once wval is active. 
+                                       -- This is to make sure that parameters longer than dbus_w are written simultaneously.
+    signal rdata            :   std_logic_vector(dbus_w - 1 downto 0); -- Data read from the ram
+    signal raddr            :   std_logic_vector(abus_w - 1 downto 0); -- Address to read from
+    signal rval             :   std_logic; -- Valid signal, active when the data is ready
+    signal ren              :   std_logic; -- Read enable signal
+begin
+    
+    core_entity : entity work.signal_router(full) port map(
+        clk             =>  clk,
+        rst             =>  core_rst,
+        core_param_in   =>  core_param,
+        -- data flow ports
+        sig_in          =>  sig_in,
+        sig_out         =>  sig_out
+    );
+
+    parameter_ram : entity work.parameter_ram_512 generic map(
+        ram_default     =>  x"7f7e7d7c7b7a79787776757473727170" &
+                            x"6f6e6d6c6b6a69686766656463626160" &
+                            x"5f5e5d5c5b5a59585756555453525150" &
+                            x"4f4e4d4c4b4a49484746454443424140"
+    )port map(
+        clk             =>  clk,
+        rst             =>  ram_rst,
+        wdata_in        =>  wdata,
+        waddr_in        =>  waddr,
+        wmask_in        =>  wmask,
+        wval_in         =>  wval,
+        wen_in          =>  wen,
+        rdata_out       =>  rdata,
+        raddr_in        =>  raddr,
+        rval_out        =>  rval,
+        ren_in          =>  ren,
+        ram_data_out    =>  core_param
+    );
+
+    bus_handler : entity work.bus_handler port map(
+        clk             =>  clk,
+        rst             =>  handler_rst,
+        bus_en_in       =>  bus_en_in,
+        dbus_in         =>  dbus_in,
+        abus_in         =>  abus_in,
+        cbus_in         =>  cbus_in,
+        rsp_data_out    =>  rsp_data_out,
+        rsp_stat_out    =>  rsp_stat_out,
+        wdata_out       =>  wdata,
+        waddr_out       =>  waddr,
+        wmask_out       =>  wmask,
+        wval_out        =>  wval,
+        wen_out         =>  wen,
+        rdata_in        =>  rdata,
+        raddr_out       =>  raddr,
+        rval_in         =>  rval,
+        ren_out         =>  ren,
+        ram_rst_out     =>  ram_rst,
+        core_rst_out    =>  core_rst
+    );
+    handler_rst <= rst;
+
+end architecture full;

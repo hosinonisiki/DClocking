@@ -135,7 +135,7 @@ begin
         signal bus_en       :   std_logic;
     begin
         bus_en <= '1' when mbus = BUS_ROUT_ADDR else '0'; -- constant defined in mypak
-        module_1 : entity work.module_signal_router port map(
+        module_1 : entity work.module_signal_router(full) port map(
             clk             =>  clk,
             rst             =>  mod_rst(1),
             bus_en_in       =>  bus_en,

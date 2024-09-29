@@ -158,9 +158,14 @@ begin
     end generate;
 end architecture behavioral;
 
+-- Since synthesis will wipe out unused channels,
+-- enabling full connections so far will not ocuupy
+-- too many resources.
 architecture full of signal_router is
     signal sig_in_buf   :   signal_array(63 downto 0);
     signal sig_out_buf  :   signal_array(63 downto 0);
+
+    signal control      :   std_logic_vector(447 downto 0);
 begin
     use_input_buffer : if io_buf = buf_for_io or io_buf = buf_i_only generate
         process(clk)
@@ -196,13 +201,17 @@ begin
         sig_out <= (others => (others => '0')) when rst = '1' else sig_out_buf;
     end generate;
 
+    param_map : for i in 0 to 63 generate
+        control(7 * i + 6 downto 7 * i) <= core_param_in(8 * i + 6 downto 8 * i);
+    end generate;
+
     full_router : entity work.sub_router generic map(
         width              =>  64,
         log_width          =>  6
     )port map(
         clk                =>  clk,
         rst                =>  rst,
-        control_in         =>  core_param_in(447 downto 0),
+        control_in         =>  control,
         sig_in             =>  sig_in_buf,
         sig_out            =>  sig_out_buf
     );
