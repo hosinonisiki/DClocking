@@ -158,4 +158,54 @@ begin
     end generate;
 end architecture behavioral;
 
+architecture full of signal_router is
+    signal sig_in_buf   :   signal_array(63 downto 0);
+    signal sig_out_buf  :   signal_array(63 downto 0);
+begin
+    use_input_buffer : if io_buf = buf_for_io or io_buf = buf_i_only generate
+        process(clk)
+        begin
+            if rising_edge(clk) then
+                if rst = '1' then
+                    sig_in_buf <= (others => (others => '0'));
+                else
+                    sig_in_buf <= sig_in;
+                end if;
+            end if;
+        end process;
+    end generate;
+
+    no_input_buffer : if io_buf = buf_o_only or io_buf = buf_none generate
+        sig_in_buf <= (others => (others => '0')) when rst = '1' else sig_in;
+    end generate;
+
+    use_output_buffer : if io_buf = buf_for_io or io_buf = buf_o_only generate
+        process(clk)
+        begin
+            if rising_edge(clk) then
+                if rst = '1' then
+                    sig_out <= (others => (others => '0'));
+                else
+                    sig_out <= sig_out_buf;
+                end if;
+            end if;
+        end process;
+    end generate;
+
+    no_output_buffer : if io_buf = buf_i_only or io_buf = buf_none generate
+        sig_out <= (others => (others => '0')) when rst = '1' else sig_out_buf;
+    end generate;
+
+    full_router : entity work.sub_router generic map(
+        width              =>  64,
+        log_width          =>  6
+    )port map(
+        clk                =>  clk,
+        rst                =>  rst,
+        control_in         =>  core_param_in(447 downto 0),
+        sig_in             =>  sig_in_buf,
+        sig_out            =>  sig_out_buf
+    );
+end architecture full;
+
 

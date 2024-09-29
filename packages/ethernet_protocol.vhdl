@@ -136,12 +136,12 @@ package ethernet_protocol is
     -- successfully sent.
 
     -- Following are constants defined for the implementation of the ethernet interface instead of the protocol.
-    constant ETHER_STATUS_IDLE : std_logc_vector(3 downto 0) := x"0";
-    constant ETHER_STATUS_INITIALIZING : std_logc_vector(3 downto 0) := x"1";
-    constant ETHER_STATUS_TRANSMITTING : std_logc_vector(3 downto 0) := x"2";
-    constant ETHER_STATUS_LISTENING : std_logc_vector(3 downto 0) := x"3";
-    constant ETHER_STATUS_RECEIVING : std_logc_vector(3 downto 0) := x"4";
-    constant ETHER_STATUS_ERROR : std_logc_vector(3 downto 0) := x"5";
-    constant ETHER_STATUS_TIMEOUT : std_logc_vector(3 downto 0) := x"6";
-    constant ETHER_STATUS_SUCCESS : std_logc_vector(3 downto 0) := x"7";    
+    constant ETHER_STATUS_IDLE : std_logic_vector(3 downto 0) := x"0";
+    constant ETHER_STATUS_INITIALIZING : std_logic_vector(3 downto 0) := x"1";
+    constant ETHER_STATUS_TRANSMITTING : std_logic_vector(3 downto 0) := x"2";
+    constant ETHER_STATUS_LISTENING : std_logic_vector(3 downto 0) := x"3";
+    constant ETHER_STATUS_RECEIVING : std_logic_vector(3 downto 0) := x"4";
+    constant ETHER_STATUS_ERROR : std_logic_vector(3 downto 0) := x"5";
+    constant ETHER_STATUS_TIMEOUT : std_logic_vector(3 downto 0) := x"6";
+    constant ETHER_STATUS_SUCCESS : std_logic_vector(3 downto 0) := x"7";    
 end package ethernet_protocol;

@@ -35,74 +35,74 @@ entity wrapper is
         fmc1_lpc_clk0_n_b : out std_logic;
         fmc1_lpc_clk1_p_b : out std_logic;
         fmc1_lpc_clk1_n_b : out std_logic;
-        fmc1_lpc_la00_p_b : in std_logic;
-        fmc1_lpc_la00_n_b : in std_logic;
+        fmc1_lpc_la00_p_b : out std_logic;
+        fmc1_lpc_la00_n_b : out std_logic;
         fmc1_lpc_la01_p_b : out std_logic;
         fmc1_lpc_la01_n_b : out std_logic;
-        fmc1_lpc_la02_p_b : in std_logic;
-        fmc1_lpc_la02_n_b : in std_logic;
+        fmc1_lpc_la02_p_b : out std_logic;
+        fmc1_lpc_la02_n_b : out std_logic;
         fmc1_lpc_la03_p_b : out std_logic;
-        fmc1_lpc_la03_n_b : inout std_logic;
-        fmc1_lpc_la04_p_b : in std_logic;
-        fmc1_lpc_la04_n_b : in std_logic;
-        fmc1_lpc_la05_p_b : in std_logic;
-        fmc1_lpc_la05_n_b : in std_logic;
-        fmc1_lpc_la06_p_b : in std_logic;
-        fmc1_lpc_la06_n_b : in std_logic;
-        fmc1_lpc_la07_p_b : in std_logic;
-        fmc1_lpc_la07_n_b : in std_logic;
-        fmc1_lpc_la08_p_b : in std_logic;
-        fmc1_lpc_la08_n_b : in std_logic;
-        fmc1_lpc_la09_p_b : in std_logic;
-        fmc1_lpc_la09_n_b : in std_logic;
-        fmc1_lpc_la10_p_b : in std_logic;
-        fmc1_lpc_la10_n_b : in std_logic;
-        fmc1_lpc_la11_p_b : in std_logic;
-        fmc1_lpc_la11_n_b : in std_logic;
-        fmc1_lpc_la12_p_b : in std_logic;
-        fmc1_lpc_la12_n_b : in std_logic;
-        fmc1_lpc_la13_p_b : in std_logic;
-        fmc1_lpc_la13_n_b : in std_logic;
-        fmc1_lpc_la14_p_b : in std_logic;
-        fmc1_lpc_la14_n_b : in std_logic;
-        fmc1_lpc_la15_p_b : in std_logic;
+        fmc1_lpc_la03_n_b : out std_logic;
+        fmc1_lpc_la04_p_b : out std_logic;
+        fmc1_lpc_la04_n_b : out std_logic;
+        fmc1_lpc_la05_p_b : out std_logic;
+        fmc1_lpc_la05_n_b : out std_logic;
+        fmc1_lpc_la06_p_b : out std_logic;
+        fmc1_lpc_la06_n_b : out std_logic;
+        fmc1_lpc_la07_p_b : out std_logic;
+        fmc1_lpc_la07_n_b : out std_logic;
+        fmc1_lpc_la08_p_b : out std_logic;
+        fmc1_lpc_la08_n_b : out std_logic;
+        fmc1_lpc_la09_p_b : out std_logic;
+        fmc1_lpc_la09_n_b : out std_logic;
+        fmc1_lpc_la10_p_b : out std_logic;
+        fmc1_lpc_la10_n_b : out std_logic;
+        fmc1_lpc_la11_p_b : out std_logic;
+        fmc1_lpc_la11_n_b : out std_logic;
+        fmc1_lpc_la12_p_b : out std_logic;
+        fmc1_lpc_la12_n_b : out std_logic;
+        fmc1_lpc_la13_p_b : out std_logic;
+        fmc1_lpc_la13_n_b : out std_logic;
+        fmc1_lpc_la14_p_b : out std_logic;
+        fmc1_lpc_la14_n_b : out std_logic;
+        fmc1_lpc_la15_p_b : out std_logic;
         fmc1_lpc_la15_n_b : out std_logic;
-        fmc1_lpc_la16_p_b : in std_logic;
-        fmc1_lpc_la16_n_b : in std_logic;
+        fmc1_lpc_la16_p_b : out std_logic;
+        fmc1_lpc_la16_n_b : out std_logic;
         fmc1_lpc_la17_p_b : out std_logic;
         fmc1_lpc_la17_n_b : out std_logic;
-        fmc1_lpc_la18_p_b : in std_logic;
-        fmc1_lpc_la18_n_b : in std_logic;
-        fmc1_lpc_la19_p_b : in std_logic;
-        fmc1_lpc_la19_n_b : in std_logic;
-        fmc1_lpc_la20_p_b : in std_logic;
-        fmc1_lpc_la20_n_b : in std_logic;
-        fmc1_lpc_la21_p_b : in std_logic;
-        fmc1_lpc_la21_n_b : in std_logic;
-        fmc1_lpc_la22_p_b : in std_logic;
-        fmc1_lpc_la22_n_b : in std_logic;
-        fmc1_lpc_la23_p_b : inout std_logic;
+        fmc1_lpc_la18_p_b : out std_logic;
+        fmc1_lpc_la18_n_b : out std_logic;
+        fmc1_lpc_la19_p_b : out std_logic;
+        fmc1_lpc_la19_n_b : out std_logic;
+        fmc1_lpc_la20_p_b : out std_logic;
+        fmc1_lpc_la20_n_b : out std_logic;
+        fmc1_lpc_la21_p_b : out std_logic;
+        fmc1_lpc_la21_n_b : out std_logic;
+        fmc1_lpc_la22_p_b : out std_logic;
+        fmc1_lpc_la22_n_b : out std_logic;
+        fmc1_lpc_la23_p_b : out std_logic;
         fmc1_lpc_la23_n_b : out std_logic;
-        fmc1_lpc_la24_p_b : in std_logic;
-        fmc1_lpc_la24_n_b : in std_logic;
-        fmc1_lpc_la25_p_b : in std_logic;
-        fmc1_lpc_la25_n_b : in std_logic;
-        fmc1_lpc_la26_p_b : in std_logic;
-        fmc1_lpc_la26_n_b : in std_logic;
-        fmc1_lpc_la27_p_b : in std_logic;
-        fmc1_lpc_la27_n_b : in std_logic;
-        fmc1_lpc_la28_p_b : in std_logic;
-        fmc1_lpc_la28_n_b : in std_logic;
-        fmc1_lpc_la29_p_b : in std_logic;
-        fmc1_lpc_la29_n_b : in std_logic;
-        fmc1_lpc_la30_p_b : in std_logic;
-        fmc1_lpc_la30_n_b : in std_logic;
-        fmc1_lpc_la31_p_b : in std_logic;
-        fmc1_lpc_la31_n_b : in std_logic;
-        fmc1_lpc_la32_p_b : in std_logic;
+        fmc1_lpc_la24_p_b : out std_logic;
+        fmc1_lpc_la24_n_b : out std_logic;
+        fmc1_lpc_la25_p_b : out std_logic;
+        fmc1_lpc_la25_n_b : out std_logic;
+        fmc1_lpc_la26_p_b : out std_logic;
+        fmc1_lpc_la26_n_b : out std_logic;
+        fmc1_lpc_la27_p_b : out std_logic;
+        fmc1_lpc_la27_n_b : out std_logic;
+        fmc1_lpc_la28_p_b : out std_logic;
+        fmc1_lpc_la28_n_b : out std_logic;
+        fmc1_lpc_la29_p_b : out std_logic;
+        fmc1_lpc_la29_n_b : out std_logic;
+        fmc1_lpc_la30_p_b : out std_logic;
+        fmc1_lpc_la30_n_b : out std_logic;
+        fmc1_lpc_la31_p_b : out std_logic;
+        fmc1_lpc_la31_n_b : out std_logic;
+        fmc1_lpc_la32_p_b : out std_logic;
         fmc1_lpc_la32_n_b : out std_logic;
-        fmc1_lpc_la33_p_b : in std_logic;
-        fmc1_lpc_la33_n_b : in std_logic;
+        fmc1_lpc_la33_p_b : out std_logic;
+        fmc1_lpc_la33_n_b : out std_logic;
         fmc1_lpc_scl_b : out std_logic;
         fmc1_lpc_sda_b : out std_logic;
 
@@ -185,74 +185,74 @@ entity wrapper is
         fmc3_hpc_clk0_n_b : out std_logic;
         fmc3_hpc_clk1_p_b : out std_logic;
         fmc3_hpc_clk1_n_b : out std_logic;
-        fmc3_hpc_la00_p_b : out std_logic;
-        fmc3_hpc_la00_n_b : out std_logic;
+        fmc3_hpc_la00_p_b : in std_logic;
+        fmc3_hpc_la00_n_b : in std_logic;
         fmc3_hpc_la01_p_b : out std_logic;
         fmc3_hpc_la01_n_b : out std_logic;
-        fmc3_hpc_la02_p_b : out std_logic;
-        fmc3_hpc_la02_n_b : out std_logic;
+        fmc3_hpc_la02_p_b : in std_logic;
+        fmc3_hpc_la02_n_b : in std_logic;
         fmc3_hpc_la03_p_b : out std_logic;
-        fmc3_hpc_la03_n_b : out std_logic;
-        fmc3_hpc_la04_p_b : out std_logic;
-        fmc3_hpc_la04_n_b : out std_logic;
-        fmc3_hpc_la05_p_b : out std_logic;
-        fmc3_hpc_la05_n_b : out std_logic;
-        fmc3_hpc_la06_p_b : out std_logic;
-        fmc3_hpc_la06_n_b : out std_logic;
-        fmc3_hpc_la07_p_b : out std_logic;
-        fmc3_hpc_la07_n_b : out std_logic;
-        fmc3_hpc_la08_p_b : out std_logic;
-        fmc3_hpc_la08_n_b : out std_logic;
-        fmc3_hpc_la09_p_b : out std_logic;
-        fmc3_hpc_la09_n_b : out std_logic;
-        fmc3_hpc_la10_p_b : out std_logic;
-        fmc3_hpc_la10_n_b : out std_logic;
-        fmc3_hpc_la11_p_b : out std_logic;
-        fmc3_hpc_la11_n_b : out std_logic;
-        fmc3_hpc_la12_p_b : out std_logic;
-        fmc3_hpc_la12_n_b : out std_logic;
-        fmc3_hpc_la13_p_b : out std_logic;
-        fmc3_hpc_la13_n_b : out std_logic;
-        fmc3_hpc_la14_p_b : out std_logic;
-        fmc3_hpc_la14_n_b : out std_logic;
-        fmc3_hpc_la15_p_b : out std_logic;
+        fmc3_hpc_la03_n_b : inout std_logic;
+        fmc3_hpc_la04_p_b : in std_logic;
+        fmc3_hpc_la04_n_b : in std_logic;
+        fmc3_hpc_la05_p_b : in std_logic;
+        fmc3_hpc_la05_n_b : in std_logic;
+        fmc3_hpc_la06_p_b : in std_logic;
+        fmc3_hpc_la06_n_b : in std_logic;
+        fmc3_hpc_la07_p_b : in std_logic;
+        fmc3_hpc_la07_n_b : in std_logic;
+        fmc3_hpc_la08_p_b : in std_logic;
+        fmc3_hpc_la08_n_b : in std_logic;
+        fmc3_hpc_la09_p_b : in std_logic;
+        fmc3_hpc_la09_n_b : in std_logic;
+        fmc3_hpc_la10_p_b : in std_logic;
+        fmc3_hpc_la10_n_b : in std_logic;
+        fmc3_hpc_la11_p_b : in std_logic;
+        fmc3_hpc_la11_n_b : in std_logic;
+        fmc3_hpc_la12_p_b : in std_logic;
+        fmc3_hpc_la12_n_b : in std_logic;
+        fmc3_hpc_la13_p_b : in std_logic;
+        fmc3_hpc_la13_n_b : in std_logic;
+        fmc3_hpc_la14_p_b : in std_logic;
+        fmc3_hpc_la14_n_b : in std_logic;
+        fmc3_hpc_la15_p_b : in std_logic;
         fmc3_hpc_la15_n_b : out std_logic;
-        fmc3_hpc_la16_p_b : out std_logic;
-        fmc3_hpc_la16_n_b : out std_logic;
+        fmc3_hpc_la16_p_b : in std_logic;
+        fmc3_hpc_la16_n_b : in std_logic;
         fmc3_hpc_la17_p_b : out std_logic;
         fmc3_hpc_la17_n_b : out std_logic;
-        fmc3_hpc_la18_p_b : out std_logic;
-        fmc3_hpc_la18_n_b : out std_logic;
-        fmc3_hpc_la19_p_b : out std_logic;
-        fmc3_hpc_la19_n_b : out std_logic;
-        fmc3_hpc_la20_p_b : out std_logic;
-        fmc3_hpc_la20_n_b : out std_logic;
-        fmc3_hpc_la21_p_b : out std_logic;
-        fmc3_hpc_la21_n_b : out std_logic;
-        fmc3_hpc_la22_p_b : out std_logic;
-        fmc3_hpc_la22_n_b : out std_logic;
-        fmc3_hpc_la23_p_b : out std_logic;
+        fmc3_hpc_la18_p_b : in std_logic;
+        fmc3_hpc_la18_n_b : in std_logic;
+        fmc3_hpc_la19_p_b : in std_logic;
+        fmc3_hpc_la19_n_b : in std_logic;
+        fmc3_hpc_la20_p_b : in std_logic;
+        fmc3_hpc_la20_n_b : in std_logic;
+        fmc3_hpc_la21_p_b : in std_logic;
+        fmc3_hpc_la21_n_b : in std_logic;
+        fmc3_hpc_la22_p_b : in std_logic;
+        fmc3_hpc_la22_n_b : in std_logic;
+        fmc3_hpc_la23_p_b : inout std_logic;
         fmc3_hpc_la23_n_b : out std_logic;
-        fmc3_hpc_la24_p_b : out std_logic;
-        fmc3_hpc_la24_n_b : out std_logic;
-        fmc3_hpc_la25_p_b : out std_logic;
-        fmc3_hpc_la25_n_b : out std_logic;
-        fmc3_hpc_la26_p_b : out std_logic;
-        fmc3_hpc_la26_n_b : out std_logic;
-        fmc3_hpc_la27_p_b : out std_logic;
-        fmc3_hpc_la27_n_b : out std_logic;
-        fmc3_hpc_la28_p_b : out std_logic;
-        fmc3_hpc_la28_n_b : out std_logic;
-        fmc3_hpc_la29_p_b : out std_logic;
-        fmc3_hpc_la29_n_b : out std_logic;
-        fmc3_hpc_la30_p_b : out std_logic;
-        fmc3_hpc_la30_n_b : out std_logic;
-        fmc3_hpc_la31_p_b : out std_logic;
-        fmc3_hpc_la31_n_b : out std_logic;
-        fmc3_hpc_la32_p_b : out std_logic;
+        fmc3_hpc_la24_p_b : in std_logic;
+        fmc3_hpc_la24_n_b : in std_logic;
+        fmc3_hpc_la25_p_b : in std_logic;
+        fmc3_hpc_la25_n_b : in std_logic;
+        fmc3_hpc_la26_p_b : in std_logic;
+        fmc3_hpc_la26_n_b : in std_logic;
+        fmc3_hpc_la27_p_b : in std_logic;
+        fmc3_hpc_la27_n_b : in std_logic;
+        fmc3_hpc_la28_p_b : in std_logic;
+        fmc3_hpc_la28_n_b : in std_logic;
+        fmc3_hpc_la29_p_b : in std_logic;
+        fmc3_hpc_la29_n_b : in std_logic;
+        fmc3_hpc_la30_p_b : in std_logic;
+        fmc3_hpc_la30_n_b : in std_logic;
+        fmc3_hpc_la31_p_b : in std_logic;
+        fmc3_hpc_la31_n_b : in std_logic;
+        fmc3_hpc_la32_p_b : in std_logic;
         fmc3_hpc_la32_n_b : out std_logic;
-        fmc3_hpc_la33_p_b : out std_logic;
-        fmc3_hpc_la33_n_b : out std_logic;
+        fmc3_hpc_la33_p_b : in std_logic;
+        fmc3_hpc_la33_n_b : in std_logic;
         fmc3_hpc_scl_b : out std_logic;
         fmc3_hpc_sda_b : out std_logic
 
@@ -312,69 +312,79 @@ architecture peripheral_wrapper of wrapper is
 
     -- SIGNAL DECLARATION GENERATION START
 
-    signal adc_a_b_data_fmc_buf : std_logic_vector(11 downto 0);
-    signal adc_c_d_data_fmc_buf : std_logic_vector(11 downto 0);
-    signal adc_a_b_dco_fmc_buf : std_logic;
-    signal adc_c_d_dco_fmc_buf : std_logic;
-    signal adc_a_b_spi_ss_fmc_buf : std_logic;
-    signal adc_c_d_spi_ss_fmc_buf : std_logic;
-    signal adc_spi_sck_fmc_buf : std_logic;
-    signal adc_spi_mosi_fmc_buf : std_logic;
-    signal adc1_spi_miso_fmc_buf : std_logic;
-    signal adc2_spi_miso_fmc_buf : std_logic;
-    signal adc_spi_io_tri_fmc_buf : std_logic;
-    signal adc_clk_125M_fmc_buf : std_logic;
-    signal adc_eeprom_iic_scl_fmc_buf : std_logic;
-    signal adc_eeprom_iic_sda_fmc_buf : std_logic;
+    signal j2_40p_fmc_buf : std_logic_vector(3 to 36);
+    signal j3_40p_fmc_buf : std_logic_vector(3 to 36);
+    signal lpc240p_eeprom_iic_scl_fmc_buf : std_logic;
+    signal lpc240p_eeprom_iic_sda_fmc_buf : std_logic;
     
     signal fmc1_lpc_clk0_p : std_logic;
     signal fmc1_lpc_clk0_n : std_logic;
     signal fmc1_lpc_clk1_p : std_logic;
     signal fmc1_lpc_clk1_n : std_logic;
-    signal fmc1_lpc_la00_buf : std_logic;
-    signal fmc1_lpc_la00 : std_logic;
+    signal fmc1_lpc_la00_p : std_logic;
+    signal fmc1_lpc_la00_n : std_logic;
     signal fmc1_lpc_la01_p : std_logic;
     signal fmc1_lpc_la01_n : std_logic;
-    signal fmc1_lpc_la02 : std_logic;
+    signal fmc1_lpc_la02_p : std_logic;
+    signal fmc1_lpc_la02_n : std_logic;
     signal fmc1_lpc_la03_p : std_logic;
-    signal fmc1_lpc_la03_no : std_logic;
-    signal fmc1_lpc_la03_ni : std_logic;
-    signal fmc1_lpc_la03_nt : std_logic;
-    signal fmc1_lpc_la04 : std_logic;
-    signal fmc1_lpc_la05 : std_logic;
-    signal fmc1_lpc_la06 : std_logic;
-    signal fmc1_lpc_la07 : std_logic;
-    signal fmc1_lpc_la08 : std_logic;
-    signal fmc1_lpc_la09 : std_logic;
-    signal fmc1_lpc_la10 : std_logic;
-    signal fmc1_lpc_la11 : std_logic;
-    signal fmc1_lpc_la12 : std_logic;
-    signal fmc1_lpc_la13 : std_logic;
-    signal fmc1_lpc_la14 : std_logic;
+    signal fmc1_lpc_la03_n : std_logic;
+    signal fmc1_lpc_la04_p : std_logic;
+    signal fmc1_lpc_la04_n : std_logic;
+    signal fmc1_lpc_la05_p : std_logic;
+    signal fmc1_lpc_la05_n : std_logic;
+    signal fmc1_lpc_la06_p : std_logic;
+    signal fmc1_lpc_la06_n : std_logic;
+    signal fmc1_lpc_la07_p : std_logic;
+    signal fmc1_lpc_la07_n : std_logic;
+    signal fmc1_lpc_la08_p : std_logic;
+    signal fmc1_lpc_la08_n : std_logic;
+    signal fmc1_lpc_la09_p : std_logic;
+    signal fmc1_lpc_la09_n : std_logic;
+    signal fmc1_lpc_la10_p : std_logic;
+    signal fmc1_lpc_la10_n : std_logic;
+    signal fmc1_lpc_la11_p : std_logic;
+    signal fmc1_lpc_la11_n : std_logic;
+    signal fmc1_lpc_la12_p : std_logic;
+    signal fmc1_lpc_la12_n : std_logic;
+    signal fmc1_lpc_la13_p : std_logic;
+    signal fmc1_lpc_la13_n : std_logic;
+    signal fmc1_lpc_la14_p : std_logic;
+    signal fmc1_lpc_la14_n : std_logic;
     signal fmc1_lpc_la15_p : std_logic;
     signal fmc1_lpc_la15_n : std_logic;
     signal fmc1_lpc_la16_p : std_logic;
     signal fmc1_lpc_la16_n : std_logic;
     signal fmc1_lpc_la17_p : std_logic;
     signal fmc1_lpc_la17_n : std_logic;
-    signal fmc1_lpc_la18_buf : std_logic;
-    signal fmc1_lpc_la18 : std_logic;
-    signal fmc1_lpc_la19 : std_logic;
-    signal fmc1_lpc_la20 : std_logic;
-    signal fmc1_lpc_la21 : std_logic;
-    signal fmc1_lpc_la22 : std_logic;
-    signal fmc1_lpc_la23_po : std_logic;
-    signal fmc1_lpc_la23_pi : std_logic;
-    signal fmc1_lpc_la23_pt : std_logic;
+    signal fmc1_lpc_la18_p : std_logic;
+    signal fmc1_lpc_la18_n : std_logic;
+    signal fmc1_lpc_la19_p : std_logic;
+    signal fmc1_lpc_la19_n : std_logic;
+    signal fmc1_lpc_la20_p : std_logic;
+    signal fmc1_lpc_la20_n : std_logic;
+    signal fmc1_lpc_la21_p : std_logic;
+    signal fmc1_lpc_la21_n : std_logic;
+    signal fmc1_lpc_la22_p : std_logic;
+    signal fmc1_lpc_la22_n : std_logic;
+    signal fmc1_lpc_la23_p : std_logic;
     signal fmc1_lpc_la23_n : std_logic;
-    signal fmc1_lpc_la24 : std_logic;
-    signal fmc1_lpc_la25 : std_logic;
-    signal fmc1_lpc_la26 : std_logic;
-    signal fmc1_lpc_la27 : std_logic;
-    signal fmc1_lpc_la28 : std_logic;
-    signal fmc1_lpc_la29 : std_logic;
-    signal fmc1_lpc_la30 : std_logic;
-    signal fmc1_lpc_la31 : std_logic;
+    signal fmc1_lpc_la24_p : std_logic;
+    signal fmc1_lpc_la24_n : std_logic;
+    signal fmc1_lpc_la25_p : std_logic;
+    signal fmc1_lpc_la25_n : std_logic;
+    signal fmc1_lpc_la26_p : std_logic;
+    signal fmc1_lpc_la26_n : std_logic;
+    signal fmc1_lpc_la27_p : std_logic;
+    signal fmc1_lpc_la27_n : std_logic;
+    signal fmc1_lpc_la28_p : std_logic;
+    signal fmc1_lpc_la28_n : std_logic;
+    signal fmc1_lpc_la29_p : std_logic;
+    signal fmc1_lpc_la29_n : std_logic;
+    signal fmc1_lpc_la30_p : std_logic;
+    signal fmc1_lpc_la30_n : std_logic;
+    signal fmc1_lpc_la31_p : std_logic;
+    signal fmc1_lpc_la31_n : std_logic;
     signal fmc1_lpc_la32_p : std_logic;
     signal fmc1_lpc_la32_n : std_logic;
     signal fmc1_lpc_la33_p : std_logic;
@@ -442,79 +452,69 @@ architecture peripheral_wrapper of wrapper is
     signal fmc2_lpc_scl : std_logic;
     signal fmc2_lpc_sda : std_logic;
 
-    signal j2_40p_fmc_buf : std_logic_vector(3 to 36);
-    signal j3_40p_fmc_buf : std_logic_vector(3 to 36);
-    signal lpc240p_eeprom_iic_scl_fmc_buf : std_logic;
-    signal lpc240p_eeprom_iic_sda_fmc_buf : std_logic;
+    signal adc_a_b_data_fmc_buf : std_logic_vector(11 downto 0);
+    signal adc_c_d_data_fmc_buf : std_logic_vector(11 downto 0);
+    signal adc_a_b_dco_fmc_buf : std_logic;
+    signal adc_c_d_dco_fmc_buf : std_logic;
+    signal adc_a_b_spi_ss_fmc_buf : std_logic;
+    signal adc_c_d_spi_ss_fmc_buf : std_logic;
+    signal adc_spi_sck_fmc_buf : std_logic;
+    signal adc_spi_mosi_fmc_buf : std_logic;
+    signal adc1_spi_miso_fmc_buf : std_logic;
+    signal adc2_spi_miso_fmc_buf : std_logic;
+    signal adc_spi_io_tri_fmc_buf : std_logic;
+    signal adc_clk_125M_fmc_buf : std_logic;
+    signal adc_eeprom_iic_scl_fmc_buf : std_logic;
+    signal adc_eeprom_iic_sda_fmc_buf : std_logic;
     
     signal fmc3_hpc_clk0_p : std_logic;
     signal fmc3_hpc_clk0_n : std_logic;
     signal fmc3_hpc_clk1_p : std_logic;
     signal fmc3_hpc_clk1_n : std_logic;
-    signal fmc3_hpc_la00_p : std_logic;
-    signal fmc3_hpc_la00_n : std_logic;
+    signal fmc3_hpc_la00_buf : std_logic;
+    signal fmc3_hpc_la00 : std_logic;
     signal fmc3_hpc_la01_p : std_logic;
     signal fmc3_hpc_la01_n : std_logic;
-    signal fmc3_hpc_la02_p : std_logic;
-    signal fmc3_hpc_la02_n : std_logic;
+    signal fmc3_hpc_la02 : std_logic;
     signal fmc3_hpc_la03_p : std_logic;
-    signal fmc3_hpc_la03_n : std_logic;
-    signal fmc3_hpc_la04_p : std_logic;
-    signal fmc3_hpc_la04_n : std_logic;
-    signal fmc3_hpc_la05_p : std_logic;
-    signal fmc3_hpc_la05_n : std_logic;
-    signal fmc3_hpc_la06_p : std_logic;
-    signal fmc3_hpc_la06_n : std_logic;
-    signal fmc3_hpc_la07_p : std_logic;
-    signal fmc3_hpc_la07_n : std_logic;
-    signal fmc3_hpc_la08_p : std_logic;
-    signal fmc3_hpc_la08_n : std_logic;
-    signal fmc3_hpc_la09_p : std_logic;
-    signal fmc3_hpc_la09_n : std_logic;
-    signal fmc3_hpc_la10_p : std_logic;
-    signal fmc3_hpc_la10_n : std_logic;
-    signal fmc3_hpc_la11_p : std_logic;
-    signal fmc3_hpc_la11_n : std_logic;
-    signal fmc3_hpc_la12_p : std_logic;
-    signal fmc3_hpc_la12_n : std_logic;
-    signal fmc3_hpc_la13_p : std_logic;
-    signal fmc3_hpc_la13_n : std_logic;
-    signal fmc3_hpc_la14_p : std_logic;
-    signal fmc3_hpc_la14_n : std_logic;
+    signal fmc3_hpc_la03_no : std_logic;
+    signal fmc3_hpc_la03_ni : std_logic;
+    signal fmc3_hpc_la03_nt : std_logic;
+    signal fmc3_hpc_la04 : std_logic;
+    signal fmc3_hpc_la05 : std_logic;
+    signal fmc3_hpc_la06 : std_logic;
+    signal fmc3_hpc_la07 : std_logic;
+    signal fmc3_hpc_la08 : std_logic;
+    signal fmc3_hpc_la09 : std_logic;
+    signal fmc3_hpc_la10 : std_logic;
+    signal fmc3_hpc_la11 : std_logic;
+    signal fmc3_hpc_la12 : std_logic;
+    signal fmc3_hpc_la13 : std_logic;
+    signal fmc3_hpc_la14 : std_logic;
     signal fmc3_hpc_la15_p : std_logic;
     signal fmc3_hpc_la15_n : std_logic;
     signal fmc3_hpc_la16_p : std_logic;
     signal fmc3_hpc_la16_n : std_logic;
     signal fmc3_hpc_la17_p : std_logic;
     signal fmc3_hpc_la17_n : std_logic;
-    signal fmc3_hpc_la18_p : std_logic;
-    signal fmc3_hpc_la18_n : std_logic;
-    signal fmc3_hpc_la19_p : std_logic;
-    signal fmc3_hpc_la19_n : std_logic;
-    signal fmc3_hpc_la20_p : std_logic;
-    signal fmc3_hpc_la20_n : std_logic;
-    signal fmc3_hpc_la21_p : std_logic;
-    signal fmc3_hpc_la21_n : std_logic;
-    signal fmc3_hpc_la22_p : std_logic;
-    signal fmc3_hpc_la22_n : std_logic;
-    signal fmc3_hpc_la23_p : std_logic;
+    signal fmc3_hpc_la18_buf : std_logic;
+    signal fmc3_hpc_la18 : std_logic;
+    signal fmc3_hpc_la19 : std_logic;
+    signal fmc3_hpc_la20 : std_logic;
+    signal fmc3_hpc_la21 : std_logic;
+    signal fmc3_hpc_la22 : std_logic;
+    signal fmc3_hpc_la23_po : std_logic;
+    signal fmc3_hpc_la23_pi : std_logic;
+    signal fmc3_hpc_la23_pt : std_logic;
     signal fmc3_hpc_la23_n : std_logic;
-    signal fmc3_hpc_la24_p : std_logic;
-    signal fmc3_hpc_la24_n : std_logic;
-    signal fmc3_hpc_la25_p : std_logic;
-    signal fmc3_hpc_la25_n : std_logic;
-    signal fmc3_hpc_la26_p : std_logic;
-    signal fmc3_hpc_la26_n : std_logic;
-    signal fmc3_hpc_la27_p : std_logic;
-    signal fmc3_hpc_la27_n : std_logic;
-    signal fmc3_hpc_la28_p : std_logic;
-    signal fmc3_hpc_la28_n : std_logic;
-    signal fmc3_hpc_la29_p : std_logic;
-    signal fmc3_hpc_la29_n : std_logic;
-    signal fmc3_hpc_la30_p : std_logic;
-    signal fmc3_hpc_la30_n : std_logic;
-    signal fmc3_hpc_la31_p : std_logic;
-    signal fmc3_hpc_la31_n : std_logic;
+    signal fmc3_hpc_la24 : std_logic;
+    signal fmc3_hpc_la25 : std_logic;
+    signal fmc3_hpc_la26 : std_logic;
+    signal fmc3_hpc_la27 : std_logic;
+    signal fmc3_hpc_la28 : std_logic;
+    signal fmc3_hpc_la29 : std_logic;
+    signal fmc3_hpc_la30 : std_logic;
+    signal fmc3_hpc_la31 : std_logic;
     signal fmc3_hpc_la32_p : std_logic;
     signal fmc3_hpc_la32_n : std_logic;
     signal fmc3_hpc_la33_p : std_logic;
@@ -529,7 +529,6 @@ architecture peripheral_wrapper of wrapper is
     component sys_clk_mmcm
         port (
             clk_out1            : out    std_logic;
-            clk_out2            : out    std_logic;
             reset               : in     std_logic;
             locked              : out    std_logic;
             clk_in1_p           : in     std_logic;
@@ -609,35 +608,13 @@ begin
 
     -- ADAPTER INSTANTIATION GENERATION START
 
-    FL9627 : entity work.FL9627_adapter port map(
-        adc_a_data => adc_a_data_buf,
-        adc_b_data => adc_b_data_buf,
-        adc_c_data => adc_c_data_buf,
-        adc_d_data => adc_d_data_buf,
-        adc_a_b_spi_ss => adc_a_b_spi_ss,
-        adc_c_d_spi_ss => adc_c_d_spi_ss,
-        adc_spi_sck => spi_sclk,
-        adc_spi_mosi => spi_mosi,
-        adc1_spi_miso => adc1_spi_miso,
-        adc2_spi_miso => adc2_spi_miso,
-        adc_spi_io_tri => spi_io_tri,
-        sys_clk => sys_clk,
-        adc_clk_125M => sys_clk_125M,
-        sys_rst => sys_rst,
-        adc_a_b_data_fmc => adc_a_b_data_fmc_buf,
-        adc_c_d_data_fmc => adc_c_d_data_fmc_buf,
-        adc_a_b_dco_fmc => adc_a_b_dco_fmc_buf,
-        adc_c_d_dco_fmc => adc_c_d_dco_fmc_buf,
-        adc_a_b_spi_ss_fmc => adc_a_b_spi_ss_fmc_buf,
-        adc_c_d_spi_ss_fmc => adc_c_d_spi_ss_fmc_buf,
-        adc_spi_sck_fmc => adc_spi_sck_fmc_buf,
-        adc_spi_mosi_fmc => adc_spi_mosi_fmc_buf,
-        adc1_spi_miso_fmc => adc1_spi_miso_fmc_buf,
-        adc2_spi_miso_fmc => adc2_spi_miso_fmc_buf,
-        adc_spi_io_tri_fmc => adc_spi_io_tri_fmc_buf,
-        adc_clk_125M_fmc => adc_clk_125M_fmc_buf,
-        adc_eeprom_iic_scl_fmc => adc_eeprom_iic_scl_fmc_buf,
-        adc_eeprom_iic_sda_fmc => adc_eeprom_iic_sda_fmc_buf
+    FL1010 : entity work.FL1010_adapter port map(
+        j2_40p => j2_40p,
+        j3_40p => j3_40p,
+        j2_40p_fmc => j2_40p_fmc_buf,
+        j3_40p_fmc => j3_40p_fmc_buf,
+        lpc240p_eeprom_iic_scl_fmc => lpc240p_eeprom_iic_scl_fmc_buf,
+        lpc240p_eeprom_iic_sda_fmc => lpc240p_eeprom_iic_sda_fmc_buf
     );
 
     FL9781 : entity work.FL9781_adapter port map(
@@ -669,59 +646,111 @@ begin
         dac_eeprom_iic_sda_fmc => dac_eeprom_iic_sda_fmc_buf
     );
 
-    FL1010 : entity work.FL1010_adapter port map(
-        j2_40p => j2_40p,
-        j3_40p => j3_40p,
-        j2_40p_fmc => j2_40p_fmc_buf,
-        j3_40p_fmc => j3_40p_fmc_buf,
-        lpc240p_eeprom_iic_scl_fmc => lpc240p_eeprom_iic_scl_fmc_buf,
-        lpc240p_eeprom_iic_sda_fmc => lpc240p_eeprom_iic_sda_fmc_buf
+    FL9627 : entity work.FL9627_adapter port map(
+        adc_a_data => adc_a_data_buf,
+        adc_b_data => adc_b_data_buf,
+        adc_c_data => adc_c_data_buf,
+        adc_d_data => adc_d_data_buf,
+        adc_a_b_spi_ss => adc_a_b_spi_ss,
+        adc_c_d_spi_ss => adc_c_d_spi_ss,
+        adc_spi_sck => spi_sclk,
+        adc_spi_mosi => spi_mosi,
+        adc1_spi_miso => adc1_spi_miso,
+        adc2_spi_miso => adc2_spi_miso,
+        adc_spi_io_tri => spi_io_tri,
+        sys_clk => sys_clk,
+        adc_clk_125M => '0',
+        sys_rst => sys_rst,
+        adc_a_b_data_fmc => adc_a_b_data_fmc_buf,
+        adc_c_d_data_fmc => adc_c_d_data_fmc_buf,
+        adc_a_b_dco_fmc => adc_a_b_dco_fmc_buf,
+        adc_c_d_dco_fmc => adc_c_d_dco_fmc_buf,
+        adc_a_b_spi_ss_fmc => adc_a_b_spi_ss_fmc_buf,
+        adc_c_d_spi_ss_fmc => adc_c_d_spi_ss_fmc_buf,
+        adc_spi_sck_fmc => adc_spi_sck_fmc_buf,
+        adc_spi_mosi_fmc => adc_spi_mosi_fmc_buf,
+        adc1_spi_miso_fmc => adc1_spi_miso_fmc_buf,
+        adc2_spi_miso_fmc => adc2_spi_miso_fmc_buf,
+        adc_spi_io_tri_fmc => adc_spi_io_tri_fmc_buf,
+        adc_clk_125M_fmc => adc_clk_125M_fmc_buf,
+        adc_eeprom_iic_scl_fmc => adc_eeprom_iic_scl_fmc_buf,
+        adc_eeprom_iic_sda_fmc => adc_eeprom_iic_sda_fmc_buf
     );
 
     -- ADAPTER INSTANTIATION GENERATION END
 
     -- SIGNAL ASSIGNMENT GENERATION START
 
-    fmc1_lpc_la01_p <= adc_clk_125M_fmc_buf;
-    adc_a_b_dco_fmc_buf <= fmc1_lpc_la00;
-    adc_a_b_data_fmc_buf(0) <= fmc1_lpc_la02;
-    adc_a_b_data_fmc_buf(1) <= fmc1_lpc_la06;
-    adc_a_b_data_fmc_buf(2) <= fmc1_lpc_la05;
-    adc_a_b_data_fmc_buf(3) <= fmc1_lpc_la04;
-    adc_a_b_data_fmc_buf(4) <= fmc1_lpc_la10;
-    adc_a_b_data_fmc_buf(5) <= fmc1_lpc_la08;
-    adc_a_b_data_fmc_buf(6) <= fmc1_lpc_la07;
-    adc_a_b_data_fmc_buf(7) <= fmc1_lpc_la09;
-    adc_a_b_data_fmc_buf(8) <= fmc1_lpc_la12;
-    adc_a_b_data_fmc_buf(9) <= fmc1_lpc_la11;
-    adc_a_b_data_fmc_buf(10) <= fmc1_lpc_la13;
-    adc_a_b_data_fmc_buf(11) <= fmc1_lpc_la14;
-    fmc1_lpc_la17_p <= adc_clk_125M_fmc_buf;
-    adc_c_d_dco_fmc_buf <= fmc1_lpc_la18;
-    adc_c_d_data_fmc_buf(0) <= fmc1_lpc_la20;
-    adc_c_d_data_fmc_buf(1) <= fmc1_lpc_la19;
-    adc_c_d_data_fmc_buf(2) <= fmc1_lpc_la27;
-    adc_c_d_data_fmc_buf(3) <= fmc1_lpc_la22;
-    adc_c_d_data_fmc_buf(4) <= fmc1_lpc_la21;
-    adc_c_d_data_fmc_buf(5) <= fmc1_lpc_la26;
-    adc_c_d_data_fmc_buf(6) <= fmc1_lpc_la25;
-    adc_c_d_data_fmc_buf(7) <= fmc1_lpc_la24;
-    adc_c_d_data_fmc_buf(8) <= fmc1_lpc_la29;
-    adc_c_d_data_fmc_buf(9) <= fmc1_lpc_la28;
-    adc_c_d_data_fmc_buf(10) <= fmc1_lpc_la31;
-    adc_c_d_data_fmc_buf(11) <= fmc1_lpc_la30;
-    fmc1_lpc_la03_p <= adc_a_b_spi_ss_fmc_buf;
-    fmc1_lpc_la17_n <= adc_c_d_spi_ss_fmc_buf;
-    fmc1_lpc_la01_n <= adc_spi_sck_fmc_buf;
-    fmc1_lpc_la23_n <= adc_spi_sck_fmc_buf;
-    fmc1_lpc_la03_no <= adc_spi_mosi_fmc_buf;
-    fmc1_lpc_la23_po <= adc_spi_mosi_fmc_buf;
-    adc1_spi_miso_fmc_buf <= fmc1_lpc_la03_ni;
-    adc2_spi_miso_fmc_buf <= fmc1_lpc_la23_pi;
-    fmc1_lpc_scl <= adc_eeprom_iic_scl_fmc_buf;
-    fmc1_lpc_sda <= adc_eeprom_iic_sda_fmc_buf;
-    fmc1_lpc_la03_nt <= adc_spi_io_tri_fmc_buf;
-    fmc1_lpc_la23_pt <= adc_spi_io_tri_fmc_buf;
+    fmc1_lpc_la17_n <= j2_40p_fmc_buf(3);
+    fmc1_lpc_la17_p <= j2_40p_fmc_buf(4);
+    fmc1_lpc_la18_n <= j2_40p_fmc_buf(5);
+    fmc1_lpc_la18_p <= j2_40p_fmc_buf(6);
+    fmc1_lpc_la23_n <= j2_40p_fmc_buf(7);
+    fmc1_lpc_la23_p <= j2_40p_fmc_buf(8);
+    fmc1_lpc_la26_n <= j2_40p_fmc_buf(9);
+    fmc1_lpc_la26_p <= j2_40p_fmc_buf(10);
+    fmc1_lpc_la27_n <= j2_40p_fmc_buf(11);
+    fmc1_lpc_la27_p <= j2_40p_fmc_buf(12);
+    fmc1_lpc_la28_n <= j2_40p_fmc_buf(13);
+    fmc1_lpc_la28_p <= j2_40p_fmc_buf(14);
+    fmc1_lpc_la29_n <= j2_40p_fmc_buf(15);
+    fmc1_lpc_la29_p <= j2_40p_fmc_buf(16);
+    fmc1_lpc_la24_n <= j2_40p_fmc_buf(17);
+    fmc1_lpc_la24_p <= j2_40p_fmc_buf(18);
+    fmc1_lpc_la25_n <= j2_40p_fmc_buf(19);
+    fmc1_lpc_la25_p <= j2_40p_fmc_buf(20);
+    fmc1_lpc_la21_n <= j2_40p_fmc_buf(21);
+    fmc1_lpc_la21_p <= j2_40p_fmc_buf(22);
+    fmc1_lpc_la22_n <= j2_40p_fmc_buf(23);
+    fmc1_lpc_la22_p <= j2_40p_fmc_buf(24);
+    fmc1_lpc_la31_n <= j2_40p_fmc_buf(25);
+    fmc1_lpc_la31_p <= j2_40p_fmc_buf(26);
+    fmc1_lpc_la30_n <= j2_40p_fmc_buf(27);
+    fmc1_lpc_la30_p <= j2_40p_fmc_buf(28);
+    fmc1_lpc_la33_n <= j2_40p_fmc_buf(29);
+    fmc1_lpc_la33_p <= j2_40p_fmc_buf(30);
+    fmc1_lpc_la32_n <= j2_40p_fmc_buf(31);
+    fmc1_lpc_la32_p <= j2_40p_fmc_buf(32);
+    fmc1_lpc_la19_n <= j2_40p_fmc_buf(33);
+    fmc1_lpc_la19_p <= j2_40p_fmc_buf(34);
+    fmc1_lpc_la20_n <= j2_40p_fmc_buf(35);
+    fmc1_lpc_la20_p <= j2_40p_fmc_buf(36);
+    fmc1_lpc_la15_n <= j3_40p_fmc_buf(3);
+    fmc1_lpc_la15_p <= j3_40p_fmc_buf(4);
+    fmc1_lpc_la16_n <= j3_40p_fmc_buf(5);
+    fmc1_lpc_la16_p <= j3_40p_fmc_buf(6);
+    fmc1_lpc_la11_n <= j3_40p_fmc_buf(7);
+    fmc1_lpc_la11_p <= j3_40p_fmc_buf(8);
+    fmc1_lpc_la00_n <= j3_40p_fmc_buf(9);
+    fmc1_lpc_la00_p <= j3_40p_fmc_buf(10);
+    fmc1_lpc_la02_n <= j3_40p_fmc_buf(11);
+    fmc1_lpc_la02_p <= j3_40p_fmc_buf(12);
+    fmc1_lpc_la03_n <= j3_40p_fmc_buf(13);
+    fmc1_lpc_la03_p <= j3_40p_fmc_buf(14);
+    fmc1_lpc_la12_n <= j3_40p_fmc_buf(15);
+    fmc1_lpc_la12_p <= j3_40p_fmc_buf(16);
+    fmc1_lpc_la07_n <= j3_40p_fmc_buf(17);
+    fmc1_lpc_la07_p <= j3_40p_fmc_buf(18);
+    fmc1_lpc_la08_n <= j3_40p_fmc_buf(19);
+    fmc1_lpc_la08_p <= j3_40p_fmc_buf(20);
+    fmc1_lpc_la04_n <= j3_40p_fmc_buf(21);
+    fmc1_lpc_la04_p <= j3_40p_fmc_buf(22);
+    fmc1_lpc_la14_n <= j3_40p_fmc_buf(23);
+    fmc1_lpc_la14_p <= j3_40p_fmc_buf(24);
+    fmc1_lpc_la13_n <= j3_40p_fmc_buf(25);
+    fmc1_lpc_la13_p <= j3_40p_fmc_buf(26);
+    fmc1_lpc_la09_n <= j3_40p_fmc_buf(27);
+    fmc1_lpc_la09_p <= j3_40p_fmc_buf(28);
+    fmc1_lpc_la10_n <= j3_40p_fmc_buf(29);
+    fmc1_lpc_la10_p <= j3_40p_fmc_buf(30);
+    fmc1_lpc_la05_n <= j3_40p_fmc_buf(31);
+    fmc1_lpc_la05_p <= j3_40p_fmc_buf(32);
+    fmc1_lpc_la06_n <= j3_40p_fmc_buf(33);
+    fmc1_lpc_la06_p <= j3_40p_fmc_buf(34);
+    fmc1_lpc_la01_n <= j3_40p_fmc_buf(35);
+    fmc1_lpc_la01_p <= j3_40p_fmc_buf(36);
+    fmc1_lpc_scl <= lpc240p_eeprom_iic_scl_fmc_buf;
+    fmc1_lpc_sda <= lpc240p_eeprom_iic_sda_fmc_buf;
 
     fmc2_lpc_la01 <= dac_a_b_dci_fmc_buf;
     dac_a_b_dco_fmc_buf <= fmc2_lpc_la00;
@@ -764,76 +793,46 @@ begin
     fmc2_lpc_scl <= dac_eeprom_iic_scl_fmc_buf;
     fmc2_lpc_sda <= dac_eeprom_iic_sda_fmc_buf;
 
-    fmc3_hpc_la17_n <= j2_40p_fmc_buf(3);
-    fmc3_hpc_la17_p <= j2_40p_fmc_buf(4);
-    fmc3_hpc_la18_n <= j2_40p_fmc_buf(5);
-    fmc3_hpc_la18_p <= j2_40p_fmc_buf(6);
-    fmc3_hpc_la23_n <= j2_40p_fmc_buf(7);
-    fmc3_hpc_la23_p <= j2_40p_fmc_buf(8);
-    fmc3_hpc_la26_n <= j2_40p_fmc_buf(9);
-    fmc3_hpc_la26_p <= j2_40p_fmc_buf(10);
-    fmc3_hpc_la27_n <= j2_40p_fmc_buf(11);
-    fmc3_hpc_la27_p <= j2_40p_fmc_buf(12);
-    fmc3_hpc_la28_n <= j2_40p_fmc_buf(13);
-    fmc3_hpc_la28_p <= j2_40p_fmc_buf(14);
-    fmc3_hpc_la29_n <= j2_40p_fmc_buf(15);
-    fmc3_hpc_la29_p <= j2_40p_fmc_buf(16);
-    fmc3_hpc_la24_n <= j2_40p_fmc_buf(17);
-    fmc3_hpc_la24_p <= j2_40p_fmc_buf(18);
-    fmc3_hpc_la25_n <= j2_40p_fmc_buf(19);
-    fmc3_hpc_la25_p <= j2_40p_fmc_buf(20);
-    fmc3_hpc_la21_n <= j2_40p_fmc_buf(21);
-    fmc3_hpc_la21_p <= j2_40p_fmc_buf(22);
-    fmc3_hpc_la22_n <= j2_40p_fmc_buf(23);
-    fmc3_hpc_la22_p <= j2_40p_fmc_buf(24);
-    fmc3_hpc_la31_n <= j2_40p_fmc_buf(25);
-    fmc3_hpc_la31_p <= j2_40p_fmc_buf(26);
-    fmc3_hpc_la30_n <= j2_40p_fmc_buf(27);
-    fmc3_hpc_la30_p <= j2_40p_fmc_buf(28);
-    fmc3_hpc_la33_n <= j2_40p_fmc_buf(29);
-    fmc3_hpc_la33_p <= j2_40p_fmc_buf(30);
-    fmc3_hpc_la32_n <= j2_40p_fmc_buf(31);
-    fmc3_hpc_la32_p <= j2_40p_fmc_buf(32);
-    fmc3_hpc_la19_n <= j2_40p_fmc_buf(33);
-    fmc3_hpc_la19_p <= j2_40p_fmc_buf(34);
-    fmc3_hpc_la20_n <= j2_40p_fmc_buf(35);
-    fmc3_hpc_la20_p <= j2_40p_fmc_buf(36);
-    fmc3_hpc_la15_n <= j3_40p_fmc_buf(3);
-    fmc3_hpc_la15_p <= j3_40p_fmc_buf(4);
-    fmc3_hpc_la16_n <= j3_40p_fmc_buf(5);
-    fmc3_hpc_la16_p <= j3_40p_fmc_buf(6);
-    fmc3_hpc_la11_n <= j3_40p_fmc_buf(7);
-    fmc3_hpc_la11_p <= j3_40p_fmc_buf(8);
-    fmc3_hpc_la00_n <= j3_40p_fmc_buf(9);
-    fmc3_hpc_la00_p <= j3_40p_fmc_buf(10);
-    fmc3_hpc_la02_n <= j3_40p_fmc_buf(11);
-    fmc3_hpc_la02_p <= j3_40p_fmc_buf(12);
-    fmc3_hpc_la03_n <= j3_40p_fmc_buf(13);
-    fmc3_hpc_la03_p <= j3_40p_fmc_buf(14);
-    fmc3_hpc_la12_n <= j3_40p_fmc_buf(15);
-    fmc3_hpc_la12_p <= j3_40p_fmc_buf(16);
-    fmc3_hpc_la07_n <= j3_40p_fmc_buf(17);
-    fmc3_hpc_la07_p <= j3_40p_fmc_buf(18);
-    fmc3_hpc_la08_n <= j3_40p_fmc_buf(19);
-    fmc3_hpc_la08_p <= j3_40p_fmc_buf(20);
-    fmc3_hpc_la04_n <= j3_40p_fmc_buf(21);
-    fmc3_hpc_la04_p <= j3_40p_fmc_buf(22);
-    fmc3_hpc_la14_n <= j3_40p_fmc_buf(23);
-    fmc3_hpc_la14_p <= j3_40p_fmc_buf(24);
-    fmc3_hpc_la13_n <= j3_40p_fmc_buf(25);
-    fmc3_hpc_la13_p <= j3_40p_fmc_buf(26);
-    fmc3_hpc_la09_n <= j3_40p_fmc_buf(27);
-    fmc3_hpc_la09_p <= j3_40p_fmc_buf(28);
-    fmc3_hpc_la10_n <= j3_40p_fmc_buf(29);
-    fmc3_hpc_la10_p <= j3_40p_fmc_buf(30);
-    fmc3_hpc_la05_n <= j3_40p_fmc_buf(31);
-    fmc3_hpc_la05_p <= j3_40p_fmc_buf(32);
-    fmc3_hpc_la06_n <= j3_40p_fmc_buf(33);
-    fmc3_hpc_la06_p <= j3_40p_fmc_buf(34);
-    fmc3_hpc_la01_n <= j3_40p_fmc_buf(35);
-    fmc3_hpc_la01_p <= j3_40p_fmc_buf(36);
-    fmc3_hpc_scl <= lpc240p_eeprom_iic_scl_fmc_buf;
-    fmc3_hpc_sda <= lpc240p_eeprom_iic_sda_fmc_buf;
+    fmc3_hpc_la01_p <= adc_clk_125M_fmc_buf;
+    adc_a_b_dco_fmc_buf <= fmc3_hpc_la00;
+    adc_a_b_data_fmc_buf(0) <= fmc3_hpc_la02;
+    adc_a_b_data_fmc_buf(1) <= fmc3_hpc_la06;
+    adc_a_b_data_fmc_buf(2) <= fmc3_hpc_la05;
+    adc_a_b_data_fmc_buf(3) <= fmc3_hpc_la04;
+    adc_a_b_data_fmc_buf(4) <= fmc3_hpc_la10;
+    adc_a_b_data_fmc_buf(5) <= fmc3_hpc_la08;
+    adc_a_b_data_fmc_buf(6) <= fmc3_hpc_la07;
+    adc_a_b_data_fmc_buf(7) <= fmc3_hpc_la09;
+    adc_a_b_data_fmc_buf(8) <= fmc3_hpc_la12;
+    adc_a_b_data_fmc_buf(9) <= fmc3_hpc_la11;
+    adc_a_b_data_fmc_buf(10) <= fmc3_hpc_la13;
+    adc_a_b_data_fmc_buf(11) <= fmc3_hpc_la14;
+    fmc3_hpc_la17_p <= adc_clk_125M_fmc_buf;
+    adc_c_d_dco_fmc_buf <= fmc3_hpc_la18;
+    adc_c_d_data_fmc_buf(0) <= fmc3_hpc_la20;
+    adc_c_d_data_fmc_buf(1) <= fmc3_hpc_la19;
+    adc_c_d_data_fmc_buf(2) <= fmc3_hpc_la27;
+    adc_c_d_data_fmc_buf(3) <= fmc3_hpc_la22;
+    adc_c_d_data_fmc_buf(4) <= fmc3_hpc_la21;
+    adc_c_d_data_fmc_buf(5) <= fmc3_hpc_la26;
+    adc_c_d_data_fmc_buf(6) <= fmc3_hpc_la25;
+    adc_c_d_data_fmc_buf(7) <= fmc3_hpc_la24;
+    adc_c_d_data_fmc_buf(8) <= fmc3_hpc_la29;
+    adc_c_d_data_fmc_buf(9) <= fmc3_hpc_la28;
+    adc_c_d_data_fmc_buf(10) <= fmc3_hpc_la31;
+    adc_c_d_data_fmc_buf(11) <= fmc3_hpc_la30;
+    fmc3_hpc_la03_p <= adc_a_b_spi_ss_fmc_buf;
+    fmc3_hpc_la17_n <= adc_c_d_spi_ss_fmc_buf;
+    fmc3_hpc_la01_n <= adc_spi_sck_fmc_buf;
+    fmc3_hpc_la23_n <= adc_spi_sck_fmc_buf;
+    fmc3_hpc_la03_no <= adc_spi_mosi_fmc_buf;
+    fmc3_hpc_la23_po <= adc_spi_mosi_fmc_buf;
+    adc1_spi_miso_fmc_buf <= fmc3_hpc_la03_ni;
+    adc2_spi_miso_fmc_buf <= fmc3_hpc_la23_pi;
+    fmc3_hpc_scl <= adc_eeprom_iic_scl_fmc_buf;
+    fmc3_hpc_sda <= adc_eeprom_iic_sda_fmc_buf;
+    fmc3_hpc_la03_nt <= adc_spi_io_tri_fmc_buf;
+    fmc3_hpc_la23_pt <= adc_spi_io_tri_fmc_buf;
 
     -- SIGNAL ASSIGNMENT GENERATION END
 
@@ -916,14 +915,13 @@ begin
         I => fmc1_lpc_clk1_n,
         O => fmc1_lpc_clk1_n_b
     );
-    fmc1_lpc_la00_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la00_p_b,
-        IB => fmc1_lpc_la00_n_b,
-        O => fmc1_lpc_la00_buf
+    fmc1_lpc_la00_p_obuf : OBUF port map(
+        I => fmc1_lpc_la00_p,
+        O => fmc1_lpc_la00_p_b
     );
-    fmc1_lpc_la00_bufg : BUFG port map(
-        I => fmc1_lpc_la00_buf,
-        O => fmc1_lpc_la00
+    fmc1_lpc_la00_n_obuf : OBUF port map(
+        I => fmc1_lpc_la00_n,
+        O => fmc1_lpc_la00_n_b
     );
     fmc1_lpc_la01_p_obuf : OBUF port map(
         I => fmc1_lpc_la01_p,
@@ -933,91 +931,125 @@ begin
         I => fmc1_lpc_la01_n,
         O => fmc1_lpc_la01_n_b
     );
-    fmc1_lpc_la02_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la02_p_b,
-        IB => fmc1_lpc_la02_n_b,
-        O => fmc1_lpc_la02
+    fmc1_lpc_la02_p_obuf : OBUF port map(
+        I => fmc1_lpc_la02_p,
+        O => fmc1_lpc_la02_p_b
+    );
+    fmc1_lpc_la02_n_obuf : OBUF port map(
+        I => fmc1_lpc_la02_n,
+        O => fmc1_lpc_la02_n_b
     );
     fmc1_lpc_la03_p_obuf : OBUF port map(
         I => fmc1_lpc_la03_p,
         O => fmc1_lpc_la03_p_b
     );
-    fmc1_lpc_la03_n_iobuf : IOBUF port map(
-        I => fmc1_lpc_la03_no,
-        O => fmc1_lpc_la03_ni,
-        IO => fmc1_lpc_la03_n_b,
-        T => fmc1_lpc_la03_nt
+    fmc1_lpc_la03_n_obuf : OBUF port map(
+        I => fmc1_lpc_la03_n,
+        O => fmc1_lpc_la03_n_b
     );
-    fmc1_lpc_la04_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la04_p_b,
-        IB => fmc1_lpc_la04_n_b,
-        O => fmc1_lpc_la04
+    fmc1_lpc_la04_p_obuf : OBUF port map(
+        I => fmc1_lpc_la04_p,
+        O => fmc1_lpc_la04_p_b
     );
-    fmc1_lpc_la05_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la05_p_b,
-        IB => fmc1_lpc_la05_n_b,
-        O => fmc1_lpc_la05
+    fmc1_lpc_la04_n_obuf : OBUF port map(
+        I => fmc1_lpc_la04_n,
+        O => fmc1_lpc_la04_n_b
     );
-    fmc1_lpc_la06_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la06_p_b,
-        IB => fmc1_lpc_la06_n_b,
-        O => fmc1_lpc_la06
+    fmc1_lpc_la05_p_obuf : OBUF port map(
+        I => fmc1_lpc_la05_p,
+        O => fmc1_lpc_la05_p_b
     );
-    fmc1_lpc_la07_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la07_p_b,
-        IB => fmc1_lpc_la07_n_b,
-        O => fmc1_lpc_la07
+    fmc1_lpc_la05_n_obuf : OBUF port map(
+        I => fmc1_lpc_la05_n,
+        O => fmc1_lpc_la05_n_b
     );
-    fmc1_lpc_la08_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la08_p_b,
-        IB => fmc1_lpc_la08_n_b,
-        O => fmc1_lpc_la08
+    fmc1_lpc_la06_p_obuf : OBUF port map(
+        I => fmc1_lpc_la06_p,
+        O => fmc1_lpc_la06_p_b
     );
-    fmc1_lpc_la09_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la09_p_b,
-        IB => fmc1_lpc_la09_n_b,
-        O => fmc1_lpc_la09
+    fmc1_lpc_la06_n_obuf : OBUF port map(
+        I => fmc1_lpc_la06_n,
+        O => fmc1_lpc_la06_n_b
     );
-    fmc1_lpc_la10_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la10_p_b,
-        IB => fmc1_lpc_la10_n_b,
-        O => fmc1_lpc_la10
+    fmc1_lpc_la07_p_obuf : OBUF port map(
+        I => fmc1_lpc_la07_p,
+        O => fmc1_lpc_la07_p_b
     );
-    fmc1_lpc_la11_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la11_p_b,
-        IB => fmc1_lpc_la11_n_b,
-        O => fmc1_lpc_la11
+    fmc1_lpc_la07_n_obuf : OBUF port map(
+        I => fmc1_lpc_la07_n,
+        O => fmc1_lpc_la07_n_b
     );
-    fmc1_lpc_la12_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la12_p_b,
-        IB => fmc1_lpc_la12_n_b,
-        O => fmc1_lpc_la12
+    fmc1_lpc_la08_p_obuf : OBUF port map(
+        I => fmc1_lpc_la08_p,
+        O => fmc1_lpc_la08_p_b
     );
-    fmc1_lpc_la13_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la13_p_b,
-        IB => fmc1_lpc_la13_n_b,
-        O => fmc1_lpc_la13
+    fmc1_lpc_la08_n_obuf : OBUF port map(
+        I => fmc1_lpc_la08_n,
+        O => fmc1_lpc_la08_n_b
     );
-    fmc1_lpc_la14_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la14_p_b,
-        IB => fmc1_lpc_la14_n_b,
-        O => fmc1_lpc_la14
+    fmc1_lpc_la09_p_obuf : OBUF port map(
+        I => fmc1_lpc_la09_p,
+        O => fmc1_lpc_la09_p_b
     );
-    fmc1_lpc_la15_p_ibuf : IBUF port map(
-        I => fmc1_lpc_la15_p_b,
-        O => fmc1_lpc_la15_p
+    fmc1_lpc_la09_n_obuf : OBUF port map(
+        I => fmc1_lpc_la09_n,
+        O => fmc1_lpc_la09_n_b
+    );
+    fmc1_lpc_la10_p_obuf : OBUF port map(
+        I => fmc1_lpc_la10_p,
+        O => fmc1_lpc_la10_p_b
+    );
+    fmc1_lpc_la10_n_obuf : OBUF port map(
+        I => fmc1_lpc_la10_n,
+        O => fmc1_lpc_la10_n_b
+    );
+    fmc1_lpc_la11_p_obuf : OBUF port map(
+        I => fmc1_lpc_la11_p,
+        O => fmc1_lpc_la11_p_b
+    );
+    fmc1_lpc_la11_n_obuf : OBUF port map(
+        I => fmc1_lpc_la11_n,
+        O => fmc1_lpc_la11_n_b
+    );
+    fmc1_lpc_la12_p_obuf : OBUF port map(
+        I => fmc1_lpc_la12_p,
+        O => fmc1_lpc_la12_p_b
+    );
+    fmc1_lpc_la12_n_obuf : OBUF port map(
+        I => fmc1_lpc_la12_n,
+        O => fmc1_lpc_la12_n_b
+    );
+    fmc1_lpc_la13_p_obuf : OBUF port map(
+        I => fmc1_lpc_la13_p,
+        O => fmc1_lpc_la13_p_b
+    );
+    fmc1_lpc_la13_n_obuf : OBUF port map(
+        I => fmc1_lpc_la13_n,
+        O => fmc1_lpc_la13_n_b
+    );
+    fmc1_lpc_la14_p_obuf : OBUF port map(
+        I => fmc1_lpc_la14_p,
+        O => fmc1_lpc_la14_p_b
+    );
+    fmc1_lpc_la14_n_obuf : OBUF port map(
+        I => fmc1_lpc_la14_n,
+        O => fmc1_lpc_la14_n_b
+    );
+    fmc1_lpc_la15_p_obuf : OBUF port map(
+        I => fmc1_lpc_la15_p,
+        O => fmc1_lpc_la15_p_b
     );
     fmc1_lpc_la15_n_obuf : OBUF port map(
         I => fmc1_lpc_la15_n,
         O => fmc1_lpc_la15_n_b
     );
-    fmc1_lpc_la16_p_ibuf : IBUF port map(
-        I => fmc1_lpc_la16_p_b,
-        O => fmc1_lpc_la16_p
+    fmc1_lpc_la16_p_obuf : OBUF port map(
+        I => fmc1_lpc_la16_p,
+        O => fmc1_lpc_la16_p_b
     );
-    fmc1_lpc_la16_n_ibuf : IBUF port map(
-        I => fmc1_lpc_la16_n_b,
-        O => fmc1_lpc_la16_n
+    fmc1_lpc_la16_n_obuf : OBUF port map(
+        I => fmc1_lpc_la16_n,
+        O => fmc1_lpc_la16_n_b
     );
     fmc1_lpc_la17_p_obuf : OBUF port map(
         I => fmc1_lpc_la17_p,
@@ -1027,100 +1059,133 @@ begin
         I => fmc1_lpc_la17_n,
         O => fmc1_lpc_la17_n_b
     );
-    fmc1_lpc_la18_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la18_p_b,
-        IB => fmc1_lpc_la18_n_b,
-        O => fmc1_lpc_la18_buf
+    fmc1_lpc_la18_p_obuf : OBUF port map(
+        I => fmc1_lpc_la18_p,
+        O => fmc1_lpc_la18_p_b
     );
-    fmc1_lpc_la18_bufg : BUFG port map(
-        I => fmc1_lpc_la18_buf,
-        O => fmc1_lpc_la18
+    fmc1_lpc_la18_n_obuf : OBUF port map(
+        I => fmc1_lpc_la18_n,
+        O => fmc1_lpc_la18_n_b
     );
-    fmc1_lpc_la19_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la19_p_b,
-        IB => fmc1_lpc_la19_n_b,
-        O => fmc1_lpc_la19
+    fmc1_lpc_la19_p_obuf : OBUF port map(
+        I => fmc1_lpc_la19_p,
+        O => fmc1_lpc_la19_p_b
     );
-    fmc1_lpc_la20_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la20_p_b,
-        IB => fmc1_lpc_la20_n_b,
-        O => fmc1_lpc_la20
+    fmc1_lpc_la19_n_obuf : OBUF port map(
+        I => fmc1_lpc_la19_n,
+        O => fmc1_lpc_la19_n_b
     );
-    fmc1_lpc_la21_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la21_p_b,
-        IB => fmc1_lpc_la21_n_b,
-        O => fmc1_lpc_la21
+    fmc1_lpc_la20_p_obuf : OBUF port map(
+        I => fmc1_lpc_la20_p,
+        O => fmc1_lpc_la20_p_b
     );
-    fmc1_lpc_la22_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la22_p_b,
-        IB => fmc1_lpc_la22_n_b,
-        O => fmc1_lpc_la22
+    fmc1_lpc_la20_n_obuf : OBUF port map(
+        I => fmc1_lpc_la20_n,
+        O => fmc1_lpc_la20_n_b
     );
-    fmc1_lpc_la23_p_iobuf : IOBUF port map(
-        I => fmc1_lpc_la23_po,
-        O => fmc1_lpc_la23_pi,
-        IO => fmc1_lpc_la23_p_b,
-        T => fmc1_lpc_la23_pt
+    fmc1_lpc_la21_p_obuf : OBUF port map(
+        I => fmc1_lpc_la21_p,
+        O => fmc1_lpc_la21_p_b
+    );
+    fmc1_lpc_la21_n_obuf : OBUF port map(
+        I => fmc1_lpc_la21_n,
+        O => fmc1_lpc_la21_n_b
+    );
+    fmc1_lpc_la22_p_obuf : OBUF port map(
+        I => fmc1_lpc_la22_p,
+        O => fmc1_lpc_la22_p_b
+    );
+    fmc1_lpc_la22_n_obuf : OBUF port map(
+        I => fmc1_lpc_la22_n,
+        O => fmc1_lpc_la22_n_b
+    );
+    fmc1_lpc_la23_p_obuf : OBUF port map(
+        I => fmc1_lpc_la23_p,
+        O => fmc1_lpc_la23_p_b
     );
     fmc1_lpc_la23_n_obuf : OBUF port map(
         I => fmc1_lpc_la23_n,
         O => fmc1_lpc_la23_n_b
     );
-    fmc1_lpc_la24_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la24_p_b,
-        IB => fmc1_lpc_la24_n_b,
-        O => fmc1_lpc_la24
+    fmc1_lpc_la24_p_obuf : OBUF port map(
+        I => fmc1_lpc_la24_p,
+        O => fmc1_lpc_la24_p_b
     );
-    fmc1_lpc_la25_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la25_p_b,
-        IB => fmc1_lpc_la25_n_b,
-        O => fmc1_lpc_la25
+    fmc1_lpc_la24_n_obuf : OBUF port map(
+        I => fmc1_lpc_la24_n,
+        O => fmc1_lpc_la24_n_b
     );
-    fmc1_lpc_la26_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la26_p_b,
-        IB => fmc1_lpc_la26_n_b,
-        O => fmc1_lpc_la26
+    fmc1_lpc_la25_p_obuf : OBUF port map(
+        I => fmc1_lpc_la25_p,
+        O => fmc1_lpc_la25_p_b
     );
-    fmc1_lpc_la27_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la27_p_b,
-        IB => fmc1_lpc_la27_n_b,
-        O => fmc1_lpc_la27
+    fmc1_lpc_la25_n_obuf : OBUF port map(
+        I => fmc1_lpc_la25_n,
+        O => fmc1_lpc_la25_n_b
     );
-    fmc1_lpc_la28_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la28_p_b,
-        IB => fmc1_lpc_la28_n_b,
-        O => fmc1_lpc_la28
+    fmc1_lpc_la26_p_obuf : OBUF port map(
+        I => fmc1_lpc_la26_p,
+        O => fmc1_lpc_la26_p_b
     );
-    fmc1_lpc_la29_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la29_p_b,
-        IB => fmc1_lpc_la29_n_b,
-        O => fmc1_lpc_la29
+    fmc1_lpc_la26_n_obuf : OBUF port map(
+        I => fmc1_lpc_la26_n,
+        O => fmc1_lpc_la26_n_b
     );
-    fmc1_lpc_la30_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la30_p_b,
-        IB => fmc1_lpc_la30_n_b,
-        O => fmc1_lpc_la30
+    fmc1_lpc_la27_p_obuf : OBUF port map(
+        I => fmc1_lpc_la27_p,
+        O => fmc1_lpc_la27_p_b
     );
-    fmc1_lpc_la31_ibufds : IBUFDS port map(
-        I => fmc1_lpc_la31_p_b,
-        IB => fmc1_lpc_la31_n_b,
-        O => fmc1_lpc_la31
+    fmc1_lpc_la27_n_obuf : OBUF port map(
+        I => fmc1_lpc_la27_n,
+        O => fmc1_lpc_la27_n_b
     );
-    fmc1_lpc_la32_p_ibuf : IBUF port map(
-        I => fmc1_lpc_la32_p_b,
-        O => fmc1_lpc_la32_p
+    fmc1_lpc_la28_p_obuf : OBUF port map(
+        I => fmc1_lpc_la28_p,
+        O => fmc1_lpc_la28_p_b
+    );
+    fmc1_lpc_la28_n_obuf : OBUF port map(
+        I => fmc1_lpc_la28_n,
+        O => fmc1_lpc_la28_n_b
+    );
+    fmc1_lpc_la29_p_obuf : OBUF port map(
+        I => fmc1_lpc_la29_p,
+        O => fmc1_lpc_la29_p_b
+    );
+    fmc1_lpc_la29_n_obuf : OBUF port map(
+        I => fmc1_lpc_la29_n,
+        O => fmc1_lpc_la29_n_b
+    );
+    fmc1_lpc_la30_p_obuf : OBUF port map(
+        I => fmc1_lpc_la30_p,
+        O => fmc1_lpc_la30_p_b
+    );
+    fmc1_lpc_la30_n_obuf : OBUF port map(
+        I => fmc1_lpc_la30_n,
+        O => fmc1_lpc_la30_n_b
+    );
+    fmc1_lpc_la31_p_obuf : OBUF port map(
+        I => fmc1_lpc_la31_p,
+        O => fmc1_lpc_la31_p_b
+    );
+    fmc1_lpc_la31_n_obuf : OBUF port map(
+        I => fmc1_lpc_la31_n,
+        O => fmc1_lpc_la31_n_b
+    );
+    fmc1_lpc_la32_p_obuf : OBUF port map(
+        I => fmc1_lpc_la32_p,
+        O => fmc1_lpc_la32_p_b
     );
     fmc1_lpc_la32_n_obuf : OBUF port map(
         I => fmc1_lpc_la32_n,
         O => fmc1_lpc_la32_n_b
     );
-    fmc1_lpc_la33_p_ibuf : IBUF port map(
-        I => fmc1_lpc_la33_p_b,
-        O => fmc1_lpc_la33_p
+    fmc1_lpc_la33_p_obuf : OBUF port map(
+        I => fmc1_lpc_la33_p,
+        O => fmc1_lpc_la33_p_b
     );
-    fmc1_lpc_la33_n_ibuf : IBUF port map(
-        I => fmc1_lpc_la33_n_b,
-        O => fmc1_lpc_la33_n
+    fmc1_lpc_la33_n_obuf : OBUF port map(
+        I => fmc1_lpc_la33_n,
+        O => fmc1_lpc_la33_n_b
     );
     fmc1_lpc_scl_obuf : OBUF port map(
         I => fmc1_lpc_scl,
@@ -1356,13 +1421,14 @@ begin
         I => fmc3_hpc_clk1_n,
         O => fmc3_hpc_clk1_n_b
     );
-    fmc3_hpc_la00_p_obuf : OBUF port map(
-        I => fmc3_hpc_la00_p,
-        O => fmc3_hpc_la00_p_b
+    fmc3_hpc_la00_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la00_p_b,
+        IB => fmc3_hpc_la00_n_b,
+        O => fmc3_hpc_la00_buf
     );
-    fmc3_hpc_la00_n_obuf : OBUF port map(
-        I => fmc3_hpc_la00_n,
-        O => fmc3_hpc_la00_n_b
+    fmc3_hpc_la00_bufg : BUFG port map(
+        I => fmc3_hpc_la00_buf,
+        O => fmc3_hpc_la00
     );
     fmc3_hpc_la01_p_obuf : OBUF port map(
         I => fmc3_hpc_la01_p,
@@ -1372,125 +1438,91 @@ begin
         I => fmc3_hpc_la01_n,
         O => fmc3_hpc_la01_n_b
     );
-    fmc3_hpc_la02_p_obuf : OBUF port map(
-        I => fmc3_hpc_la02_p,
-        O => fmc3_hpc_la02_p_b
-    );
-    fmc3_hpc_la02_n_obuf : OBUF port map(
-        I => fmc3_hpc_la02_n,
-        O => fmc3_hpc_la02_n_b
+    fmc3_hpc_la02_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la02_p_b,
+        IB => fmc3_hpc_la02_n_b,
+        O => fmc3_hpc_la02
     );
     fmc3_hpc_la03_p_obuf : OBUF port map(
         I => fmc3_hpc_la03_p,
         O => fmc3_hpc_la03_p_b
     );
-    fmc3_hpc_la03_n_obuf : OBUF port map(
-        I => fmc3_hpc_la03_n,
-        O => fmc3_hpc_la03_n_b
+    fmc3_hpc_la03_n_iobuf : IOBUF port map(
+        I => fmc3_hpc_la03_no,
+        O => fmc3_hpc_la03_ni,
+        IO => fmc3_hpc_la03_n_b,
+        T => fmc3_hpc_la03_nt
     );
-    fmc3_hpc_la04_p_obuf : OBUF port map(
-        I => fmc3_hpc_la04_p,
-        O => fmc3_hpc_la04_p_b
+    fmc3_hpc_la04_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la04_p_b,
+        IB => fmc3_hpc_la04_n_b,
+        O => fmc3_hpc_la04
     );
-    fmc3_hpc_la04_n_obuf : OBUF port map(
-        I => fmc3_hpc_la04_n,
-        O => fmc3_hpc_la04_n_b
+    fmc3_hpc_la05_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la05_p_b,
+        IB => fmc3_hpc_la05_n_b,
+        O => fmc3_hpc_la05
     );
-    fmc3_hpc_la05_p_obuf : OBUF port map(
-        I => fmc3_hpc_la05_p,
-        O => fmc3_hpc_la05_p_b
+    fmc3_hpc_la06_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la06_p_b,
+        IB => fmc3_hpc_la06_n_b,
+        O => fmc3_hpc_la06
     );
-    fmc3_hpc_la05_n_obuf : OBUF port map(
-        I => fmc3_hpc_la05_n,
-        O => fmc3_hpc_la05_n_b
+    fmc3_hpc_la07_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la07_p_b,
+        IB => fmc3_hpc_la07_n_b,
+        O => fmc3_hpc_la07
     );
-    fmc3_hpc_la06_p_obuf : OBUF port map(
-        I => fmc3_hpc_la06_p,
-        O => fmc3_hpc_la06_p_b
+    fmc3_hpc_la08_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la08_p_b,
+        IB => fmc3_hpc_la08_n_b,
+        O => fmc3_hpc_la08
     );
-    fmc3_hpc_la06_n_obuf : OBUF port map(
-        I => fmc3_hpc_la06_n,
-        O => fmc3_hpc_la06_n_b
+    fmc3_hpc_la09_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la09_p_b,
+        IB => fmc3_hpc_la09_n_b,
+        O => fmc3_hpc_la09
     );
-    fmc3_hpc_la07_p_obuf : OBUF port map(
-        I => fmc3_hpc_la07_p,
-        O => fmc3_hpc_la07_p_b
+    fmc3_hpc_la10_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la10_p_b,
+        IB => fmc3_hpc_la10_n_b,
+        O => fmc3_hpc_la10
     );
-    fmc3_hpc_la07_n_obuf : OBUF port map(
-        I => fmc3_hpc_la07_n,
-        O => fmc3_hpc_la07_n_b
+    fmc3_hpc_la11_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la11_p_b,
+        IB => fmc3_hpc_la11_n_b,
+        O => fmc3_hpc_la11
     );
-    fmc3_hpc_la08_p_obuf : OBUF port map(
-        I => fmc3_hpc_la08_p,
-        O => fmc3_hpc_la08_p_b
+    fmc3_hpc_la12_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la12_p_b,
+        IB => fmc3_hpc_la12_n_b,
+        O => fmc3_hpc_la12
     );
-    fmc3_hpc_la08_n_obuf : OBUF port map(
-        I => fmc3_hpc_la08_n,
-        O => fmc3_hpc_la08_n_b
+    fmc3_hpc_la13_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la13_p_b,
+        IB => fmc3_hpc_la13_n_b,
+        O => fmc3_hpc_la13
     );
-    fmc3_hpc_la09_p_obuf : OBUF port map(
-        I => fmc3_hpc_la09_p,
-        O => fmc3_hpc_la09_p_b
+    fmc3_hpc_la14_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la14_p_b,
+        IB => fmc3_hpc_la14_n_b,
+        O => fmc3_hpc_la14
     );
-    fmc3_hpc_la09_n_obuf : OBUF port map(
-        I => fmc3_hpc_la09_n,
-        O => fmc3_hpc_la09_n_b
-    );
-    fmc3_hpc_la10_p_obuf : OBUF port map(
-        I => fmc3_hpc_la10_p,
-        O => fmc3_hpc_la10_p_b
-    );
-    fmc3_hpc_la10_n_obuf : OBUF port map(
-        I => fmc3_hpc_la10_n,
-        O => fmc3_hpc_la10_n_b
-    );
-    fmc3_hpc_la11_p_obuf : OBUF port map(
-        I => fmc3_hpc_la11_p,
-        O => fmc3_hpc_la11_p_b
-    );
-    fmc3_hpc_la11_n_obuf : OBUF port map(
-        I => fmc3_hpc_la11_n,
-        O => fmc3_hpc_la11_n_b
-    );
-    fmc3_hpc_la12_p_obuf : OBUF port map(
-        I => fmc3_hpc_la12_p,
-        O => fmc3_hpc_la12_p_b
-    );
-    fmc3_hpc_la12_n_obuf : OBUF port map(
-        I => fmc3_hpc_la12_n,
-        O => fmc3_hpc_la12_n_b
-    );
-    fmc3_hpc_la13_p_obuf : OBUF port map(
-        I => fmc3_hpc_la13_p,
-        O => fmc3_hpc_la13_p_b
-    );
-    fmc3_hpc_la13_n_obuf : OBUF port map(
-        I => fmc3_hpc_la13_n,
-        O => fmc3_hpc_la13_n_b
-    );
-    fmc3_hpc_la14_p_obuf : OBUF port map(
-        I => fmc3_hpc_la14_p,
-        O => fmc3_hpc_la14_p_b
-    );
-    fmc3_hpc_la14_n_obuf : OBUF port map(
-        I => fmc3_hpc_la14_n,
-        O => fmc3_hpc_la14_n_b
-    );
-    fmc3_hpc_la15_p_obuf : OBUF port map(
-        I => fmc3_hpc_la15_p,
-        O => fmc3_hpc_la15_p_b
+    fmc3_hpc_la15_p_ibuf : IBUF port map(
+        I => fmc3_hpc_la15_p_b,
+        O => fmc3_hpc_la15_p
     );
     fmc3_hpc_la15_n_obuf : OBUF port map(
         I => fmc3_hpc_la15_n,
         O => fmc3_hpc_la15_n_b
     );
-    fmc3_hpc_la16_p_obuf : OBUF port map(
-        I => fmc3_hpc_la16_p,
-        O => fmc3_hpc_la16_p_b
+    fmc3_hpc_la16_p_ibuf : IBUF port map(
+        I => fmc3_hpc_la16_p_b,
+        O => fmc3_hpc_la16_p
     );
-    fmc3_hpc_la16_n_obuf : OBUF port map(
-        I => fmc3_hpc_la16_n,
-        O => fmc3_hpc_la16_n_b
+    fmc3_hpc_la16_n_ibuf : IBUF port map(
+        I => fmc3_hpc_la16_n_b,
+        O => fmc3_hpc_la16_n
     );
     fmc3_hpc_la17_p_obuf : OBUF port map(
         I => fmc3_hpc_la17_p,
@@ -1500,133 +1532,100 @@ begin
         I => fmc3_hpc_la17_n,
         O => fmc3_hpc_la17_n_b
     );
-    fmc3_hpc_la18_p_obuf : OBUF port map(
-        I => fmc3_hpc_la18_p,
-        O => fmc3_hpc_la18_p_b
+    fmc3_hpc_la18_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la18_p_b,
+        IB => fmc3_hpc_la18_n_b,
+        O => fmc3_hpc_la18_buf
     );
-    fmc3_hpc_la18_n_obuf : OBUF port map(
-        I => fmc3_hpc_la18_n,
-        O => fmc3_hpc_la18_n_b
+    fmc3_hpc_la18_bufg : BUFG port map(
+        I => fmc3_hpc_la18_buf,
+        O => fmc3_hpc_la18
     );
-    fmc3_hpc_la19_p_obuf : OBUF port map(
-        I => fmc3_hpc_la19_p,
-        O => fmc3_hpc_la19_p_b
+    fmc3_hpc_la19_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la19_p_b,
+        IB => fmc3_hpc_la19_n_b,
+        O => fmc3_hpc_la19
     );
-    fmc3_hpc_la19_n_obuf : OBUF port map(
-        I => fmc3_hpc_la19_n,
-        O => fmc3_hpc_la19_n_b
+    fmc3_hpc_la20_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la20_p_b,
+        IB => fmc3_hpc_la20_n_b,
+        O => fmc3_hpc_la20
     );
-    fmc3_hpc_la20_p_obuf : OBUF port map(
-        I => fmc3_hpc_la20_p,
-        O => fmc3_hpc_la20_p_b
+    fmc3_hpc_la21_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la21_p_b,
+        IB => fmc3_hpc_la21_n_b,
+        O => fmc3_hpc_la21
     );
-    fmc3_hpc_la20_n_obuf : OBUF port map(
-        I => fmc3_hpc_la20_n,
-        O => fmc3_hpc_la20_n_b
+    fmc3_hpc_la22_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la22_p_b,
+        IB => fmc3_hpc_la22_n_b,
+        O => fmc3_hpc_la22
     );
-    fmc3_hpc_la21_p_obuf : OBUF port map(
-        I => fmc3_hpc_la21_p,
-        O => fmc3_hpc_la21_p_b
-    );
-    fmc3_hpc_la21_n_obuf : OBUF port map(
-        I => fmc3_hpc_la21_n,
-        O => fmc3_hpc_la21_n_b
-    );
-    fmc3_hpc_la22_p_obuf : OBUF port map(
-        I => fmc3_hpc_la22_p,
-        O => fmc3_hpc_la22_p_b
-    );
-    fmc3_hpc_la22_n_obuf : OBUF port map(
-        I => fmc3_hpc_la22_n,
-        O => fmc3_hpc_la22_n_b
-    );
-    fmc3_hpc_la23_p_obuf : OBUF port map(
-        I => fmc3_hpc_la23_p,
-        O => fmc3_hpc_la23_p_b
+    fmc3_hpc_la23_p_iobuf : IOBUF port map(
+        I => fmc3_hpc_la23_po,
+        O => fmc3_hpc_la23_pi,
+        IO => fmc3_hpc_la23_p_b,
+        T => fmc3_hpc_la23_pt
     );
     fmc3_hpc_la23_n_obuf : OBUF port map(
         I => fmc3_hpc_la23_n,
         O => fmc3_hpc_la23_n_b
     );
-    fmc3_hpc_la24_p_obuf : OBUF port map(
-        I => fmc3_hpc_la24_p,
-        O => fmc3_hpc_la24_p_b
+    fmc3_hpc_la24_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la24_p_b,
+        IB => fmc3_hpc_la24_n_b,
+        O => fmc3_hpc_la24
     );
-    fmc3_hpc_la24_n_obuf : OBUF port map(
-        I => fmc3_hpc_la24_n,
-        O => fmc3_hpc_la24_n_b
+    fmc3_hpc_la25_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la25_p_b,
+        IB => fmc3_hpc_la25_n_b,
+        O => fmc3_hpc_la25
     );
-    fmc3_hpc_la25_p_obuf : OBUF port map(
-        I => fmc3_hpc_la25_p,
-        O => fmc3_hpc_la25_p_b
+    fmc3_hpc_la26_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la26_p_b,
+        IB => fmc3_hpc_la26_n_b,
+        O => fmc3_hpc_la26
     );
-    fmc3_hpc_la25_n_obuf : OBUF port map(
-        I => fmc3_hpc_la25_n,
-        O => fmc3_hpc_la25_n_b
+    fmc3_hpc_la27_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la27_p_b,
+        IB => fmc3_hpc_la27_n_b,
+        O => fmc3_hpc_la27
     );
-    fmc3_hpc_la26_p_obuf : OBUF port map(
-        I => fmc3_hpc_la26_p,
-        O => fmc3_hpc_la26_p_b
+    fmc3_hpc_la28_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la28_p_b,
+        IB => fmc3_hpc_la28_n_b,
+        O => fmc3_hpc_la28
     );
-    fmc3_hpc_la26_n_obuf : OBUF port map(
-        I => fmc3_hpc_la26_n,
-        O => fmc3_hpc_la26_n_b
+    fmc3_hpc_la29_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la29_p_b,
+        IB => fmc3_hpc_la29_n_b,
+        O => fmc3_hpc_la29
     );
-    fmc3_hpc_la27_p_obuf : OBUF port map(
-        I => fmc3_hpc_la27_p,
-        O => fmc3_hpc_la27_p_b
+    fmc3_hpc_la30_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la30_p_b,
+        IB => fmc3_hpc_la30_n_b,
+        O => fmc3_hpc_la30
     );
-    fmc3_hpc_la27_n_obuf : OBUF port map(
-        I => fmc3_hpc_la27_n,
-        O => fmc3_hpc_la27_n_b
+    fmc3_hpc_la31_ibufds : IBUFDS port map(
+        I => fmc3_hpc_la31_p_b,
+        IB => fmc3_hpc_la31_n_b,
+        O => fmc3_hpc_la31
     );
-    fmc3_hpc_la28_p_obuf : OBUF port map(
-        I => fmc3_hpc_la28_p,
-        O => fmc3_hpc_la28_p_b
-    );
-    fmc3_hpc_la28_n_obuf : OBUF port map(
-        I => fmc3_hpc_la28_n,
-        O => fmc3_hpc_la28_n_b
-    );
-    fmc3_hpc_la29_p_obuf : OBUF port map(
-        I => fmc3_hpc_la29_p,
-        O => fmc3_hpc_la29_p_b
-    );
-    fmc3_hpc_la29_n_obuf : OBUF port map(
-        I => fmc3_hpc_la29_n,
-        O => fmc3_hpc_la29_n_b
-    );
-    fmc3_hpc_la30_p_obuf : OBUF port map(
-        I => fmc3_hpc_la30_p,
-        O => fmc3_hpc_la30_p_b
-    );
-    fmc3_hpc_la30_n_obuf : OBUF port map(
-        I => fmc3_hpc_la30_n,
-        O => fmc3_hpc_la30_n_b
-    );
-    fmc3_hpc_la31_p_obuf : OBUF port map(
-        I => fmc3_hpc_la31_p,
-        O => fmc3_hpc_la31_p_b
-    );
-    fmc3_hpc_la31_n_obuf : OBUF port map(
-        I => fmc3_hpc_la31_n,
-        O => fmc3_hpc_la31_n_b
-    );
-    fmc3_hpc_la32_p_obuf : OBUF port map(
-        I => fmc3_hpc_la32_p,
-        O => fmc3_hpc_la32_p_b
+    fmc3_hpc_la32_p_ibuf : IBUF port map(
+        I => fmc3_hpc_la32_p_b,
+        O => fmc3_hpc_la32_p
     );
     fmc3_hpc_la32_n_obuf : OBUF port map(
         I => fmc3_hpc_la32_n,
         O => fmc3_hpc_la32_n_b
     );
-    fmc3_hpc_la33_p_obuf : OBUF port map(
-        I => fmc3_hpc_la33_p,
-        O => fmc3_hpc_la33_p_b
+    fmc3_hpc_la33_p_ibuf : IBUF port map(
+        I => fmc3_hpc_la33_p_b,
+        O => fmc3_hpc_la33_p
     );
-    fmc3_hpc_la33_n_obuf : OBUF port map(
-        I => fmc3_hpc_la33_n,
-        O => fmc3_hpc_la33_n_b
+    fmc3_hpc_la33_n_ibuf : IBUF port map(
+        I => fmc3_hpc_la33_n_b,
+        O => fmc3_hpc_la33_n
     );
     fmc3_hpc_scl_obuf : OBUF port map(
         I => fmc3_hpc_scl,
