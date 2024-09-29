@@ -51,6 +51,10 @@ architecture structural of FL9781_adapter is
     signal dac_a_b_data_l_buf : std_logic_vector(13 downto 0);
     signal dac_c_d_data_h_buf : std_logic_vector(13 downto 0);
     signal dac_c_d_data_l_buf : std_logic_vector(13 downto 0);
+    signal dac_a_b_data_h_buf_1 : std_logic_vector(13 downto 0);
+    signal dac_a_b_data_l_buf_1 : std_logic_vector(13 downto 0);
+    signal dac_c_d_data_h_buf_1 : std_logic_vector(13 downto 0);
+    signal dac_c_d_data_l_buf_1 : std_logic_vector(13 downto 0);
     signal dac_a_b_data_h : std_logic_vector(13 downto 0);
     signal dac_a_b_data_l : std_logic_vector(13 downto 0);
     signal dac_c_d_data_h : std_logic_vector(13 downto 0);
@@ -68,22 +72,26 @@ architecture structural of FL9781_adapter is
     signal dac_eeprom_iic_scl : std_logic;
     signal dac_eeprom_iic_sda : std_logic;
 
-    signal dac_a_data_fifo_rst_busy : std_logic;
+    signal dac_a_data_fifo_wrst_busy : std_logic;
+    signal dac_a_data_fifo_rrst_busy : std_logic;
     signal dac_a_data_fifo_empty : std_logic;
     signal dac_a_data_fifo_full : std_logic;
     signal dac_a_data_fifo_ren : std_logic;
     signal dac_a_data_fifo_ren_1 : std_logic;
-    signal dac_b_data_fifo_rst_busy : std_logic;
+    signal dac_b_data_fifo_wrst_busy : std_logic;
+    signal dac_b_data_fifo_rrst_busy : std_logic;
     signal dac_b_data_fifo_empty : std_logic;
     signal dac_b_data_fifo_full : std_logic;
     signal dac_b_data_fifo_ren : std_logic;
     signal dac_b_data_fifo_ren_1 : std_logic;
-    signal dac_c_data_fifo_rst_busy : std_logic;
+    signal dac_c_data_fifo_wrst_busy : std_logic;
+    signal dac_c_data_fifo_rrst_busy : std_logic;
     signal dac_c_data_fifo_empty : std_logic;
     signal dac_c_data_fifo_full : std_logic;
     signal dac_c_data_fifo_ren : std_logic;
     signal dac_c_data_fifo_ren_1 : std_logic;
-    signal dac_d_data_fifo_rst_busy : std_logic;
+    signal dac_d_data_fifo_wrst_busy : std_logic;
+    signal dac_d_data_fifo_rrst_busy : std_logic;
     signal dac_d_data_fifo_empty : std_logic;
     signal dac_d_data_fifo_full : std_logic;
     signal dac_d_data_fifo_ren : std_logic;
@@ -100,17 +108,19 @@ begin
         rclk => dac_a_b_dco,
         rst => sys_rst_bar,
         wdata_in => dac_a_data,
-        wen_in => not dac_a_data_fifo_rst_busy,
+        wen_in => not dac_a_data_fifo_wrst_busy,
         rdata_out => dac_a_b_data_h_buf,
         ren_in => dac_a_data_fifo_ren,
-        rval_out => open,
-        rst_busy_out => dac_a_data_fifo_rst_busy,
-        empty_out => dac_a_data_fifo_empty,
-        full_out => dac_a_data_fifo_full
+        wrst_busy_out => dac_a_data_fifo_wrst_busy,
+        rrst_busy_out => dac_a_data_fifo_rrst_busy,
+        wempty_out => open,
+        rempty_out => dac_a_data_fifo_empty,
+        wfull_out => open,
+        rfull_out => dac_a_data_fifo_full
     );
     -- Period ratio is approximately 1:2, which means 1 input is read every 2 cycles on average, but there can be exceptions
     -- The following logic is employed to adjust data rate on the fly, by whether delaying or advancing the read by 1 cycle
-    dac_a_data_fifo_ren <= ((not dac_a_data_fifo_empty and not dac_a_data_fifo_ren_1) or dac_a_data_fifo_full) and not dac_a_data_fifo_rst_busy;
+    dac_a_data_fifo_ren <= ((not dac_a_data_fifo_empty and not dac_a_data_fifo_ren_1) or dac_a_data_fifo_full) and not dac_a_data_fifo_rrst_busy;
     dac_b_data_fifo : entity work.async_fifo generic map(
         width => 14
     )port map(
@@ -118,25 +128,29 @@ begin
         rclk => dac_a_b_dco,
         rst => sys_rst_bar,
         wdata_in => dac_b_data,
-        wen_in => not dac_b_data_fifo_rst_busy,
+        wen_in => not dac_b_data_fifo_wrst_busy,
         rdata_out => dac_a_b_data_l_buf,
         ren_in => dac_b_data_fifo_ren,
-        rval_out => open,
-        rst_busy_out => dac_b_data_fifo_rst_busy,
-        empty_out => dac_b_data_fifo_empty,
-        full_out => dac_b_data_fifo_full
+        wrst_busy_out => dac_b_data_fifo_wrst_busy,
+        rrst_busy_out => dac_b_data_fifo_rrst_busy,
+        wempty_out => open,
+        rempty_out => dac_b_data_fifo_empty,
+        wfull_out => open,
+        rfull_out => dac_b_data_fifo_full
     );
-    dac_b_data_fifo_ren <= ((not dac_b_data_fifo_empty and not dac_b_data_fifo_ren_1) or dac_b_data_fifo_full) and not dac_b_data_fifo_rst_busy;
+    dac_b_data_fifo_ren <= ((not dac_b_data_fifo_empty and not dac_b_data_fifo_ren_1) or dac_b_data_fifo_full) and not dac_b_data_fifo_rrst_busy;
     process(dac_a_b_dco)
     begin
         if rising_edge(dac_a_b_dco) then
             dac_a_data_fifo_ren_1 <= dac_a_data_fifo_ren;
             dac_b_data_fifo_ren_1 <= dac_b_data_fifo_ren;
             if dac_a_data_fifo_ren_1 = '1' then
-                dac_a_b_data_h <= dac_a_b_data_h_buf;
+                dac_a_b_data_h_buf_1 <= dac_a_b_data_h_buf;
+                dac_a_b_data_h <= dac_a_b_data_h_buf_1;
             end if;
             if dac_b_data_fifo_ren_1 = '1' then
-                dac_a_b_data_l <= dac_a_b_data_l_buf;
+                dac_a_b_data_l_buf_1 <= dac_a_b_data_l_buf;
+                dac_a_b_data_l <= dac_a_b_data_l_buf_1;
             end if;
         end if;
     end process;
@@ -147,15 +161,17 @@ begin
         rclk => dac_c_d_dco,
         rst => sys_rst_bar,
         wdata_in => dac_c_data,
-        wen_in => not dac_c_data_fifo_rst_busy,
+        wen_in => not dac_c_data_fifo_wrst_busy,
         rdata_out => dac_c_d_data_h_buf,
         ren_in => dac_c_data_fifo_ren,
-        rval_out => open,
-        rst_busy_out => dac_c_data_fifo_rst_busy,
-        empty_out => dac_c_data_fifo_empty,
-        full_out => dac_c_data_fifo_full
+        wrst_busy_out => dac_c_data_fifo_wrst_busy,
+        rrst_busy_out => dac_c_data_fifo_rrst_busy,
+        wempty_out => open,
+        rempty_out => dac_c_data_fifo_empty,
+        wfull_out => open,
+        rfull_out => dac_c_data_fifo_full
     );
-    dac_c_data_fifo_ren <= ((not dac_c_data_fifo_empty and not dac_c_data_fifo_ren_1) or dac_c_data_fifo_full) and not dac_c_data_fifo_rst_busy;
+    dac_c_data_fifo_ren <= ((not dac_c_data_fifo_empty and not dac_c_data_fifo_ren_1) or dac_c_data_fifo_full) and not dac_c_data_fifo_rrst_busy;
     dac_d_data_fifo : entity work.async_fifo generic map(
         width => 14
     )port map(
@@ -163,25 +179,28 @@ begin
         rclk => dac_c_d_dco,
         rst => sys_rst_bar,
         wdata_in => dac_d_data,
-        wen_in => not dac_d_data_fifo_rst_busy,
+        wen_in => not dac_d_data_fifo_wrst_busy,
         rdata_out => dac_c_d_data_l_buf,
         ren_in => dac_d_data_fifo_ren,
-        rval_out => open,
-        rst_busy_out => dac_d_data_fifo_rst_busy,
-        empty_out => dac_d_data_fifo_empty,
-        full_out => dac_d_data_fifo_full
+        wrst_busy_out => dac_d_data_fifo_wrst_busy,
+        wempty_out => open,
+        rempty_out => dac_d_data_fifo_empty,
+        wfull_out => open,
+        rfull_out => dac_d_data_fifo_full
     );
-    dac_d_data_fifo_ren <= ((not dac_d_data_fifo_empty and not dac_d_data_fifo_ren_1) or dac_d_data_fifo_full) and not dac_d_data_fifo_rst_busy;
+    dac_d_data_fifo_ren <= ((not dac_d_data_fifo_empty and not dac_d_data_fifo_ren_1) or dac_d_data_fifo_full) and not dac_d_data_fifo_rrst_busy;
     process(dac_c_d_dco)
     begin
         if rising_edge(dac_c_d_dco) then
             dac_c_data_fifo_ren_1 <= dac_c_data_fifo_ren;
             dac_d_data_fifo_ren_1 <= dac_d_data_fifo_ren;
             if dac_c_data_fifo_ren_1 = '1' then
-                dac_c_d_data_h <= dac_c_d_data_h_buf;
+                dac_c_d_data_h_buf_1 <= dac_c_d_data_h_buf;
+                dac_c_d_data_h <= dac_c_d_data_h_buf_1;
             end if;
             if dac_d_data_fifo_ren_1 = '1' then
-                dac_c_d_data_l <= dac_c_d_data_l_buf;
+                dac_c_d_data_l_buf_1 <= dac_c_d_data_l_buf;
+                dac_c_d_data_l <= dac_c_d_data_l_buf_1;
             end if;
         end if;
     end process;
