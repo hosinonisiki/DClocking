@@ -529,7 +529,6 @@ architecture peripheral_wrapper of wrapper is
     component sys_clk_mmcm
         port (
             clk_out1            : out    std_logic;
-            clk_out2            : out    std_logic;
             reset               : in     std_logic;
             locked              : out    std_logic;
             clk_in1_p           : in     std_logic;
