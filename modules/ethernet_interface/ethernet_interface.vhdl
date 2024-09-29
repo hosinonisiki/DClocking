@@ -12,7 +12,7 @@
 -- bus handler, which translates high level bus commands
 -- into a series of ethernet frames and also intercepts
 -- further commands when the interface is busy.
--- Since the length of a frame is usualy flexible, the
+-- Since the length of a frame is usually flexible, the
 -- payload field is read as a byte stream, either
 -- from the ether_payload_in port or the module's
 -- data_in port.
