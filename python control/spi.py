@@ -23,6 +23,8 @@ class Spi():
         # Check if data length is consistent with write length
         if len(data) != write_length:
             raise Exception("Data length is not consistent with write length")
+        # Pad empty bytes
+        data = data.ljust(4, b'\x00')
         message = b":SPI_." + module.encode() + b".\x00\x00" + (write_length * 8 - 1).to_bytes(1, "big") + (length * 8 - 1).to_bytes(1, "big") + b"." + data + b"!"
         response = self.serial.post(message)
 

@@ -1,12 +1,14 @@
 import uart
 import bus
 import module_signal_router
+import spi
 
 ser = uart.MySerial("COM3", baudrate = 57600, parity = "E", timeout = 0.5)
 bus = bus.Bus(ser)
 router = module_signal_router.ModuleSignalRouter(bus)
+sp = spi.Spi(ser)
 
-VERBOSE = False
+VERBOSE = True
 if VERBOSE:
     # refresh
     print("refreshing bus modules")
@@ -94,26 +96,31 @@ if VERBOSE:
     ser.post(b":SPI_.DAC2.\x00\x00\x0F\x0F.\x11\x00\x00\x00!")
     ser.post(b":SPI_.DAC2.\x00\x00\x0F\x0F.\x12\x00\x00\x00!")
 
-    ser.post(b":SPI_.ADC1.\x00\x00\x17\x17.\x00\x14\x40\x00!")
+    ser.post(b":SPI_.ADC1.\x00\x00\x17\x17.\x00\x14\x41\x00!")
     ser.post(b":SPI_.ADC1.\x00\x00\x17\x17.\x00\x17\x06\x00!")
     ser.post(b":SPI_.ADC1.\x00\x00\x17\x17.\x00\xFF\x01\x00!")
-    ser.post(b":SPI_.ADC2.\x00\x00\x17\x17.\x00\x14\x40\x00!")
+    ser.post(b":SPI_.ADC2.\x00\x00\x17\x17.\x00\x14\x41\x00!")
     ser.post(b":SPI_.ADC2.\x00\x00\x17\x17.\x00\x17\x06\x00!")
     ser.post(b":SPI_.ADC2.\x00\x00\x17\x17.\x00\xFF\x01\x00!")
 
-    router._set_routing(2, 6)
-    router._set_routing(3, 7)
-    router._set_routing(4, 5)
-    router._set_routing(5, 4)
+    router.set_routing(2, 6)
+    router.set_routing(3, 7)
+    router.set_routing(4, 5)
+    router.set_routing(5, 4)
     #router.implement_routing()
     router.upload()
 else:
-    ser.post(b":BUS_.ACCM.WRTE.ADDR.\x00\x00\x00\x01.DATA.\x01\x00\x00\x00.HOLD!")
+    ser.post(b":SPI_.ADC1.\x00\x00\x0F\x17.\x80\x02\x00\x00!")
+    ser.post(b":SPI_.ADC2.\x00\x00\x17\x17.\x00\x14\x41\x00!")
+    ser.post(b":SPI_.ADC2.\x00\x00\x17\x17.\x00\x17\x06\x00!")
+    ser.post(b":SPI_.ADC2.\x00\x00\x17\x17.\x00\xFF\x01\x00!")
+    
+    ser.post(b":BUS_.ACCM.WRTE.ADDR.\x00\x00\x00\x01.DATA.\x00\x10\x00\x00.HOLD!")
     ser.post(b":BUS_.ACCM.WRTE.ADDR.\x00\x00\x00\x00.DATA.\x00\x00\x00\x00!")
 
-    router._set_routing(2, 6)
-    router._set_routing(3, 7)
-    router._set_routing(4, 5)
-    router._set_routing(5, 4)
+    router.set_routing(2, 6)
+    router.set_routing(3, 7)
+    router.set_routing(4, 5)
+    router.set_routing(5, 4)
     #router.implement_routing()
     router.upload()

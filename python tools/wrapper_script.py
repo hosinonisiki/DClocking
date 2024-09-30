@@ -1,6 +1,6 @@
 from configuration_list import *
 
-configurations = [FL9627_configuration, FL9781_configuration, FL1010_configuration]
+configurations = [FL1010_configuration, FL9627_configuration, default_configuration]
 lpc_name = ["fmc1_lpc", "fmc2_lpc", "fmc3_hpc"]
 for i in range(3):
     configurations[i].lpc_name = lpc_name[i]

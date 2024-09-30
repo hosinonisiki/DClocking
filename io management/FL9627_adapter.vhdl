@@ -245,7 +245,7 @@ begin
     adc1_spi_miso <= adc1_spi_miso_fmc;
     adc2_spi_miso <= adc2_spi_miso_fmc;
     adc_spi_io_tri_fmc <= adc_spi_io_tri;
-    adc_clk_125M_fmc <= clk_125M;
+    adc_clk_125M_fmc <= adc_clk_125M;
     adc_eeprom_iic_scl_fmc <= adc_eeprom_iic_scl;
     adc_eeprom_iic_sda_fmc <= adc_eeprom_iic_sda;
 
