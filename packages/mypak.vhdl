@@ -12,7 +12,7 @@ package mypak is
     type buf_type is (buf_for_io, buf_i_only, buf_o_only, buf_none); -- Universal io buffer type for the core modules.
 
     constant dbus_w     :   integer := 32; -- Width of the data bus.
-    constant abus_w     :   integer := 5; -- Width of the address bus. This determines the size of individual memories in each module.
+    constant abus_w     :   integer := 6; -- Width of the address bus. This determines the size of individual memories in each module.
     constant mbus_w     :   integer := 5; -- Width of the module selection bus. This determines the max number of modules that can be connected to the bus.
     constant cbus_w     :   integer := 5; -- Width of the control bus.
     constant rdbus_w    :   integer := 32; -- Width of the response data bus.
@@ -21,11 +21,12 @@ package mypak is
 
     constant log_dbus_w :   integer := 5; -- Log2 of the data bus width.
 
-    constant module_count   : integer := 4; -- Number of modules connected to the bus.
+    constant module_count   : integer := 5; -- Number of modules connected to the bus.
     constant BUS_ROUT_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(1, mbus_w)); -- Address of the router module.
     constant BUS_TRIG_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(2, mbus_w)); -- Address of the trigonometric module.
     constant BUS_ACCM_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(3, mbus_w)); -- Address of the accumulator module.
     constant BUS_SCLR_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(4, mbus_w)); -- Address of the scalar module.
+    constant BUS_MMWR_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(5, mbus_w)); -- Address of the mim_wrapper module.
 
     -- Used in wrapper and central_control
     constant SPI_DAC1_ADDR      : integer := 0; -- Address of chip DAC1, responsible for dac channel A and B.
@@ -42,5 +43,5 @@ package mypak is
 
     constant spi_clk_freq   :   integer := 10_000_000; -- SPI clock frequency in Hz.
 
-    type signal_array is array(natural range <>) of std_logic_vector(15 downto 0); -- Used in the router's io ports.
+    type signal_array is array(natural range <>) of std_logic_vector(15 downto 0); -- Used in the router's io ports and mim_wrapper.
 end package mypak;

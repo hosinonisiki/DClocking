@@ -21,6 +21,7 @@ package uart_protocol is
     -- :SPI_.DAC1.<4B data>.<4B data>!
     -- :BUS_.ROUT.WRTE.ADDR.<4B data>.DATA.<4B data>.HOLD!
     -- :BUS_.ROUT.READ.ADDR.<4B data>.BYTE.<4B data>!
+    -- :BUS_.MMWR.MISC.<4B data>!
     -- :ACKN.<4B data>!
     -- :ERR_!
 
@@ -36,6 +37,7 @@ package uart_protocol is
         constant u_DEVICE_TRIG  : std_logic_vector(31 downto 0) := x"54524947"; -- ASCII 'TRIG'
         constant u_DEVICE_ACCM  : std_logic_vector(31 downto 0) := x"4143434d"; -- ASCII 'ACCM'
         constant u_DEVICE_SCLR  : std_logic_vector(31 downto 0) := x"53434c52"; -- ASCII 'SCLR'
+        constant u_DEVICE_MMWR  : std_logic_vector(31 downto 0) := x"4d4d5752"; -- ASCII 'MMWR'
         constant u_COMMAND_CTRL : std_logic_vector(31 downto 0) := x"4354524c"; -- ASCII 'CTRL'
             constant u_KEYWORD_SETC : std_logic_vector(31 downto 0) := x"53455443"; -- ASCII 'SETC'
             constant u_KEYWORD_SETR : std_logic_vector(31 downto 0) := x"53455452"; -- ASCII 'SETR'
@@ -47,6 +49,7 @@ package uart_protocol is
             constant u_KEYWORD_DATA : std_logic_vector(31 downto 0) := x"44415441"; -- ASCII 'DATA'
             constant u_KEYWORD_MASK : std_logic_vector(31 downto 0) := x"4d41534b"; -- ASCII 'MASK'
             constant u_KEYWORD_HOLD : std_logic_vector(31 downto 0) := x"484f4c44"; -- ASCII 'HOLD'
+        constant u_COMMAND_MISC : std_logic_vector(31 downto 0) := x"4d495343"; -- ASCII 'MISC'
         -- Further commands for the ethernet trx may be necessary
         -- since they can't be mapped to simple read/write operations.
         -- For example, the module should reject new transmission

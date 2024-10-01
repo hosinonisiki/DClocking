@@ -10,7 +10,9 @@ use work.mypak.all;
 
 use work.bus_protocol.all;
 
-entity bus_handler is
+use work.moku_mim_config.all;
+
+entity bus_handler_moku_mim_wrapper is
     port(
         clk             :   in  std_logic;
         rst             :   in  std_logic;
@@ -30,12 +32,15 @@ entity bus_handler is
         rval_in         :   in  std_logic;
         ren_out         :   out std_logic;
         ram_rst_out     :   out std_logic;
-        core_rst_out    :   out std_logic
+        core_rst_out    :   out std_logic;
+        -- Extra signals
+        mim_en_out      :   out std_logic;
+        mim_id_out      :   out std_logic_vector(5 downto 0) -- Allows a maximum of id up to 63
     );
-end entity bus_handler;
+end entity bus_handler_moku_mim_wrapper;
 
-architecture behaviorial of bus_handler is
-    type state_type is (s_idle, s_handle_command, s_handle_write, s_handle_read, s_wait_response, s_error);
+architecture behaviorial of bus_handler_moku_mim_wrapper is
+    type state_type is (s_idle, s_handle_command, s_handle_write, s_handle_read, s_wait_response, s_handle_misc, s_misc_valid, s_error);
     signal state            :   state_type := s_idle;
 
     signal cmd_head_buf     :   std_logic_vector(cbus_w - 1 downto cbus_w - 2);
@@ -45,10 +50,12 @@ architecture behaviorial of bus_handler is
 
     signal wval_reg         :   std_logic := '0';
     signal wen              :   std_logic;
+
+    signal id_valid         :   std_logic;
 begin
     -- FSM
     process(clk, rst)
-    begin  
+    begin
         if rising_edge(clk) then
             if rst = '1' then
                 state <= s_idle;
@@ -63,8 +70,8 @@ begin
                                     state <= s_handle_write;
                                 when READ_HEAD =>
                                     state <= s_handle_read;
-                                when others =>
-                                    state <= s_error;
+                                when MISC_HEAD =>
+                                    state <= s_handle_misc;
                             end case;
                         end if;
                     when s_handle_command =>
@@ -80,6 +87,15 @@ begin
                         if rval_in = '1' then
                             state <= s_idle;
                         end if;
+                    when s_handle_misc =>
+                        -- Check if the id is valid
+                        if VALID_ID(to_integer(unsigned(data_buf(5 downto 0)))) = '1' then
+                            state <= s_misc_valid;
+                        else
+                            state <= s_error;
+                        end if;
+                    when s_misc_valid =>
+                        state <= s_idle;
                     when s_error =>
                         state <= s_idle;
                 end case;
@@ -165,6 +181,21 @@ begin
         end if;
     end process;
 
+    -- handle misc commands
+    process(clk)
+        variable id : integer;
+    begin
+        if rising_edge(clk) then
+            if rst = '1' then
+                mim_en_out <= '0';
+            elsif state = s_misc_valid then
+                -- Masks according to moku_mim_config
+                mim_en_out <= data_buf(28);
+                mim_id_out <= data_buf(5 downto 0);
+            end if;
+        end if;
+    end process;
+
     -- handle replies
     process(clk)
     begin
@@ -183,9 +214,12 @@ begin
                     if rval_in = '1' then
                         rsp_stat_out <= ROGER;
                     end if;
+                when s_misc_valid =>
+                    -- All misc commands that currently exist only take one cycle to complete
+                    rsp_stat_out <= ROGER;
                 when s_error =>
                     rsp_stat_out <= ERROR;
-                    rsp_data_out <= x"4E4D5343"; -- "NMSC" for no miscellaneous commands
+                    rsp_data_out <= x"49564944"; -- "IVID" for invalid id
                 when others =>
             end case;
         end if;

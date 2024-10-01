@@ -36,4 +36,5 @@ class Bus():
         elif type(address) == str:
             address = int(address, 16).to_bytes(4, "big")
         message = b":BUS_." + module.encode() + b".READ.ADDR." + address + b"!"
-        self.serial.post(message)
+        response = self.serial.post(message)
+        return response[-5:-1]

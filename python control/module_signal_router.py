@@ -64,7 +64,8 @@ class ModuleSignalRouter(module.ModuleBase):
         self.routing_enable[channel] = 0
 
     def implement_routing(self):
-        assert not self.full_connection, "Full connection mode does not require routing implementation."
+        if self.full_connection:
+            return
         # Check if the routing configuration can be realized
         need_forward = [0] * 8
         receive_forward = [0] * 8
@@ -133,10 +134,12 @@ class ModuleSignalRouter(module.ModuleBase):
         return
     
     def get_bytes(self):
+        self.implement_routing()
         self.encode()
         return "".join([hex(int(self.bits[i * 8: (i + 1) * 8], 2))[2:] for i in range(64)])
     
     def upload(self):
+        self.implement_routing()
         self.encode()
         for i in range(15, -1, -1):
             if self.bits[i * 32: (i + 1) * 32] != self.last_bits[i * 32: (i + 1) * 32]:

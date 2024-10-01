@@ -49,7 +49,8 @@ architecture parser of central_control is
                         s_bus_parse_device, s_bus_parse_head, s_bus_control_parse_body,
                         s_bus_write_parse_body, s_bus_write_parse_address,
                         s_bus_write_parse_data, s_bus_write_parse_mask,
-                        s_bus_read_parse_body, s_bus_read_parse_address, s_bus_transmit_1,
+                        s_bus_read_parse_body, s_bus_read_parse_address,
+                        s_bus_misc_parse_body, s_bus_misc_parse_data, s_bus_transmit_1,
                         s_bus_transmit_2, s_bus_listen, s_respond_acknowledgement,
                         s_respond_exception, s_send);
     signal state        : state_type := s_idle;
@@ -267,6 +268,9 @@ begin
                                 when u_DEVICE_SCLR =>
                                     bus_mod_buf <= BUS_SCLR_ADDR;
                                     state <= s_bus_parse_head;
+                                when u_DEVICE_MMWR =>
+                                    bus_mod_buf <= BUS_MMWR_ADDR;
+                                    state <= s_bus_parse_head;
                                 when others =>
                                     response_err_buf <= x"44564345"; -- "DVCE" for device error
                                     state <= s_respond_exception;
@@ -290,6 +294,10 @@ begin
                                     bus_cmd_buf(cbus_w - 1 downto cbus_w - 2) <= WRITE_HEAD;
                                     bus_cmd_buf(cbus_w - 3 downto 0) <= (others => '0');
                                     state <= s_bus_write_parse_body;
+                                when u_COMMAND_MISC =>
+                                    bus_cmd_buf(cbus_w - 1 downto cbus_w - 2) <= MISC_HEAD;
+                                    bus_cmd_buf(cbus_w - 3 downto 0) <= (others => '0');
+                                    state <= s_bus_misc_parse_body;
                                 when others =>
                                     response_err_buf <= x"48454144"; -- "HEAD" for head error
                                     state <= s_respond_exception;
@@ -403,6 +411,27 @@ begin
                                 state <= s_bus_read_parse_body;
                             end if;
                         end if;
+                    when s_bus_misc_parse_body =>
+                        if bsr_i2_reg(5) /= u_SEP then
+                            response_err_buf <= x"534e5458"; -- "SNTX" for syntax error
+                            state <= s_respond_exception;
+                        else
+                            case cur_str is
+                                when u_KEYWORD_DATA =>
+                                    state <= s_bus_misc_parse_data;
+                                when others =>
+                                    response_err_buf <= x"424f4459"; -- "BODY" for body error
+                                    state <= s_respond_exception;
+                            end case;
+                        end if;
+                    when s_bus_misc_parse_data =>
+                        if bsr_i2_reg(5) /= u_TERM then -- Assert end of message
+                            response_err_buf <= x"534e5458"; -- "SNTX" for syntax error
+                            state <= s_respond_exception;
+                        else
+                            bus_data_buf <= cur_str(dbus_w - 1 downto 0);
+                            state <= s_bus_transmit_1;
+                        end if;
                     -- Sending bus commands in multiple steps. Refer to bus_protocol for details.
                     when s_bus_transmit_1 =>
                         bsr_i2_sl <= '0';
@@ -422,13 +451,18 @@ begin
                         state <= s_bus_listen;
                     when s_bus_listen =>
                         cbus_out <= (others => '0');
-                        if rsp_stat_in = ROGER then
-                            if bus_cmd_buf(cbus_w - 1 downto cbus_w - 2) = READ_HEAD then
-                                response_data_buf <= rsp_data_in;
-                                response_data_attached <= '1';
-                            end if;
-                            state <= s_respond_acknowledgement;
-                        end if;
+                        case rsp_stat_in is
+                            when ROGER =>
+                                if bus_cmd_buf(cbus_w - 1 downto cbus_w - 2) = READ_HEAD then
+                                    response_data_buf <= rsp_data_in;
+                                    response_data_attached <= '1';
+                                end if;
+                                state <= s_respond_acknowledgement;
+                            when ERROR =>
+                                response_err_buf <= rsp_data_in;
+                                state <= s_respond_exception;
+                            when others =>
+                        end case;
                     when s_respond_acknowledgement =>
                         -- Load an acknowledgement message
                         bsr_i2_sl <= '0';

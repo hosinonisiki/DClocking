@@ -13,7 +13,7 @@ class MySerial(Serial):
         response = self.read_until(b"!")
         print(response)
         if response[:5] != b":ACKN":
-            raise Exception("Error in transmission")
+            raise Exception("Error in transmission. Received: " + response.decode())
         return response
 
    

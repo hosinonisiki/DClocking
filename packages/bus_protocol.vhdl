@@ -45,7 +45,17 @@ package bus_protocol is
     --  t1  0           X            X
     constant READ_HEAD : std_logic_vector(1 downto 0) := "10"; -- Commands starting with "10" are read commands
     constant READ : std_logic_vector(cbus_w - 3 downto 0) := "000"; -- Read from ADDRESS
+    -- "1XXX" usage:
+    --      control     address      data
+    --  t-1 0           X            X
+    --  t0  COMMAND     X            ADDITIONAL INFORMATION
+    --  t1  0           X            X
+    constant MISC_HEAD : std_logic_vector(1 downto 0) := "11"; -- Commands starting with "11" are miscellaneous commands
+    -- Details of this type of commands are defined by individual bus handlers that require special logic.
+    -- Additional information is provided in the data field and transmitted through the data bus.
 
     -- reply signals from slave to master
     constant ROGER : std_logic_vector(rsbus_w - 1 downto 0) := "001"; -- Acknowledge that the command was implemented
+    constant ERROR : std_logic_vector(rsbus_w - 1 downto 0) := "111"; -- Acknowledge that the command was not implemented
+    -- Additional information of the error is provided in the response data bus.
 end package bus_protocol;

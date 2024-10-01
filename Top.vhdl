@@ -207,6 +207,31 @@ begin
         );
     end block module_4_block;
 
+    module_5_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_MMWR_ADDR else '0'; -- constant defined in mypak
+        module_5 : entity work.module_moku_mim_wrapper port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(5),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(5),
+            rsp_stat_out    =>  rsbus(5),
+            
+            inputa          => sig_bank_out(6),
+            inputb          => sig_bank_out(7),
+            inputc          => sig_bank_out(8),
+            inputd          => sig_bank_out(9),
+            outputa         => sig_bank_in(10),
+            outputb         => sig_bank_in(11),
+            outputc         => sig_bank_in(12),
+            outputd         => sig_bank_in(13)
+        );
+    end block module_5_block;
+
     -- signal banks provided by the router
     
     sig_bank_in(6) <= adc_a & x"0";
