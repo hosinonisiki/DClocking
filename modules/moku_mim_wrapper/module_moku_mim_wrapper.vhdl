@@ -69,8 +69,8 @@ architecture structural of module_moku_mim_wrapper is
     signal outputc_buf      :   signal_array(MAX_ID downto 0) := (others => (others => '0')); -- Buffer for outputc
     signal outputd_buf      :   signal_array(MAX_ID downto 0) := (others => (others => '0')); -- Buffer for outputd
 
-    signal mim_en_out       :   std_logic;
-    signal mim_id_out       :   std_logic_vector(5 downto 0);
+    signal mim_en           :   std_logic;
+    signal mim_id           :   std_logic_vector(5 downto 0);
 begin
     
     core_entity_0 : entity work.moku_mim_wrapper(id_0) port map(
@@ -174,20 +174,20 @@ begin
         ram_rst_out     =>  ram_rst,
         core_rst_out    =>  core_rst,
         -- Extra signals
-        mim_en_out      =>  mim_en_out,
-        mim_id_out      =>  mim_id_out
+        mim_en_out      =>  mim_en,
+        mim_id_out      =>  mim_id
     );
     handler_rst <= rst;
 
     -- IO multiplexer
     input_buf_gen : for i in 0 to MAX_ID generate
-        inputa_buf(i) <= inputa when mim_en_out = '1' and mim_id_out = std_logic_vector(to_unsigned(i, 6)) else (others => '0');
-        inputb_buf(i) <= inputb when mim_en_out = '1' and mim_id_out = std_logic_vector(to_unsigned(i, 6)) else (others => '0');
-        inputc_buf(i) <= inputc when mim_en_out = '1' and mim_id_out = std_logic_vector(to_unsigned(i, 6)) else (others => '0');
-        inputd_buf(i) <= inputd when mim_en_out = '1' and mim_id_out = std_logic_vector(to_unsigned(i, 6)) else (others => '0');
+        inputa_buf(i) <= inputa when mim_en = '1' and mim_id = std_logic_vector(to_unsigned(i, 6)) else (others => '0');
+        inputb_buf(i) <= inputb when mim_en = '1' and mim_id = std_logic_vector(to_unsigned(i, 6)) else (others => '0');
+        inputc_buf(i) <= inputc when mim_en = '1' and mim_id = std_logic_vector(to_unsigned(i, 6)) else (others => '0');
+        inputd_buf(i) <= inputd when mim_en = '1' and mim_id = std_logic_vector(to_unsigned(i, 6)) else (others => '0');
     end generate input_buf_gen;
-    outputa <= outputa_buf(to_integer(unsigned(mim_id_out))) when mim_en_out = '1' else (others => '0');
-    outputb <= outputb_buf(to_integer(unsigned(mim_id_out))) when mim_en_out = '1' else (others => '0');
-    outputc <= outputc_buf(to_integer(unsigned(mim_id_out))) when mim_en_out = '1' else (others => '0');
-    outputd <= outputd_buf(to_integer(unsigned(mim_id_out))) when mim_en_out = '1' else (others => '0');
+    outputa <= outputa_buf(to_integer(unsigned(mim_id))) when mim_en = '1' else (others => '0');
+    outputb <= outputb_buf(to_integer(unsigned(mim_id))) when mim_en = '1' else (others => '0');
+    outputc <= outputc_buf(to_integer(unsigned(mim_id))) when mim_en = '1' else (others => '0');
+    outputd <= outputd_buf(to_integer(unsigned(mim_id))) when mim_en = '1' else (others => '0');
 end architecture structural;

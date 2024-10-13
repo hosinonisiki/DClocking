@@ -72,6 +72,7 @@ begin
                                     state <= s_handle_read;
                                 when MISC_HEAD =>
                                     state <= s_handle_misc;
+                                when others =>
                             end case;
                         end if;
                     when s_handle_command =>

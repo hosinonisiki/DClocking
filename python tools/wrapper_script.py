@@ -123,7 +123,7 @@ with open(filename, 'r') as file:
         code.append("\n")
     code += end
 
-    # Write to file
-    with open(filename, 'w') as file:
-        file.writelines(code)
+# Write to file
+with open(filename, 'w') as file:
+    file.writelines(code)
 

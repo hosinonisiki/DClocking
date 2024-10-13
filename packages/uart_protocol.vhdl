@@ -21,7 +21,7 @@ package uart_protocol is
     -- :SPI_.DAC1.<4B data>.<4B data>!
     -- :BUS_.ROUT.WRTE.ADDR.<4B data>.DATA.<4B data>.HOLD!
     -- :BUS_.ROUT.READ.ADDR.<4B data>.BYTE.<4B data>!
-    -- :BUS_.MMWR.MISC.<4B data>!
+    -- :BUS_.MMWR.MISC.DATA.<4B data>!
     -- :ACKN.<4B data>!
     -- :ERR_!
 

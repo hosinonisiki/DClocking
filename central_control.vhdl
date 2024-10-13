@@ -56,6 +56,7 @@ architecture parser of central_control is
     signal state        : state_type := s_idle;
 
     signal char_count   : unsigned(7 downto 0); -- Count of characters in a message
+    signal aux_char_count : unsigned(2 downto 0); -- Count of characters in a segment, used to determine if a char is part of syntax
 
     signal cur_str      : std_logic_vector(31 downto 0); -- Current string being parsed
 
@@ -138,10 +139,12 @@ begin
                     when s_receive =>
                         -- Zero the chracter counter
                         char_count <= (others => '0');
+                        aux_char_count <= (others => '0');
                         -- Receive the character with the shift register
                         bsr_i1_sr <= '0';
                         -- If the character is a terminator, start flipping the message
-                        if rxd_in = u_TERM then
+                        -- Also assert fifth and tenth characters are separators to prevent ambiguity
+                        if rxd_in = u_TERM and bsr_i1_reg(4) = u_SEP and bsr_i1_reg(9) = u_SEP then
                             bsr_i1_sl <= '1';
                             bsr_i2_sr <= '1';
                             state <= s_flip;
@@ -157,8 +160,15 @@ begin
                     when s_flip =>
                         -- Count the length of the message
                         char_count <= char_count + x"01";
-                        -- If the character is an initiator, start parsing the message
-                        if bsr_i1_reg(0) = u_INIT then
+                        -- Count the position of characters in a segment
+                        if aux_char_count = to_unsigned(4, 3) then
+                            aux_char_count <= (others => '0');
+                        else
+                            aux_char_count <= aux_char_count + "001";
+                        end if;
+                        -- If the character is an initiator, AND the length of message is 5 * n + 1,
+                        -- start parsing the message
+                        if bsr_i1_reg(0) = u_INIT and aux_char_count = "000" then
                             bsr_i1_sl <= '0';
                             bsr_i2_sr <= '0';
                             bsr_i2_sl <= '1';

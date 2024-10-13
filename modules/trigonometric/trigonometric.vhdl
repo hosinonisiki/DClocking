@@ -55,11 +55,11 @@ architecture behavioral of trigonometric is
         x"00000a"
     ); -- angle values of arctan(2^(-i))
     signal c, s, z          :   signed_array(0 to 18); -- cos, sin and angle residue
-    signal c_buf, s_buf, z_buf  :   signed_array(0 to 8); -- buffers inserted to pipeline
+    signal c_buf, s_buf, z_buf  :   signed_array(0 to 17); -- buffers inserted to pipeline
 
     type sign_array is array(natural range <>) of std_logic;
     signal d, x             :   sign_array(0 to 18); -- d stores the sign of residue. x stores quandrant information of the input
-    signal d_buf, x_buf     :   sign_array(0 to 8); -- buffers inserted to pipeline
+    signal d_buf, x_buf     :   sign_array(0 to 17); -- buffers inserted to pipeline
 begin
     use_input_buffer : if io_buf = buf_for_io or io_buf = buf_i_only generate
         process(clk)
@@ -106,37 +106,24 @@ begin
     s(0) <= x"475e34" when d(0) = '0' else x"b8a1cc"; -- x"b8a1cc" = -0.607253 * x"7586a5"
 
     iterations : for i in 0 to 17 generate
-        with_buffer: if (i mod 2 = 1) generate
-            c_buf((i - 1) / 2) <= c(i) - shift_right(s(i), i + 1) when d_buf((i - 1) / 2) = '0' else
-                                  c(i) + shift_right(s(i), i + 1);
-            s_buf((i - 1) / 2) <= s(i) + shift_right(c(i), i + 1) when d_buf((i - 1) / 2) = '0' else
-                                  s(i) - shift_right(c(i), i + 1);
-            d_buf((i - 1) / 2) <= z_buf((i - 1) / 2)(23);
-            x_buf((i - 1) / 2) <= x(i);
-            z_buf((i - 1) / 2) <= z(i) - a(i) when d(i) = '0' else
-                                  z(i) + a(i);
-            process(clk)
-            begin
-                if rising_edge(clk) then
-                    c(i + 1) <= c_buf((i - 1) / 2);
-                    s(i + 1) <= s_buf((i - 1) / 2);
-                    d(i + 1) <= d_buf((i - 1) / 2);
-                    x(i + 1) <= x_buf((i - 1) / 2);
-                    z(i + 1) <= z_buf((i - 1) / 2);
-                end if;
-            end process;
-        end generate with_buffer;
-
-        without_buffer: if (i mod 2 /= 1) generate
-            c(i + 1) <= c(i) - shift_right(s(i), i + 1) when d(i + 1) = '0' else
-                        c(i) + shift_right(s(i), i + 1);
-            s(i + 1) <= s(i) + shift_right(c(i), i + 1) when d(i + 1) = '0' else
-                        s(i) - shift_right(c(i), i + 1);
-            d(i + 1) <= z(i + 1)(23);
-            x(i + 1) <= x(i);
-            z(i + 1) <= z(i) - a(i) when d(i) = '0' else
-                        z(i) + a(i);
-        end generate without_buffer;
+        c_buf(i) <= c(i) - shift_right(s(i), i + 1) when d_buf(i) = '0' else
+                            c(i) + shift_right(s(i), i + 1);
+        s_buf(i) <= s(i) + shift_right(c(i), i + 1) when d_buf(i) = '0' else
+                            s(i) - shift_right(c(i), i + 1);
+        d_buf(i) <= z_buf(i)(23);
+        x_buf(i) <= x(i);
+        z_buf(i) <= z(i) - a(i) when d(i) = '0' else
+                            z(i) + a(i);
+        process(clk)
+        begin
+            if rising_edge(clk) then
+                c(i + 1) <= c_buf(i);
+                s(i + 1) <= s_buf(i);
+                d(i + 1) <= d_buf(i);
+                x(i + 1) <= x_buf(i);
+                z(i + 1) <= z_buf(i);
+            end if;
+        end process;
     end generate iterations;
 
     -- rotate back to the original quadrant with rounding

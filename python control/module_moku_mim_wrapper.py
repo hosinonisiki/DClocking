@@ -12,14 +12,15 @@ class ModuleMokuMIMWrapper(module.ModuleBase):
         self.upload()
 
     def enable(self):
-        self.data = b"\x01\x00\x00" + self.config_id.to_bytes(1, "big")
+        self.data = b"\x10\x00\x00" + self.config_id.to_bytes(1, "big")
 
     def disable(self):
         self.data = b"\x00\x00\x00" + self.config_id.to_bytes(1, "big")
 
     def set_config(self, config_id):
-        self.config_id = config_id
-        self.data = self.data[:3] + self.config_id.to_bytes(1, "big")
+        self.config_id = int(config_id)
+        if self.config_id != -1:
+            self.data = self.data[:3] + self.config_id.to_bytes(1, "big")
 
     def upload(self):
-        self.bus.post_bytes(b":BUS_.MMWR.MISC." + self.data + b"!")
+        self.bus.post_bytes(b":BUS_.MMWR.MISC.DATA." + self.data + b"!")
