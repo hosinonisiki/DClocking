@@ -115,7 +115,7 @@ begin
         wfull_out => open,
         rfull_out => adc_a_data_fifo_full
     );
-    adc_a_data_fifo_ren <= ((not adc_a_data_fifo_empty and not adc_a_data_fifo_ren_1) or adc_a_data_fifo_full) and not adc_a_data_fifo_rrst_busy;
+    adc_a_data_fifo_ren <= not adc_a_data_fifo_empty and not adc_a_data_fifo_rrst_busy;
     adc_b_data_fifo : entity work.async_fifo generic map(
         width => 12
     )port map(
@@ -133,7 +133,7 @@ begin
         wfull_out => open,
         rfull_out => adc_b_data_fifo_full
     );
-    adc_b_data_fifo_ren <= ((not adc_b_data_fifo_empty and not adc_b_data_fifo_ren_1) or adc_b_data_fifo_full) and not adc_b_data_fifo_rrst_busy;
+    adc_b_data_fifo_ren <= not adc_b_data_fifo_empty and not adc_b_data_fifo_rrst_busy;
     process(sys_clk)
     begin
         if rising_edge(sys_clk) then
@@ -166,7 +166,7 @@ begin
         wfull_out => open,
         rfull_out => adc_c_data_fifo_full
     );
-    adc_c_data_fifo_ren <= ((not adc_c_data_fifo_empty and not adc_c_data_fifo_ren_1) or adc_c_data_fifo_full) and not adc_c_data_fifo_rrst_busy;
+    adc_c_data_fifo_ren <= not adc_c_data_fifo_empty and not adc_c_data_fifo_rrst_busy;
     adc_d_data_fifo : entity work.async_fifo generic map(
         width => 12
     )port map(
@@ -184,7 +184,7 @@ begin
         wfull_out => open,
         rfull_out => adc_d_data_fifo_full
     );
-    adc_d_data_fifo_ren <= ((not adc_d_data_fifo_empty and not adc_d_data_fifo_ren_1) or adc_d_data_fifo_full) and not adc_d_data_fifo_rrst_busy;
+    adc_d_data_fifo_ren <= not adc_d_data_fifo_empty and not adc_d_data_fifo_rrst_busy;
     process(sys_clk)
     begin
         if rising_edge(sys_clk) then

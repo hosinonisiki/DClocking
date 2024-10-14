@@ -38,7 +38,7 @@ package mypak is
     type rdbus_type is array(0 to module_count) of std_logic_vector(rdbus_w - 1 downto 0); -- 0 is reserved for no module.
     type rsbus_type is array(0 to module_count) of std_logic_vector(rsbus_w - 1 downto 0);
 
-    constant clk_freq       :   integer := 250_000_000; -- Clock frequency in Hz.
+    constant clk_freq       :   integer := 125_000_000; -- Clock frequency in Hz.
     constant baudrate       :   integer := 57600; -- Baudrate for the UART.
     -- constant baudrate       :   integer := 25_000_000; -- Only use in simulation.
 

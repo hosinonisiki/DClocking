@@ -120,6 +120,9 @@ begin
     );
     -- Period ratio is approximately 1:2, which means 1 input is read every 2 cycles on average, but there can be exceptions
     -- The following logic is employed to adjust data rate on the fly, by whether delaying or advancing the read by 1 cycle
+    -- The above comments are out of date.
+    -- The period ratio has been changed to 1:4, but since this module is currently not instantiated,
+    -- the modifications will be made later.
     dac_a_data_fifo_ren <= ((not dac_a_data_fifo_empty and not dac_a_data_fifo_ren_1) or dac_a_data_fifo_full) and not dac_a_data_fifo_rrst_busy;
     dac_b_data_fifo : entity work.async_fifo generic map(
         width => 14

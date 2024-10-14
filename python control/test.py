@@ -103,8 +103,8 @@ if VERBOSE:
     ser.post(b":SPI_.ADC2.\x00\x00\x17\x17.\x00\x17\x06\x00!")
     ser.post(b":SPI_.ADC2.\x00\x00\x17\x17.\x00\xFF\x01\x00!")
 
-    router.set_routing(2, 6)
-    router.set_routing(3, 7)
+    router.set_routing(2, 0)
+    router.set_routing(3, 1)
     router.set_routing(4, 5)
     router.set_routing(5, 4)
     #router.implement_routing()

@@ -30,7 +30,10 @@ architecture direct of AN9767_adapter is
     signal dac_a_wrt      : std_logic;
     signal dac_b_wrt      : std_logic;
 begin
-    -- AN9767 works at 125MHz, which is half of the system clock
+    -- AN9767 works at max 125MHz
+    -- System clock frequency has been reduced from 250 to 125MHz,
+    -- but in order to keep the timing structure, the working frequency
+    -- of the DAC is reduced to 62.5MHz correspondingly.
     -- The rising edge of CLK should be earlier than the rising edge of WRT,
     -- thus we can use the falling edge of clk to generate the WRT signal
     --             ____      _____       _____       _____
