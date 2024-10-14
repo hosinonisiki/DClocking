@@ -131,24 +131,11 @@ begin
     -- 2.Register the address of the module in mypak
     -- 3.Register the name of the module in uart_protocol
     -- 4.Add corresponding lines in central_control
-    module_1_block : block
-        signal bus_en       :   std_logic;
-    begin
-        bus_en <= '1' when mbus = BUS_ROUT_ADDR else '0'; -- constant defined in mypak
-        module_1 : entity work.module_signal_router(full) port map(
-            clk             =>  clk,
-            rst             =>  mod_rst(1),
-            bus_en_in       =>  bus_en,
-            dbus_in         =>  dbus,
-            abus_in         =>  abus,
-            cbus_in         =>  cbus,
-            rsp_data_out    =>  rdbus(1),
-            rsp_stat_out    =>  rsbus(1),
-            
-            sig_in          =>  sig_bank_in,
-            sig_out         =>  sig_bank_out
-        );
-    end block module_1_block;
+    -- ** This branch is a testing branch that removes the signal router to try reolving metastability issues **
+    sig_bank_out(0) <= sig_bank_in(0);
+    sig_bank_out(1) <= sig_bank_in(6);
+    sig_bank_out(2) <= sig_bank_in(1);
+    sig_bank_out(3) <= sig_bank_in(7);
 
     module_2_block : block
         signal bus_en       :   std_logic;
