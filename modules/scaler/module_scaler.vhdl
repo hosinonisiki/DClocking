@@ -53,7 +53,10 @@ architecture structural of module_scaler is
     signal ren              :   std_logic; -- Read enable signal
 begin
     
-    core_entity : entity work.scaler port map(
+    core_entity : entity work.scaler generic map(
+        -- Removed buffer options for high bandwidth testing
+        io_buf => buf_none   
+    )port map(
         clk             =>  clk,
         rst             =>  core_rst,
         core_param_in   =>  core_param,

@@ -281,6 +281,9 @@ begin
                                 when u_DEVICE_MMWR =>
                                     bus_mod_buf <= BUS_MMWR_ADDR;
                                     state <= s_bus_parse_head;
+                                when u_DEVICE_PIDC =>
+                                    bus_mod_buf <= BUS_PIDC_ADDR;
+                                    state <= s_bus_parse_head;
                                 when others =>
                                     response_err_buf <= x"44564345"; -- "DVCE" for device error
                                     state <= s_respond_exception;

@@ -52,7 +52,10 @@ architecture structural of module_accumulator is
     signal ren              :   std_logic; -- Read enable signal
 begin
     
-    core_entity : entity work.accumulator port map(
+    core_entity : entity work.accumulator generic map(
+        -- Removed buffer options for high bandwidth testing
+        io_buf => buf_none   
+    )port map(
         clk             =>  clk,
         rst             =>  core_rst,
         core_param_in   =>  core_param,

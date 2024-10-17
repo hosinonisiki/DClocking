@@ -8,7 +8,7 @@ bus = bus.Bus(ser)
 router = module_signal_router.ModuleSignalRouter(bus)
 sp = spi.Spi(ser)
 
-VERBOSE = True
+VERBOSE = False
 if VERBOSE:
     # refresh
     print("refreshing bus modules")
@@ -118,8 +118,8 @@ else:
     ser.post(b":BUS_.ACCM.WRTE.ADDR.\x00\x00\x00\x01.DATA.\x00\x10\x00\x00.HOLD!")
     ser.post(b":BUS_.ACCM.WRTE.ADDR.\x00\x00\x00\x00.DATA.\x00\x00\x00\x00!")
 
-    router.set_routing(2, 6)
-    router.set_routing(3, 7)
+    router.set_routing(0, 0)
+    router.set_routing(1, 1)
     router.set_routing(4, 5)
     router.set_routing(5, 4)
     #router.implement_routing()

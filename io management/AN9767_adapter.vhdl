@@ -36,18 +36,18 @@ begin
     -- of the DAC is reduced to 62.5MHz correspondingly.
     -- The rising edge of CLK should be earlier than the rising edge of WRT,
     -- thus we can use the falling edge of clk to generate the WRT signal
+    -- Above comments out of date.
+    -- Let all data be aligned at rising edges of sys_clk
     --             ____      _____       _____       _____
     -- sys_clk ___/    \____/     \_____/     \_____/     \___
     --             _________             ___________
     -- dac_clk ___/         \___________/           \_________
-    --                  __________             ___________
-    -- dac_wrt ________/          \___________/           \___
+    --                       ___________             ___________
+    -- dac_wrt _____________/           \___________/           \___
     process(sys_clk)
     begin
         if rising_edge(sys_clk) then
             dac_clk <= not dac_clk;
-        end if;
-        if falling_edge(sys_clk) then
             dac_a_wrt <= dac_clk;
             dac_b_wrt <= dac_clk;
             if dac_a_wrt = '1' then
