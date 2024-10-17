@@ -232,6 +232,25 @@ begin
         );
     end block module_5_block;
 
+    module_6_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_PIDC_ADDR else '0'; -- constant defined in mypak
+        module_6 : entity work.module_pid_controller port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(6),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(6),
+            rsp_stat_out    =>  rsbus(6),
+            
+            error_in        => sig_bank_out(10),
+            feedback_out    => sig_bank_in(14)
+        );
+    end block module_6_block;
+
     -- signal banks provided by the router
     
     sig_bank_in(6) <= adc_a & x"0";
@@ -245,19 +264,20 @@ begin
     dac_d <= sig_bank_out(3)(15 downto 2);
 
     -- analog front
+    -- pipeline only the output but not the input
     process(clk)
     begin
         if rising_edge(clk) then
-            adc_a <= adc_in_a;
-            adc_b <= adc_in_b;
-            adc_c <= adc_in_c;
-            adc_d <= adc_in_d;
-
             dac_out_a <= dac_a;
             dac_out_b <= dac_b;
             dac_out_c <= dac_c;
             dac_out_d <= dac_d;
         end if;
     end process;
+
+    adc_a <= adc_in_a;
+    adc_b <= adc_in_b;
+    adc_c <= adc_in_c;
+    adc_d <= adc_in_d;
     
 end architecture structural;

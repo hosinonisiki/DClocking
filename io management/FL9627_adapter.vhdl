@@ -53,10 +53,6 @@ architecture structural of FL9627_adapter is
     signal adc_b_data_buf : std_logic_vector(11 downto 0);
     signal adc_c_data_buf : std_logic_vector(11 downto 0);
     signal adc_d_data_buf : std_logic_vector(11 downto 0);
-    signal adc_a_data_buf_1 : std_logic_vector(11 downto 0);
-    signal adc_b_data_buf_1 : std_logic_vector(11 downto 0);
-    signal adc_c_data_buf_1 : std_logic_vector(11 downto 0);
-    signal adc_d_data_buf_1 : std_logic_vector(11 downto 0);
     signal adc_a_b_data_h : std_logic_vector(11 downto 0);
     signal adc_a_b_data_l : std_logic_vector(11 downto 0);
     signal adc_c_d_data_h : std_logic_vector(11 downto 0);
@@ -140,12 +136,10 @@ begin
             adc_a_data_fifo_ren_1 <= adc_a_data_fifo_ren;
             adc_b_data_fifo_ren_1 <= adc_b_data_fifo_ren;
             if adc_a_data_fifo_ren_1 = '1' then
-                adc_a_data_buf_1 <= adc_a_data_buf;
-                adc_a_data <= adc_a_data_buf_1;
+                adc_a_data <= adc_a_data_buf;
             end if;
             if adc_b_data_fifo_ren_1 = '1' then
-                adc_b_data_buf_1 <= adc_b_data_buf;
-                adc_b_data <= adc_b_data_buf_1;
+                adc_b_data <= adc_b_data_buf;
             end if;
         end if;
     end process;
@@ -191,12 +185,10 @@ begin
             adc_c_data_fifo_ren_1 <= adc_c_data_fifo_ren;
             adc_d_data_fifo_ren_1 <= adc_d_data_fifo_ren;
             if adc_c_data_fifo_ren_1 = '1' then
-                adc_c_data_buf_1 <= adc_c_data_buf;
-                adc_c_data <= adc_c_data_buf_1;
+                adc_c_data <= adc_c_data_buf;
             end if;
             if adc_d_data_fifo_ren_1 = '1' then
-                adc_d_data_buf_1 <= adc_d_data_buf;
-                adc_d_data <= adc_d_data_buf_1;
+                adc_d_data <= adc_d_data_buf;
             end if;
         end if;
     end process;

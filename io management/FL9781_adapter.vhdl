@@ -51,10 +51,6 @@ architecture structural of FL9781_adapter is
     signal dac_a_b_data_l_buf : std_logic_vector(13 downto 0);
     signal dac_c_d_data_h_buf : std_logic_vector(13 downto 0);
     signal dac_c_d_data_l_buf : std_logic_vector(13 downto 0);
-    signal dac_a_b_data_h_buf_1 : std_logic_vector(13 downto 0);
-    signal dac_a_b_data_l_buf_1 : std_logic_vector(13 downto 0);
-    signal dac_c_d_data_h_buf_1 : std_logic_vector(13 downto 0);
-    signal dac_c_d_data_l_buf_1 : std_logic_vector(13 downto 0);
     signal dac_a_b_data_h : std_logic_vector(13 downto 0);
     signal dac_a_b_data_l : std_logic_vector(13 downto 0);
     signal dac_c_d_data_h : std_logic_vector(13 downto 0);
@@ -145,12 +141,10 @@ begin
             dac_a_data_fifo_ren_1 <= dac_a_data_fifo_ren;
             dac_b_data_fifo_ren_1 <= dac_b_data_fifo_ren;
             if dac_a_data_fifo_ren_1 = '1' then
-                dac_a_b_data_h_buf_1 <= dac_a_b_data_h_buf;
-                dac_a_b_data_h <= dac_a_b_data_h_buf_1;
+                dac_a_b_data_h <= dac_a_b_data_h_buf;
             end if;
             if dac_b_data_fifo_ren_1 = '1' then
-                dac_a_b_data_l_buf_1 <= dac_a_b_data_l_buf;
-                dac_a_b_data_l <= dac_a_b_data_l_buf_1;
+                dac_a_b_data_l <= dac_a_b_data_l_buf;
             end if;
         end if;
     end process;
@@ -195,12 +189,10 @@ begin
             dac_c_data_fifo_ren_1 <= dac_c_data_fifo_ren;
             dac_d_data_fifo_ren_1 <= dac_d_data_fifo_ren;
             if dac_c_data_fifo_ren_1 = '1' then
-                dac_c_d_data_h_buf_1 <= dac_c_d_data_h_buf;
-                dac_c_d_data_h <= dac_c_d_data_h_buf_1;
+                dac_c_d_data_h <= dac_c_d_data_h_buf;
             end if;
             if dac_d_data_fifo_ren_1 = '1' then
-                dac_c_d_data_l_buf_1 <= dac_c_d_data_l_buf;
-                dac_c_d_data_l <= dac_c_d_data_l_buf_1;
+                dac_c_d_data_l <= dac_c_d_data_l_buf;
             end if;
         end if;
     end process;

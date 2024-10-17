@@ -129,7 +129,10 @@ architecture full of module_signal_router is
     signal ren              :   std_logic; -- Read enable signal
 begin
     
-    core_entity : entity work.signal_router(full) port map(
+    core_entity : entity work.signal_router(full) generic map(
+        -- Removed buffer options for high bandwidth testing
+        io_buf          =>  buf_none
+    )port map(
         clk             =>  clk,
         rst             =>  core_rst,
         core_param_in   =>  core_param,
