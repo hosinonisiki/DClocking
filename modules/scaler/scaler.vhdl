@@ -15,7 +15,7 @@ entity scaler is
     port(
         clk             :   in  std_logic;
         rst             :   in  std_logic;
-        core_param_in   :   in  std_logic_vector(63 downto 0);
+        core_param_in   :   in  std_logic_vector(255 downto 0);
         sig_in          :   in  std_logic_vector(15 downto 0);
         sig_out         :   out std_logic_vector(15 downto 0)
     );
@@ -25,11 +25,18 @@ architecture behavioral of scaler is
     signal sig_in_buf   :   signed(15 downto 0);
     signal sig_out_buf  :   signed(15 downto 0);
 
-    signal scale        :   signed(23 downto 0);
-    signal bias         :   signed(15 downto 0);
-    signal product      :   signed(39 downto 0);
-    signal product_1    :   signed(39 downto 0);
-    signal sum          :   signed(15 downto 0);
+    -- Each "x" "_" "z" and "y" represents 4 bits, with the "x" aligned with final output,
+    -- "y" representing dont care, "z" representing bits to be discarded and "_" representing unused bits.
+    signal scale            :   signed(23 downto 0); -- Scalling factor = scale / 2^16, from 2^-16 to 2^8
+    signal bias             :   signed(27 downto 0); -- yy xxxx y___
+    signal product          :   signed(39 downto 0); -- yy xxxx yzzz
+    signal product_1        :   signed(27 downto 0); -- yy xxxx y___
+    signal sum_buf          :   signed(27 downto 0); -- yy xxxx y___
+    signal sum_buf_limited  :   signed(27 downto 0); -- yy xxxx y___
+    signal upper_limit      :   signed(27 downto 0); -- yy xxxx y___
+    signal lower_limit      :   signed(27 downto 0); -- yy xxxx y___
+
+    signal enable_wrapping  :   std_logic;
 begin
     use_output_buffer : if io_buf = buf_for_io or io_buf = buf_o_only generate
         process(clk)
@@ -65,16 +72,27 @@ begin
         sig_in_buf <= (others => '0') when rst = '1' else signed(sig_in);
     end generate;
 
-    scale <= signed(core_param_in(23 downto 0));
-    bias <= signed(core_param_in(47 downto 32));
+    scale <= signed(core_param_in(23 downto 0)); -- address 0x00
+    bias <= (7 downto 0 => core_param_in(47)) & signed(core_param_in(47 downto 32)) & x"0"; -- address 0x01
+    upper_limit <= (7 downto 0 => core_param_in(79)) & signed(core_param_in(79 downto 64)) & x"0"; -- address 0x02
+    lower_limit <= (7 downto 0 => core_param_in(111)) & signed(core_param_in(111 downto 96)) & x"0"; -- address 0x03
+    enable_wrapping <= core_param_in(128); -- address 0x04
+
     product <= sig_in_buf * scale;
-    sum <= product_1(31 downto 16) + bias;
+    sum_buf <= product_1 + bias;
+    sum_buf_limited <= upper_limit when sum_buf > upper_limit else
+                        lower_limit when sum_buf < lower_limit else
+                        sum_buf;
 
     process(clk)
     begin
         if rising_edge(clk) then
-            product_1 <= product;
-            sig_out_buf <= sum;
+            product_1 <= product(39 downto 12) + ((26 downto 0 => '0') & product(11));
+            if enable_wrapping = '1' then
+                sig_out_buf <= sum_buf(19 downto 4);
+            else
+                sig_out_buf <= sum_buf_limited(19 downto 4);
+            end if;
         end if;
     end process;
 end architecture behavioral;

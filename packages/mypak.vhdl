@@ -40,7 +40,7 @@ package mypak is
     type rsbus_type is array(0 to module_count) of std_logic_vector(rsbus_w - 1 downto 0);
 
     constant clk_freq       :   integer := 250_000_000; -- Clock frequency in Hz.
-    constant baudrate       :   integer := 28800; -- Baudrate for the UART.
+    constant baudrate       :   integer := 19200; -- Baudrate for the UART.
     -- constant baudrate       :   integer := 25_000_000; -- Only use in simulation.
 
     constant spi_clk_freq   :   integer := 10_000_000; -- SPI clock frequency in Hz.

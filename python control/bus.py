@@ -18,10 +18,12 @@ class Bus():
             address = address.to_bytes(4, "big")
         elif type(address) == str:
             address = bytes.fromhex(address)
+            address = address.rjust(4, b"\x00")
         if type(data) == int:
             data = data.to_bytes(4, "big")
         elif type(data) == str:
             data = bytes.fromhex(data)
+            data = data.rjust(4, b"\x00")
         message = b":BUS_." + module.encode() + b".WRTE.ADDR." + address + b".DATA." + data
         if hold:
             message += b".HOLD!"

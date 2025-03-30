@@ -26,7 +26,7 @@ architecture behavioural of pid_controller is
     signal feedback_out_buf :   signed(15 downto 0);
 
     -- Each "x" "_" "z" and "y" represents 4 bits, with the "x" aligned with final output,
-    -- "y" representing dont care, "z" representing discarded bits and "_" representing unused bits.
+    -- "y" representing dont care, "z" representing bits to be discarded and "_" representing unused bits.
     signal error_from_setpoint   :   signed(15 downto 0);
     signal error_1      :   signed(15 downto 0);
     signal differential :   signed(15 downto 0);

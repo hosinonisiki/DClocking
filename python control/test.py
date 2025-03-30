@@ -5,11 +5,12 @@ import module_signal_router
 import spi
 from port_numbers import *
 
-ser = uart.MySerial("COM5", baudrate = 9600, parity = "E", timeout = 0.5)
+ser = uart.MySerial("COM5", baudrate = 19200, parity = "E", timeout = 0.5)
 bus = bus.Bus(ser)
 router = module_signal_router.ModuleSignalRouter(bus)
 tri = module.ModuleBase(bus, "TRIG")
 acc = module.ModuleBase(bus, "ACCM")
+sclr = module.ModuleScaler(bus, "SCLR")
 pid = module.ModulePID(bus, "PIDC")
 spi = spi.Spi(ser)
 
@@ -20,7 +21,6 @@ if VERBOSE:
     router.reset()
     tri.reset()
     acc.reset()
-    pid.reset()
 
     # initialize
     print("writing parameters")
@@ -103,14 +103,9 @@ if VERBOSE:
     spi.write("ADC2", 3, 3, "001706")
     spi.write("ADC2", 3, 3, "00FF01")
 
-    # pid test
-    router.set_routing(OUTPUT_A, PID_OUT)
-    router.set_routing(OUTPUT_B, INPUT_C)
-    router.set_routing(PID_IN, INPUT_D)
-    router.set_routing(TRI_IN, SCALER_OUT)  
-    router.set_routing(SCALER_IN, ACC_OUT)
-    router.set_routing(OUTPUT_C, PID_OUT)
-    router.set_routing(OUTPUT_D, TRI_SIN)
+    router.set_routing(OUTPUT_C, SCALER_OUT)
+    router.set_routing(SCALER_IN, PID_OUT)
+    router.set_routing(PID_IN, INPUT_C)
     #router.implement_routing()
     router.upload()
 else:
@@ -125,11 +120,12 @@ else:
     acc.write(0, "00000000")
 
     router.set_routing(OUTPUT_C, PID_OUT)
-    router.set_routing(OUTPUT_D, INPUT_C)
+    router.set_routing(OUTPUT_D, SCALER_OUT)
+    router.set_routing(SCALER_IN, PID_OUT)
+    router.set_routing(PID_IN, INPUT_D)
+    #-26000 -50000 -18000
+    # 20000
     #router.set_routing(OUTPUT_C, TRI_SIN)
     #router.set_routing(OUTPUT_D, TRI_COS)
-    router.set_routing(PID_IN, INPUT_C)
-    router.set_routing(TRI_IN, SCALER_OUT)  
-    router.set_routing(SCALER_IN, ACC_OUT)
     #router.implement_routing()
     router.upload()

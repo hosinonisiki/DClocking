@@ -35,7 +35,7 @@ entity module_scaler is
 end entity module_scaler;
 
 architecture structural of module_scaler is
-    signal core_param       :   std_logic_vector(63 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
+    signal core_param       :   std_logic_vector(255 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
     signal core_rst         :   std_logic := '1';
 
     signal ram_rst          :   std_logic := '1';
@@ -65,8 +65,9 @@ begin
         sig_out         =>  sig_out
     );
 
-    parameter_ram : entity work.parameter_ram_64 generic map(
-        ram_default     =>  x"0000000000010000"
+    parameter_ram : entity work.parameter_ram_256 generic map(
+        ram_default     =>  x"00000000_00000000_00000000_00000000" &
+                            x"00008000_00007fff_00000000_00010000"
     )port map(
         clk             =>  clk,
         rst             =>  ram_rst,
