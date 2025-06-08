@@ -154,7 +154,7 @@ begin
             end if;
         end if;
     end process;
-
+    
     idle_out <= '1' when state = s_idle and rst = '0' else '0';
     
     bit_ready <= '1' when cycle_cnt = bit_length + x"FFFF" or (state = s_start and cycle_cnt = half_bit_length + x"FFFF") else '0';
