@@ -136,10 +136,14 @@ begin
             adc_a_data_fifo_ren_1 <= adc_a_data_fifo_ren;
             adc_b_data_fifo_ren_1 <= adc_b_data_fifo_ren;
             if adc_a_data_fifo_ren_1 = '1' then
-                adc_a_data <= adc_a_data_buf;
+                -- By default, FL9627 uses 0000 for MAX, 1000 for 0 and 1111 for MIN in 2's complement mode
+                -- Reverse all but the first bit of the data, same applies to b, c and d
+                adc_a_data(11) <= adc_a_data_buf(11);
+                adc_a_data(10 downto 0) <= not adc_a_data_buf(10 downto 0);
             end if;
             if adc_b_data_fifo_ren_1 = '1' then
-                adc_b_data <= adc_b_data_buf;
+                adc_b_data(11) <= adc_b_data_buf(11);
+                adc_b_data(10 downto 0) <= not adc_b_data_buf(10 downto 0);
             end if;
         end if;
     end process;
@@ -185,10 +189,12 @@ begin
             adc_c_data_fifo_ren_1 <= adc_c_data_fifo_ren;
             adc_d_data_fifo_ren_1 <= adc_d_data_fifo_ren;
             if adc_c_data_fifo_ren_1 = '1' then
-                adc_c_data <= adc_c_data_buf;
+                adc_c_data(11) <= adc_c_data_buf(11);
+                adc_c_data(10 downto 0) <= not adc_c_data_buf(10 downto 0);
             end if;
             if adc_d_data_fifo_ren_1 = '1' then
-                adc_d_data <= adc_d_data_buf;
+                adc_d_data(11) <= adc_d_data_buf(11);
+                adc_d_data(10 downto 0) <= not adc_d_data_buf(10 downto 0);
             end if;
         end if;
     end process;

@@ -87,7 +87,10 @@ begin
     process(clk)
     begin
         if rising_edge(clk) then
-            product_1 <= product(39 downto 12) + ((26 downto 0 => '0') & product(11));
+             -- No need to round because it's the same as flooring in terms of uniformity
+             -- and the half bit bias is unimportant in this case.
+             -- Plus it will cause timing failure. (Suspective)
+            product_1 <= product(39 downto 12);
             if enable_wrapping = '1' then
                 sig_out_buf <= sum_buf(19 downto 4);
             else
