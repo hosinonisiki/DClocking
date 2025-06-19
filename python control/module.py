@@ -82,3 +82,13 @@ class ModuleScaler(ModuleBase):
         "lower": 3, "lower_limit": 3,
         "enable_wrapping": 4, "wrap": 4, "wrapping": 4
     }
+
+class ModuleAccumulator(ModuleBase):
+    parameter_list = {
+        0: {"name": "low", "width": 32},
+        1: {"name": "high", "width": 32}
+    }
+    alias_list = {
+        "low": 0,
+        "high": 1
+    }

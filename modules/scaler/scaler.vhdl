@@ -30,7 +30,6 @@ architecture behavioral of scaler is
     signal scale            :   signed(23 downto 0); -- Scalling factor = scale / 2^16, from 2^-16 to 2^8
     signal bias             :   signed(27 downto 0); -- yy xxxx y___
     signal product          :   signed(39 downto 0); -- yy xxxx yzzz
-    signal product_1        :   signed(27 downto 0); -- yy xxxx y___
     signal sum_buf          :   signed(27 downto 0); -- yy xxxx y___
     signal sum_buf_limited  :   signed(27 downto 0); -- yy xxxx y___
     signal upper_limit      :   signed(27 downto 0); -- yy xxxx y___
@@ -78,8 +77,7 @@ begin
     lower_limit <= (7 downto 0 => core_param_in(111)) & signed(core_param_in(111 downto 96)) & x"0"; -- address 0x03
     enable_wrapping <= core_param_in(128); -- address 0x04
 
-    product <= sig_in_buf * scale;
-    sum_buf <= product_1 + bias;
+    sum_buf <= product(39 downto 12) + ((26 downto 0 => '0') & product(11)) + bias;
     sum_buf_limited <= upper_limit when sum_buf > upper_limit else
                         lower_limit when sum_buf < lower_limit else
                         sum_buf;
@@ -87,7 +85,7 @@ begin
     process(clk)
     begin
         if rising_edge(clk) then
-            product_1 <= product(39 downto 12) + ((26 downto 0 => '0') & product(11));
+            product <= sig_in_buf * scale;
             if enable_wrapping = '1' then
                 sig_out_buf <= sum_buf(19 downto 4);
             else
