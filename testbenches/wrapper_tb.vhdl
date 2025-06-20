@@ -12,6 +12,7 @@ architecture structural of wrapper_vhdl_tb is
     signal clk_2 : std_logic := '1';
     signal rst : std_logic := '1';
     signal rst_bar : std_logic := '0';
+    signal rst_delayed : std_logic := '1';
     signal uart : std_logic := '1';
     signal counter : integer := 0;
     signal txd_data : std_logic_vector(7 downto 0);
@@ -54,7 +55,7 @@ begin
     process(clk_2)
     begin
         if rising_edge(clk_2) then
-            if rst = '1' then
+            if rst_delayed = '1' then
                 counter <= 0;
             else
                 counter <= counter + 1;
@@ -88,6 +89,7 @@ begin
 
     rst <= '0' after 50000 ns;
     rst_bar <= not rst;
+    rst_delayed <= rst after 400000 ns;
 
     process(clk_2)
     begin

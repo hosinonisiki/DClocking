@@ -84,21 +84,21 @@ architecture parser of central_control is
     -- One flips the order of the characters in a message, and the other flips back.
     -- This is because the length of a message is unpredictable.
     -- By using two shift registers, the central control can always read the current character at address 0.
-    signal bsr_i1_reg    : bsr_type; -- Shift registers
+    signal bsr_i1_reg    : bsr_type := (others => (others => '0')); -- Shift registers
     signal bsr_i1_din    : std_logic_vector(7 downto 0); -- Data in
     signal bsr_i1_sl     : std_logic; -- Shift left, output
     signal bsr_i1_sr     : std_logic; -- Shift right, input
     signal bsr_i1_rst    : std_logic; -- Reset
 
-    signal bsr_i2_reg    : bsr_type; -- Shift registers
+    signal bsr_i2_reg    : bsr_type := (others => (others => '0')); -- Shift registers
     signal bsr_i2_din    : std_logic_vector(7 downto 0); -- Data in
     signal bsr_i2_sl     : std_logic; -- Shift left, output, 5 chars at a time
     signal bsr_i2_sr     : std_logic; -- Shift right, input
     signal bsr_i2_rst    : std_logic; -- Reset
 
     -- Output shift register stores the message to be sent
-    signal bsr_o_reg     : bsr_type; -- Shift registers
-    signal bsr_o_din     : bsr_type; -- Read all characters at once
+    signal bsr_o_reg     : bsr_type := (others => (others => '0')); -- Shift registers
+    signal bsr_o_din     : bsr_type := (others => (others => '0')); -- Read all characters at once
     signal bsr_o_ren     : std_logic; -- Read enable
     signal bsr_o_sl      : std_logic; -- Shift left, output
     signal bsr_o_rst     : std_logic; -- Reset
@@ -520,11 +520,15 @@ begin
                     when s_send =>
                         -- Send the message loaded in the output shift register
                         bsr_o_ren <= '0';
-                        if bsr_o_reg(0) = u_TERM then
+                        if bsr_o_reg(0) = u_TERM and (bsr_o_sl = '1' or txen_out = '1') then
                             txen_out <= '0';
                             bsr_o_sl <= '0';
                             state <= s_idle;
-                        else
+                        elsif bsr_o_sl = '1' or txen_out = '1' then
+                            -- Deassert after one clock cycle
+                            bsr_o_sl <= '0';
+                            txen_out <= '0';
+                        elsif txful_in = '0' then
                             bsr_o_sl <= '1';
                             txen_out <= '1';
                         end if;

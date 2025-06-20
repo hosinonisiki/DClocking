@@ -5,11 +5,13 @@ import module_signal_router
 import spi
 from port_numbers import *
 
-ser = uart.MySerial("COM5", baudrate = 19200, parity = "E", timeout = 0.5)
+import code
+
+ser = uart.MySerial("COM3", baudrate = 19200, parity = "E", timeout = 0.5)
 bus = bus.Bus(ser)
 router = module_signal_router.ModuleSignalRouter(bus)
 tri = module.ModuleBase(bus, "TRIG")
-acc = module.ModuleBase(bus, "ACCM")
+acc = module.ModuleAccumulator(bus, "ACCM")
 sclr = module.ModuleScaler(bus, "SCLR")
 pid = module.ModulePID(bus, "PIDC")
 spi = spi.Spi(ser)
@@ -108,6 +110,8 @@ if VERBOSE:
     router.set_routing(PID_IN, INPUT_C)
     #router.implement_routing()
     router.upload()
+
+    code.interact(local=locals())
 else:
     spi.write("ADC1", 3, 3, "001441")
     spi.write("ADC1", 3, 3, "001706")
