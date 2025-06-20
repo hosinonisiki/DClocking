@@ -265,7 +265,8 @@ architecture peripheral_wrapper of wrapper is
     signal sys_clk_buf : std_logic;
     signal sys_clk_125M : std_logic;
     signal sys_clk_125M_buf : std_logic;
-    signal sys_rst : std_logic;
+    signal sys_rst : std_logic := '0';
+    signal sys_rst_raw : std_logic;
     signal sys_rst_bar : std_logic;
 
     signal led_1 : std_logic;
@@ -557,7 +558,7 @@ architecture peripheral_wrapper of wrapper is
 begin
     top : entity work.top port map(
         clk => sys_clk,
-        rst => sys_rst_bar,
+        rst => sys_rst,
         txd => uart_txd,
         rxd => uart_rxd,
 
@@ -591,7 +592,7 @@ begin
     led_3 <= spi_sclk; -- detects spi clock
     led_4 <= not (and spi_ss); -- detects if any spi chip is selected
     panel_led_1 <= '1'; -- detects if the system is running
-    panel_led_2 <= sys_rst_bar; -- detects if the system is reset
+    panel_led_2 <= sys_rst; -- detects if the system is reset
 
     -- FL9781 adapter
     dac_a_b_spi_ss <= spi_ss(SPI_DAC1_ADDR);
@@ -811,10 +812,19 @@ begin
 
     -- rst
     sys_rst_ibuf : IBUF port map(
-        O => sys_rst,
+        O => sys_rst_raw,
         I => rst
     );
-    sys_rst_bar <= not sys_rst;
+    sys_rst_debouncer : entity work.debouncer generic map(
+        debounce_time => 10, -- 10ms debounce time
+        default_output => '0'
+    )port map(
+        clk => sys_clk, 
+        rst => not sys_clk_locked, -- This will reset the system on power up
+        input => sys_rst_raw,
+        output => sys_rst_bar
+    );
+    sys_rst <= not sys_rst_bar;
 
     -- leds
     led_1_obuf : OBUF port map(

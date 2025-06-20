@@ -47,8 +47,6 @@ entity FL9627_adapter is
 end entity FL9627_adapter;
 
 architecture structural of FL9627_adapter is
-    signal sys_rst_bar : std_logic;
-
     signal adc_a_data_buf : std_logic_vector(11 downto 0);
     signal adc_b_data_buf : std_logic_vector(11 downto 0);
     signal adc_c_data_buf : std_logic_vector(11 downto 0);
@@ -96,7 +94,7 @@ begin
     )port map(
         wclk => adc_a_b_dco,
         rclk => sys_clk,
-        rst => sys_rst_bar,
+        rst => sys_rst,
         wdata_in => adc_a_b_data_h,
         wen_in => not adc_a_data_fifo_wrst_busy,
         rdata_out => adc_a_data_buf,
@@ -114,7 +112,7 @@ begin
     )port map(
         wclk => adc_a_b_dco,
         rclk => sys_clk,
-        rst => sys_rst_bar,
+        rst => sys_rst,
         wdata_in => adc_a_b_data_l,
         wen_in => not adc_b_data_fifo_wrst_busy,
         rdata_out => adc_b_data_buf,
@@ -147,7 +145,7 @@ begin
     )port map(
         wclk => adc_c_d_dco,
         rclk => sys_clk,
-        rst => sys_rst_bar,
+        rst => sys_rst,
         wdata_in => adc_c_d_data_h,
         wen_in => not adc_c_data_fifo_wrst_busy,
         rdata_out => adc_c_data_buf,
@@ -165,7 +163,7 @@ begin
     )port map(
         wclk => adc_c_d_dco,
         rclk => sys_clk,
-        rst => sys_rst_bar,
+        rst => sys_rst,
         wdata_in => adc_c_d_data_l,
         wen_in => not adc_d_data_fifo_wrst_busy,
         rdata_out => adc_d_data_buf,
@@ -203,7 +201,7 @@ begin
             C => adc_a_b_dco,
             CB => not adc_a_b_dco,
             D => adc_a_b_data(i),
-            R => sys_rst_bar
+            R => sys_rst
         );
     end generate adc_a_b_data_iddre1_gen;
     adc_c_d_data_iddre1_gen : for i in 0 to 11 generate
@@ -213,7 +211,7 @@ begin
             C => adc_c_d_dco,
             CB => not adc_c_d_dco,
             D => adc_c_d_data(i),
-            R => sys_rst_bar
+            R => sys_rst
         );
     end generate adc_c_d_data_iddre1_gen;
 
@@ -231,8 +229,5 @@ begin
     adc_clk_125M_fmc <= adc_clk_125M;
     adc_eeprom_iic_scl_fmc <= adc_eeprom_iic_scl;
     adc_eeprom_iic_sda_fmc <= adc_eeprom_iic_sda;
-
-    -- Misc
-    sys_rst_bar <= not sys_rst;
 end architecture structural;
         

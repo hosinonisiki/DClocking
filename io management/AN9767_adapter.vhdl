@@ -25,8 +25,6 @@ entity AN9767_adapter is
 end entity AN9767_adapter;
 
 architecture direct of AN9767_adapter is
-    signal sys_rst_bar : std_logic;
-
     signal dac_a_data_buf   : std_logic_vector(13 downto 0);
     signal dac_b_data_buf   : std_logic_vector(13 downto 0);
     signal dac_a_data_buf_1 : std_logic_vector(13 downto 0);
@@ -65,7 +63,7 @@ begin
     )port map(
         wclk => sys_clk,
         rclk => dac_clk_125M,
-        rst => sys_rst_bar,
+        rst => sys_rst,
         wdata_in => dac_a_data,
         wen_in => dac_a_data_fifo_wen,
         rdata_out => dac_a_data_buf,
@@ -84,7 +82,7 @@ begin
     )port map(
         wclk => sys_clk,
         rclk => dac_clk_125M,
-        rst => sys_rst_bar,
+        rst => sys_rst,
         wdata_in => dac_b_data,
         wen_in => dac_b_data_fifo_wen,
         rdata_out => dac_b_data_buf,
@@ -112,14 +110,14 @@ begin
         D2 => '1',
         C => dac_clk_125M,
         Q => dac_a_wrt,
-        SR => sys_rst_bar
+        SR => sys_rst
     );
     dac_b_wrt_oddre1 : ODDRE1 port map(
         D1 => '0',
         D2 => '1',
         C => dac_clk_125M,
         Q => dac_b_wrt,
-        SR => sys_rst_bar
+        SR => sys_rst
     );
 
     -- Match the signals
@@ -159,5 +157,4 @@ begin
     -- Misc
     j_40p(35) <= '1';
     j_40p(36) <= '1';
-    sys_rst_bar <= not sys_rst;
 end architecture direct;
