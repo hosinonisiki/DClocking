@@ -604,7 +604,7 @@ begin
         dac_b_data => dac_b_data_buf,
 
         sys_clk => sys_clk,
-        slow_dac_clk => '0',
+        dac_clk_125M => sys_clk_125M,
         sys_rst => sys_rst,
 
         j_40p => j2_40p
@@ -615,7 +615,7 @@ begin
         dac_b_data => dac_d_data_buf,
         
         sys_clk => sys_clk,
-        slow_dac_clk => '0',
+        dac_clk_125M => sys_clk_125M,
         sys_rst => sys_rst,
         
         j_40p => j3_40p

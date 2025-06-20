@@ -88,9 +88,6 @@ architecture structural of FL9627_adapter is
     signal adc_d_data_fifo_full : std_logic;
     signal adc_d_data_fifo_ren : std_logic;
     signal adc_d_data_fifo_ren_1 : std_logic;
-
-    -- Debug
-    signal clk_125M : std_logic := '0';
 begin
     -- Interface
     -- Transfer data from slow adc clock to system clock by employing asynchronous fifo
@@ -136,14 +133,12 @@ begin
             adc_a_data_fifo_ren_1 <= adc_a_data_fifo_ren;
             adc_b_data_fifo_ren_1 <= adc_b_data_fifo_ren;
             if adc_a_data_fifo_ren_1 = '1' then
-                -- By default, FL9627 uses 0000 for MAX, 1000 for 0 and 1111 for MIN in 2's complement mode
-                -- Reverse all but the first bit of the data, same applies to b, c and d
-                adc_a_data(11) <= adc_a_data_buf(11);
-                adc_a_data(10 downto 0) <= not adc_a_data_buf(10 downto 0);
+                -- By default, FL9627 uses 1000 for MAX, 0000 for 0 and 0111 for MIN in 2's complement mode (set by command)
+                -- Reverse all bits of the data, same applies to b, c and d
+                adc_a_data <= not adc_a_data_buf;
             end if;
             if adc_b_data_fifo_ren_1 = '1' then
-                adc_b_data(11) <= adc_b_data_buf(11);
-                adc_b_data(10 downto 0) <= not adc_b_data_buf(10 downto 0);
+                adc_b_data <= not adc_b_data_buf;
             end if;
         end if;
     end process;
@@ -189,12 +184,10 @@ begin
             adc_c_data_fifo_ren_1 <= adc_c_data_fifo_ren;
             adc_d_data_fifo_ren_1 <= adc_d_data_fifo_ren;
             if adc_c_data_fifo_ren_1 = '1' then
-                adc_c_data(11) <= adc_c_data_buf(11);
-                adc_c_data(10 downto 0) <= not adc_c_data_buf(10 downto 0);
+                adc_c_data <= not adc_c_data_buf;
             end if;
             if adc_d_data_fifo_ren_1 = '1' then
-                adc_d_data(11) <= adc_d_data_buf(11);
-                adc_d_data(10 downto 0) <= not adc_d_data_buf(10 downto 0);
+                adc_d_data <= not adc_d_data_buf;
             end if;
         end if;
     end process;
@@ -223,14 +216,6 @@ begin
             R => sys_rst_bar
         );
     end generate adc_c_d_data_iddre1_gen;
-
-    -- Debug
-    process(sys_clk)
-    begin
-        if rising_edge(sys_clk) then
-            clk_125M <= not clk_125M;
-        end if;
-    end process;
 
     adc_a_b_data <= adc_a_b_data_fmc;
     adc_c_d_data <= adc_c_d_data_fmc;
