@@ -30,12 +30,14 @@ entity module_signal_router is
         rsp_stat_out    :   out std_logic_vector(rsbus_w - 1 downto 0);
         -- data flow ports
         sig_in          :   in  signal_array(63 downto 0);
-        sig_out         :   out signal_array(63 downto 0)
+        sig_out         :   out signal_array(63 downto 0);
+        ctrl_in         :   in  std_logic_vector(63 downto 0);
+        ctrl_out        :   out std_logic_vector(63 downto 0)
     );
 end entity module_signal_router;
 
 architecture structural of module_signal_router is
-    signal core_param       :   std_logic_vector(511 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
+    signal core_param       :   std_logic_vector(1023 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
     signal core_rst         :   std_logic := '1';
 
     signal ram_rst          :   std_logic := '1';
@@ -59,11 +61,17 @@ begin
         core_param_in   =>  core_param,
         -- data flow ports
         sig_in          =>  sig_in,
-        sig_out         =>  sig_out
+        sig_out         =>  sig_out,
+        ctrl_in         =>  ctrl_in,
+        ctrl_out        =>  ctrl_out
     );
 
-    parameter_ram : entity work.parameter_ram_512 generic map(
+    parameter_ram : entity work.parameter_ram_1024 generic map(
         ram_default     =>  x"000000007b9ac5a928398a4188204a2f" &
+                            x"6ad2728c128bdab49ca304a2f6ad2728" &
+                            x"c128bdab49ca304a2f6ad2728c128bda" &
+                            x"b49ca304a2f6ad2728c128bdab49ca30" &
+                            x"000000007b9ac5a928398a4188204a2f" &
                             x"6ad2728c128bdab49ca304a2f6ad2728" &
                             x"c128bdab49ca304a2f6ad2728c128bda" &
                             x"b49ca304a2f6ad2728c128bdab49ca30"
@@ -111,7 +119,7 @@ end architecture structural;
 -- enabling full connections so far will not ocuupy
 -- too many resources.
 architecture full of module_signal_router is
-    signal core_param       :   std_logic_vector(511 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
+    signal core_param       :   std_logic_vector(1023 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
     signal core_rst         :   std_logic := '1';
 
     signal ram_rst          :   std_logic := '1';
@@ -138,11 +146,17 @@ begin
         core_param_in   =>  core_param,
         -- data flow ports
         sig_in          =>  sig_in,
-        sig_out         =>  sig_out
+        sig_out         =>  sig_out,
+        ctrl_in         =>  ctrl_in,
+        ctrl_out        =>  ctrl_out
     );
 
-    parameter_ram : entity work.parameter_ram_512 generic map(
+    parameter_ram : entity work.parameter_ram_1024 generic map(
         ram_default     =>  x"7f7e7d7c7b7a79787776757473727170" &
+                            x"6f6e6d6c6b6a69686766656463626160" &
+                            x"5f5e5d5c5b5a59585756555453525150" &
+                            x"4f4e4d4c4b4a49484746454443424140" &
+                            x"7f7e7d7c7b7a79787776757473727170" &
                             x"6f6e6d6c6b6a69686766656463626160" &
                             x"5f5e5d5c5b5a59585756555453525150" &
                             x"4f4e4d4c4b4a49484746454443424140"

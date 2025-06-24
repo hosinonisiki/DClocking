@@ -278,6 +278,7 @@ architecture peripheral_wrapper of wrapper is
 
     signal uart_txd : std_logic;
     signal uart_rxd : std_logic;
+    signal uart_err : std_logic;
 
     -- To register an spi module:
     -- 1.Follow the format below, connecting mosi, miso, sclk and one bit from ss to the module
@@ -561,6 +562,7 @@ begin
         rst => sys_rst,
         txd => uart_txd,
         rxd => uart_rxd,
+        err => uart_err,
 
         mosi => spi_mosi,
         miso => spi_miso,
@@ -589,7 +591,7 @@ begin
     -- leds
     led_1 <= not uart_rxd; -- detects input bit flow
     led_2 <= not uart_txd; -- detects output bit flow
-    led_3 <= spi_sclk; -- detects spi clock
+    led_3 <= uart_err; -- detects uart error
     led_4 <= not (and spi_ss); -- detects if any spi chip is selected
     panel_led_1 <= '1'; -- detects if the system is running
     panel_led_2 <= sys_rst; -- detects if the system is reset

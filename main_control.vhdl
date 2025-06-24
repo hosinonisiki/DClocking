@@ -16,6 +16,7 @@ entity main_control is
         rst             :   in  std_logic;
         txd_out         :   out std_logic;
         rxd_in          :   in  std_logic;
+        err_out         :   out std_logic;
         mosi_out        :   out std_logic;
         miso_in         :   in  std_logic;
         sclk_out        :   out std_logic;
@@ -123,6 +124,7 @@ architecture structural of main_control is
             txen_in : IN STD_LOGIC;
             txful_out : OUT STD_LOGIC;
             irpt : IN STD_LOGIC;
+            err : OUT STD_LOGIC;
             m00_axi_aclk : IN STD_LOGIC;
             m00_axi_aresetn : IN STD_LOGIC;
             m00_axi_awaddr : OUT STD_LOGIC_VECTOR(31 DOWNTO 0);
@@ -198,6 +200,7 @@ begin
         txen_in => tx_wen,
         txful_out => tx_full,
         irpt => irpt,
+        err => err_out,
         m00_axi_aclk => clk,
         m00_axi_aresetn => axi_aresetn,
         m00_axi_awaddr => axi_awaddr,

@@ -37,6 +37,7 @@ entity top is
         rst         :   in  std_logic;
         txd         :   out std_logic;
         rxd         :   in  std_logic;
+        err         :   out std_logic;
 
         mosi        :   out std_logic;
         miso        :   in  std_logic;
@@ -85,8 +86,10 @@ architecture structural of top is
     signal dac_c        :   std_logic_vector(13 downto 0) := "00000000000000";
     signal dac_d        :   std_logic_vector(13 downto 0) := "00000000000000";
 
-    signal sig_bank_in  :   signal_array(63 downto 0);
-    signal sig_bank_out :   signal_array(63 downto 0);
+    signal sig_bank_in      :   signal_array(63 downto 0);
+    signal sig_bank_out     :   signal_array(63 downto 0);
+    signal ctrl_bank_in     :   std_logic_vector(63 downto 0);
+    signal ctrl_bank_out    :   std_logic_vector(63 downto 0);
 begin
 
     -- The main control module handles all ios and communication with the modules.
@@ -95,6 +98,7 @@ begin
         rst             =>  mc_rst,
         txd_out         =>  txd,
         rxd_in          =>  rxd,
+        err_out         =>  err,
 
         mosi_out        =>  mosi,
         miso_in         =>  miso,
@@ -146,7 +150,9 @@ begin
             rsp_stat_out    =>  rsbus(1),
             
             sig_in          =>  sig_bank_in,
-            sig_out         =>  sig_bank_out
+            sig_out         =>  sig_bank_out,
+            ctrl_in         =>  ctrl_bank_in,
+            ctrl_out        =>  ctrl_bank_out
         );
     end block module_1_block;
 

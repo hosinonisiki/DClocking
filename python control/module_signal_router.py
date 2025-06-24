@@ -16,6 +16,15 @@ class ModuleSignalRouter(module.ModuleBase):
     # Internal routing must be inferred from the routing
     # configuration of the external ports.
 
+    # In full connection mode, no internal interconnection
+    # channel will be used, and instead every output port
+    # will be allowed to be connected to any input port.
+
+    # A sub-unit of the router is added to route 1-bit control
+    # signals within the design. The structure is exactly the
+    # same with the signal router except for that it utilizes
+    # higher bytes of the ram as control registers.
+
     channel_count = 96
     port_count = 64
 
@@ -23,30 +32,30 @@ class ModuleSignalRouter(module.ModuleBase):
         super().__init__(bus, "ROUT")
         self.full_connection = full_connection
         if full_connection:
-            self.port_config = list(range(64))
-            self.port_enable = [1] * 64
+            self.port_config = list(range(64)) + list(range(64))
+            self.port_enable = [1] * (64 + 64)
             self.encode()
             self.last_bits = self.bits
         else:
-            self.routing_config = list(range(10)) * 8 + list(range(16))
-            self.routing_enable = [1] * self.channel_count
-            self.port_config = list(range(64))
-            self.port_enable = [1] * 64
+            self.routing_config = list(range(10)) * 8 + list(range(16)) + list(range(10)) * 8 + list(range(16))
+            self.routing_enable = [1] * (self.channel_count + self.channel_count)
+            self.port_config = list(range(64)) + list(range(64))
+            self.port_enable = [1] * (64 + 64)
             self.encode()
             self.last_bits = self.bits
 
     def reset(self):
         super().reset()
         if self.full_connection:
-            self.port_config = list(range(64))
-            self.port_enable = [1] * 64
+            self.port_config = list(range(64)) + list(range(64))
+            self.port_enable = [1] * (64 + 64)
             self.encode()
             self.last_bits = self.bits
         else:
-            self.routing_config = list(range(10)) * 8 + list(range(16))
-            self.routing_enable = [1] * self.channel_count
-            self.port_config = list(range(64))
-            self.port_enable = [1] * 64
+            self.routing_config = list(range(10)) * 8 + list(range(16)) + list(range(10)) * 8 + list(range(16))
+            self.routing_enable = [1] * (self.channel_count + self.channel_count)
+            self.port_config = list(range(64)) + list(range(64))
+            self.port_enable = [1] * (64 + 64)
             self.encode()
             self.last_bits = self.bits
 
@@ -94,7 +103,7 @@ class ModuleSignalRouter(module.ModuleBase):
                 else:
                     self._set_routing(i * 10 + j, self.port_config[i * 8 + j] % 8)
         nth_receive = [0] * 8
-        for i in range(15):
+        for i in range(16):
             if forward_destination[i] is not None:
                 target_bank = forward_destination[i] // 8
                 self._set_routing(80 + i, target_bank * 2 + nth_receive[target_bank])
@@ -106,9 +115,51 @@ class ModuleSignalRouter(module.ModuleBase):
                     self._enable(i * 10 + j)
                 else:
                     self._disable(i * 10 + j)
+        # Repeat for control ports
+        need_forward = [0] * 8
+        receive_forward = [0] * 8
+        for i in range(8):
+            for j in range(8):
+                if self.port_config[64 + i * 8 + j] < i * 8 or self.port_config[64 + i * 8 + j] >= (i + 1) * 8:
+                    need_forward[i] += 1
+                    receive_forward[self.port_config[64 + i * 8 + j] // 8] += 1
+        for i in range(8):
+            if need_forward[i] >= 3:
+                raise ValueError(f"The {i}th bank requires {need_forward[i]} forward switches.")
+            if receive_forward[i] >= 3:
+                raise ValueError(f"The {i}th bank receives {receive_forward[i]} forward switches.")
+        forward_destination = [None] * 16
+        for i in range(8):
+            nth_forward = 0
+            for j in range(8):
+                if self.port_config[64 + i * 8 + j] < i * 8 or self.port_config[64 + i * 8 + j] >= (i + 1) * 8:
+                    if nth_forward == 0:
+                        self._set_routing(96 + i * 10 + j, 8)
+                        forward_destination[i * 2] = self.port_config[64 + i * 8 + j]
+                        nth_forward += 1
+                    else:
+                        self._set_routing(96 + i * 10 + j, 9)
+                        forward_destination[i * 2 + 1] = self.port_config[64 + i * 8 + j]
+                else:
+                    self._set_routing(96 + i * 10 + j, self.port_config[64 + i * 8 + j] % 8)
+        nth_receive = [0] * 8
+        for i in range(16):
+            if forward_destination[i] is not None:
+                target_bank = forward_destination[i] // 8
+                self._set_routing(176 + i, target_bank * 2 + nth_receive[target_bank])
+                self._set_routing(96 + target_bank * 10 + 8 + nth_receive[target_bank], forward_destination[i] % 8)
+                nth_receive[target_bank] += 1
+        for i in range(8):
+            for j in range(8):
+                if self.port_enable[64 + i * 8 + j]:
+                    self._enable(96 + i * 10 + j)
+                else:
+                    self._disable(96 + i * 10 + j)
 
     def set_routing(self, port, source):
-        self.port_config[port] = source
+        if port // 64 != source // 64:
+            raise ValueError("Port and source must either be both signals or control signals.")
+        self.port_config[port] = source % 64
 
     def enable(self, port):
         self.port_enable[port] = 1
@@ -119,17 +170,21 @@ class ModuleSignalRouter(module.ModuleBase):
     def encode(self):
         if self.full_connection:
             bits = ""
-            for i in range(self.port_count):
+            for i in range(self.port_count + self.port_count):
                 bits = bin(self.port_config[i])[2:].zfill(6) + bits
                 bits = str(self.port_enable[i]) + bits
                 bits = "0" + bits
-            bits = bits.zfill(512)
+            bits = bits.zfill(1024)
         else:
             bits = ""
             for i in range(self.channel_count):
                 bits = bin(self.routing_config[i])[2:].zfill(4) + bits
                 bits = str(self.routing_enable[i]) + bits
             bits = bits.zfill(512)
+            for i in range(self.channel_count):
+                bits = bin(self.routing_config[96 + i])[2:].zfill(4) + bits
+                bits = str(self.routing_enable[96 + i]) + bits
+            bits = bits.zfill(1024)
         self.bits = bits
         return
     
@@ -141,9 +196,9 @@ class ModuleSignalRouter(module.ModuleBase):
     def upload(self):
         self.implement_routing()
         self.encode()
-        for i in range(15, -1, -1):
+        for i in range(31, -1, -1):
             if self.bits[i * 32: (i + 1) * 32] != self.last_bits[i * 32: (i + 1) * 32]:
-                self.write((15 - i), int(self.bits[i * 32: (i + 1) * 32], 2))
+                self.write((31 - i), int(self.bits[i * 32: (i + 1) * 32], 2))
         self.last_bits = self.bits
 
     def plot(self):
