@@ -30,7 +30,9 @@ entity module_pid_controller is
         rsp_stat_out    :   out std_logic_vector(rsbus_w - 1 downto 0);
         -- data flow ports
         error_in        :   in  std_logic_vector(15 downto 0);
-        feedback_out    :   out std_logic_vector(15 downto 0)
+        feedback_out    :   out std_logic_vector(15 downto 0);
+        -- control ports
+        auto_reset_in   :   in  std_logic
     );
 end entity module_pid_controller;
 
@@ -62,7 +64,9 @@ begin
         core_param_in   =>  core_param,
         -- data flow ports
         error_in        =>  error_in,
-        feedback_out    =>  feedback_out
+        feedback_out    =>  feedback_out,
+        -- control ports
+        auto_reset_in   =>  auto_reset_in
     );
 
     parameter_ram : entity work.parameter_ram_256 generic map(

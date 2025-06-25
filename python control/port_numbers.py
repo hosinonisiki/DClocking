@@ -27,3 +27,7 @@ MIM_IN_B = 7
 MIM_IN_C = 8
 MIM_IN_D = 9
 PID_IN = 10
+
+# Output control from signal router, input to module:
+SCALER_RESET = 0
+PID_RESET = 1

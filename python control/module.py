@@ -56,7 +56,8 @@ class ModulePID(ModuleBase):
         2: {"name": "gain_d", "width": 24},
         3: {"name": "setpoint", "width": 16},
         4: {"name": "limit_integral", "width": 16},
-        5: {"name": "limit_sum", "width": 16}
+        5: {"name": "limit_sum", "width": 16},
+        7: {"name": "enable_auto_reset", "width": 1}
     }
     alias_list = {
         "gain_p": 0, "p": 0, "kp" : 0, "k_p": 0,
@@ -64,7 +65,8 @@ class ModulePID(ModuleBase):
         "gain_d": 2, "d": 2, "kd" : 2, "k_d": 2,
         "setpoint": 3, "set": 3,
         "limit_integral": 4, "limit_i": 4,
-        "limit_sum": 5, "limit": 5
+        "limit_sum": 5, "limit": 5,
+        "enable_auto_reset": 7, "auto_reset": 7, "auto": 7
     }
 
 class ModuleScaler(ModuleBase):
@@ -86,9 +88,11 @@ class ModuleScaler(ModuleBase):
 class ModuleAccumulator(ModuleBase):
     parameter_list = {
         0: {"name": "low", "width": 32},
-        1: {"name": "high", "width": 32}
+        1: {"name": "high", "width": 32},
+        3: {"name": "enable_auto_reset", "width": 1}
     }
     alias_list = {
         "low": 0,
-        "high": 1
+        "high": 1,
+        "enable_auto_reset": 3, "auto_reset": 3, "auto": 3
     }

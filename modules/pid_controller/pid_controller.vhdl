@@ -17,7 +17,9 @@ entity pid_controller is
         core_param_in   :   in  std_logic_vector(255 downto 0);
         -- data flow ports
         error_in        :   in  std_logic_vector(15 downto 0);
-        feedback_out    :   out std_logic_vector(15 downto 0) 
+        feedback_out    :   out std_logic_vector(15 downto 0);
+        -- control ports
+        auto_reset_in   :   in  std_logic
     );
 end entity pid_controller;
 
@@ -48,12 +50,15 @@ architecture behavioural of pid_controller is
     signal integral_buf_limited :   signed(47 downto 0); -- yy xxxx yyyy yy__
     signal sum_buf              :   signed(27 downto 0); -- yy xxxx y___ ____
     signal sum_buf_limited      :   signed(27 downto 0); -- yy xxxx y___ ____
+
+    signal internal_rst         :   std_logic;
+    signal enable_auto_reset    :   std_logic;
 begin
     use_input_buffer : if io_buf = buf_for_io or io_buf = buf_i_only generate
         process(clk)
         begin
             if rising_edge(clk) then
-                if rst = '1' then
+                if internal_rst = '1' then
                     error_in_buf <= (others => '0');
                 else
                     error_in_buf <= signed(error_in);
@@ -63,14 +68,14 @@ begin
     end generate;
 
     no_input_buffer : if io_buf = buf_o_only or io_buf = buf_none generate
-        error_in_buf <= (others => '0') when rst = '1' else signed(error_in);
+        error_in_buf <= (others => '0') when internal_rst = '1' else signed(error_in);
     end generate;
 
     use_output_buffer : if io_buf = buf_for_io or io_buf = buf_o_only generate
         process(clk)
         begin
             if rising_edge(clk) then
-                if rst = '1' then
+                if internal_rst = '1' then
                     feedback_out <= (others => '0');
                 else
                     feedback_out <= std_logic_vector(feedback_out_buf);
@@ -80,8 +85,10 @@ begin
     end generate;
 
     no_output_buffer : if io_buf = buf_i_only or io_buf = buf_none generate
-        feedback_out <= (others => '0') when rst = '1' else std_logic_vector(feedback_out_buf);
+        feedback_out <= (others => '0') when internal_rst = '1' else std_logic_vector(feedback_out_buf);
     end generate;
+
+    internal_rst <= '1' when rst = '1' or (enable_auto_reset = '1' and auto_reset_in = '1') else '0';
 
     gain_p <= signed(core_param_in(23 downto 0)); -- address 0x00
     gain_i <= signed(core_param_in(63 downto 32)); -- address 0x01
@@ -89,11 +96,12 @@ begin
     setpoint <= signed(core_param_in(111 downto 96)); -- address 0x03
     limit_integral <= x"00" & signed(core_param_in(143 downto 128)) & x"000000"; -- address 0x04
     limit_sum <= x"00" & signed(core_param_in(175 downto 160)) & x"0"; -- address 0x05
+    enable_auto_reset <= core_param_in(224); -- address 0x07
 
     process(clk)
     begin
         if rising_edge(clk) then
-            if rst = '1' then
+            if internal_rst = '1' then
                 integral <= (others => '0');
             else
                 error_from_setpoint <= error_in_buf - setpoint;

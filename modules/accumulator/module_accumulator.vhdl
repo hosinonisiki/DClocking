@@ -29,12 +29,14 @@ entity module_accumulator is
         rsp_data_out    :   out std_logic_vector(rdbus_w - 1 downto 0);
         rsp_stat_out    :   out std_logic_vector(rsbus_w - 1 downto 0);
         -- data flow ports
-        acc_out : out std_logic_vector(15 downto 0)
+        acc_out         :   out std_logic_vector(15 downto 0);
+        -- control ports
+        auto_reset_in   :   in  std_logic
     );
 end entity module_accumulator;
 
 architecture structural of module_accumulator is
-    signal core_param       :   std_logic_vector(63 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
+    signal core_param       :   std_logic_vector(127 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
     signal core_rst         :   std_logic := '1';
 
     signal ram_rst          :   std_logic := '1';
@@ -60,11 +62,13 @@ begin
         rst             =>  core_rst,
         core_param_in   =>  core_param,
         -- data flow ports
-        acc_out         =>  acc_out
+        acc_out         =>  acc_out,
+        -- control ports
+        auto_reset_in   =>  auto_reset_in
     );
 
-    parameter_ram : entity work.parameter_ram_64 generic map(
-        ram_default     =>  x"0000000000000000"
+    parameter_ram : entity work.parameter_ram_128 generic map(
+        ram_default     =>  x"00000000000000000000000000000000"
     )port map(
         clk             =>  clk,
         rst             =>  ram_rst,

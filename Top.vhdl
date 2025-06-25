@@ -86,10 +86,10 @@ architecture structural of top is
     signal dac_c        :   std_logic_vector(13 downto 0) := "00000000000000";
     signal dac_d        :   std_logic_vector(13 downto 0) := "00000000000000";
 
-    signal sig_bank_in      :   signal_array(63 downto 0);
-    signal sig_bank_out     :   signal_array(63 downto 0);
-    signal ctrl_bank_in     :   std_logic_vector(63 downto 0);
-    signal ctrl_bank_out    :   std_logic_vector(63 downto 0);
+    signal sig_bank_in      :   signal_array(63 downto 0) := (others => (others => '0'));
+    signal sig_bank_out     :   signal_array(63 downto 0) := (others => (others => '0'));
+    signal ctrl_bank_in     :   std_logic_vector(63 downto 0) := (others => '0');
+    signal ctrl_bank_out    :   std_logic_vector(63 downto 0) := (others => '0');
 begin
 
     -- The main control module handles all ios and communication with the modules.
@@ -190,7 +190,9 @@ begin
             rsp_data_out    =>  rdbus(3),
             rsp_stat_out    =>  rsbus(3),
             
-            acc_out         =>  sig_bank_in(4)
+            acc_out         =>  sig_bank_in(4),
+
+            auto_reset_in   =>  ctrl_bank_out(0)
         );
     end block module_3_block;
 
@@ -253,7 +255,9 @@ begin
             rsp_stat_out    =>  rsbus(6),
             
             error_in        => sig_bank_out(10),
-            feedback_out    => sig_bank_in(14)
+            feedback_out    => sig_bank_in(14),
+
+            auto_reset_in   => ctrl_bank_out(1),
         );
     end block module_6_block;
 
