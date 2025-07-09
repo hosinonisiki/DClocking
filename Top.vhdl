@@ -257,7 +257,7 @@ begin
             error_in        => sig_bank_out(10),
             feedback_out    => sig_bank_in(14),
 
-            auto_reset_in   => ctrl_bank_out(1),
+            auto_reset_in   => ctrl_bank_out(1)
         );
     end block module_6_block;
 

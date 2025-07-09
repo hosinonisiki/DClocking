@@ -37,51 +37,9 @@ entity moku_mim_wrapper is
     );
 end entity moku_mim_wrapper;
 
-architecture id_0 of moku_mim_wrapper is
+architecture id_12 of moku_mim_wrapper is
 begin
-    slot_3 : entity work.mcc_wrapper(feedback) port map(
-        clk             =>  clk,
-        rst             =>  rst,
-        core_param_in   =>  core_param_in(1535 downto 1024),
-        inputa          =>  inputb,
-        inputb          =>  x"0000",
-        outputa         =>  outputd,
-        outputb         =>  outputc,
-        outputc         =>  outputb,
-        outputd         =>  open
-    );
-
-    slot_2 : entity work.mcc_wrapper(turnkey) port map(
-        clk             =>  clk,
-        rst             =>  rst,
-        core_param_in   =>  core_param_in(1023 downto 512),
-        inputa          =>  inputa,
-        inputb          =>  x"0000",
-        outputa         =>  outputa,
-        outputb         =>  open,
-        outputc         =>  open,
-        outputd         =>  open
-    );
-end architecture id_0;
-
-architecture id_1 of moku_mim_wrapper is
-begin
-    slot_2 : entity work.mcc_wrapper(turnkey) port map(
-        clk             =>  clk,
-        rst             =>  rst,
-        core_param_in   =>  core_param_in(1023 downto 512),
-        inputa          =>  inputa,
-        inputb          =>  inputb,
-        outputa         =>  outputa,
-        outputb         =>  outputb,
-        outputc         =>  open,
-        outputd         =>  open
-    );
-end architecture id_1;
-
-architecture id_6 of moku_mim_wrapper is
-begin
-    slot_2 : entity work.mcc_wrapper(PID_wrapped) port map(
+    slot_2 : entity work.mcc_wrapper(pdh) port map(
         clk             =>  clk,
         rst             =>  rst,
         core_param_in   =>  core_param_in(1023 downto 512),
@@ -89,7 +47,7 @@ begin
         inputb          =>  x"0000",
         outputa         =>  outputa,
         outputb         =>  outputb,
-        outputc         =>  open,
+        outputc         =>  outputc,
         outputd         =>  open
     );
-end architecture id_6;
+end architecture id_12;
