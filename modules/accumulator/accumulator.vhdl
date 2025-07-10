@@ -18,7 +18,7 @@ entity accumulator is
         core_param_in   :   in  std_logic_vector(127 downto 0);
         acc_out         :   out std_logic_vector(15 downto 0);
 
-        auto_reset_in   :   in  std_logic;
+        auto_reset_in   :   in  std_logic
     );
 end entity accumulator;
 

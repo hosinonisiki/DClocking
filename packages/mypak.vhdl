@@ -1,5 +1,5 @@
 -- ///////////////Documentation////////////////////
--- Package for global defined constants.
+-- Package for global defined constants and functions.
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -46,4 +46,25 @@ package mypak is
     constant spi_clk_freq   :   integer := 10_000_000; -- SPI clock frequency in Hz.
 
     type signal_array is array(natural range <>) of std_logic_vector(15 downto 0); -- Used in the router's io ports and mim_wrapper.
+
+    function ceillog2(n : natural) return natural;
+    function triangular(n : natural) return natural;
 end package mypak;
+
+package body mypak is
+    function ceillog2(n : natural) return natural is
+        variable result : natural := 0;
+    begin
+        assert n >= 1;
+        while (2 ** result < n) loop
+            result := result + 1;
+        end loop;
+        return result;
+    end function;
+
+    function triangular(n : natural) return natural is
+    begin
+        assert n >= 1;
+        return (n * (n - 1)) / 2;
+    end function;
+end package body mypak;
