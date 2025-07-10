@@ -47,46 +47,73 @@ entity FL9627_adapter is
 end entity FL9627_adapter;
 
 architecture structural of FL9627_adapter is
-    signal adc_a_data_buf : std_logic_vector(11 downto 0);
-    signal adc_b_data_buf : std_logic_vector(11 downto 0);
-    signal adc_c_data_buf : std_logic_vector(11 downto 0);
-    signal adc_d_data_buf : std_logic_vector(11 downto 0);
-    signal adc_a_b_data_h : std_logic_vector(11 downto 0);
-    signal adc_a_b_data_l : std_logic_vector(11 downto 0);
-    signal adc_c_d_data_h : std_logic_vector(11 downto 0);
-    signal adc_c_d_data_l : std_logic_vector(11 downto 0);
-    signal adc_a_b_data : std_logic_vector(11 downto 0);
-    signal adc_c_d_data : std_logic_vector(11 downto 0);
-    signal adc_a_b_dco : std_logic;
-    signal adc_c_d_dco : std_logic;
-    signal adc_eeprom_iic_scl : std_logic;
-    signal adc_eeprom_iic_sda : std_logic;
+    signal sys_rst_adc_a_b_1    : std_logic;
+    signal sys_rst_adc_a_b_2    : std_logic;
+    signal sys_rst_adc_c_d_1    : std_logic;
+    signal sys_rst_adc_c_d_2    : std_logic;
 
-    signal adc_a_data_fifo_rrst_busy : std_logic;
-    signal adc_a_data_fifo_wrst_busy : std_logic;
-    signal adc_a_data_fifo_empty : std_logic;
-    signal adc_a_data_fifo_full : std_logic;
-    signal adc_a_data_fifo_ren : std_logic;
-    signal adc_a_data_fifo_ren_1 : std_logic;
-    signal adc_b_data_fifo_rrst_busy : std_logic;
-    signal adc_b_data_fifo_wrst_busy : std_logic;
-    signal adc_b_data_fifo_empty : std_logic;
-    signal adc_b_data_fifo_full : std_logic;
-    signal adc_b_data_fifo_ren : std_logic;
-    signal adc_b_data_fifo_ren_1 : std_logic;
-    signal adc_c_data_fifo_rrst_busy : std_logic;
-    signal adc_c_data_fifo_wrst_busy : std_logic;
-    signal adc_c_data_fifo_empty : std_logic;
-    signal adc_c_data_fifo_full : std_logic;
-    signal adc_c_data_fifo_ren : std_logic;
-    signal adc_c_data_fifo_ren_1 : std_logic;
-    signal adc_d_data_fifo_rrst_busy : std_logic;
-    signal adc_d_data_fifo_wrst_busy : std_logic;
-    signal adc_d_data_fifo_empty : std_logic;
-    signal adc_d_data_fifo_full : std_logic;
-    signal adc_d_data_fifo_ren : std_logic;
-    signal adc_d_data_fifo_ren_1 : std_logic;
+    signal adc_a_data_buf       : std_logic_vector(11 downto 0);
+    signal adc_b_data_buf       : std_logic_vector(11 downto 0);
+    signal adc_c_data_buf       : std_logic_vector(11 downto 0);
+    signal adc_d_data_buf       : std_logic_vector(11 downto 0);
+    signal adc_a_b_data_h       : std_logic_vector(11 downto 0);
+    signal adc_a_b_data_l       : std_logic_vector(11 downto 0);
+    signal adc_c_d_data_h       : std_logic_vector(11 downto 0);
+    signal adc_c_d_data_l       : std_logic_vector(11 downto 0);
+    signal adc_a_b_data         : std_logic_vector(11 downto 0);
+    signal adc_c_d_data         : std_logic_vector(11 downto 0);
+    signal adc_a_b_dco          : std_logic;
+    signal adc_c_d_dco          : std_logic;
+    signal adc_eeprom_iic_scl   : std_logic;
+    signal adc_eeprom_iic_sda   : std_logic;
+
+    signal adc_a_data_fifo_rrst_busy    : std_logic;
+    signal adc_a_data_fifo_wrst_busy    : std_logic;
+    signal adc_a_data_fifo_empty        : std_logic;
+    signal adc_a_data_fifo_full         : std_logic;
+    signal adc_a_data_fifo_ren          : std_logic;
+    signal adc_a_data_fifo_ren_1        : std_logic;
+    signal adc_b_data_fifo_rrst_busy    : std_logic;
+    signal adc_b_data_fifo_wrst_busy    : std_logic;
+    signal adc_b_data_fifo_empty        : std_logic;
+    signal adc_b_data_fifo_full         : std_logic;
+    signal adc_b_data_fifo_ren          : std_logic;
+    signal adc_b_data_fifo_ren_1        : std_logic;
+    signal adc_c_data_fifo_rrst_busy    : std_logic;
+    signal adc_c_data_fifo_wrst_busy    : std_logic;
+    signal adc_c_data_fifo_empty        : std_logic;
+    signal adc_c_data_fifo_full         : std_logic;
+    signal adc_c_data_fifo_ren          : std_logic;
+    signal adc_c_data_fifo_ren_1        : std_logic;
+    signal adc_d_data_fifo_rrst_busy    : std_logic;
+    signal adc_d_data_fifo_wrst_busy    : std_logic;
+    signal adc_d_data_fifo_empty        : std_logic;
+    signal adc_d_data_fifo_full         : std_logic;
+    signal adc_d_data_fifo_ren          : std_logic;
+    signal adc_d_data_fifo_ren_1        : std_logic;
+
+    attribute ASYNC_REG : string;
+    attribute ASYNC_REG of sys_rst_adc_a_b_1 : signal is "TRUE";
+    attribute ASYNC_REG of sys_rst_adc_a_b_2 : signal is "TRUE";
+    attribute ASYNC_REG of sys_rst_adc_c_d_1 : signal is "TRUE";
+    attribute ASYNC_REG of sys_rst_adc_c_d_2 : signal is "TRUE";
 begin
+    -- 1 bit cdc syncronizer for sys_rst
+    process(adc_a_b_dco)
+    begin
+        if rising_edge(adc_a_b_dco) then
+            sys_rst_adc_a_b_1 <= sys_rst;
+            sys_rst_adc_a_b_2 <= sys_rst_adc_a_b_1;
+        end if;
+    end process;
+    process(adc_c_d_dco)
+    begin
+        if rising_edge(adc_c_d_dco) then
+            sys_rst_adc_c_d_1 <= sys_rst;
+            sys_rst_adc_c_d_2 <= sys_rst_adc_c_d_1;
+        end if;
+    end process;
+
     -- Interface
     -- Transfer data from slow adc clock to system clock by employing asynchronous fifo
     adc_a_data_fifo : entity work.async_fifo generic map(
@@ -94,7 +121,7 @@ begin
     )port map(
         wclk => adc_a_b_dco,
         rclk => sys_clk,
-        rst => sys_rst,
+        rst => sys_rst_adc_a_b_2,
         wdata_in => adc_a_b_data_h,
         wen_in => not adc_a_data_fifo_wrst_busy,
         rdata_out => adc_a_data_buf,
@@ -112,7 +139,7 @@ begin
     )port map(
         wclk => adc_a_b_dco,
         rclk => sys_clk,
-        rst => sys_rst,
+        rst => sys_rst_adc_a_b_2,
         wdata_in => adc_a_b_data_l,
         wen_in => not adc_b_data_fifo_wrst_busy,
         rdata_out => adc_b_data_buf,
@@ -145,7 +172,7 @@ begin
     )port map(
         wclk => adc_c_d_dco,
         rclk => sys_clk,
-        rst => sys_rst,
+        rst => sys_rst_adc_c_d_2,
         wdata_in => adc_c_d_data_h,
         wen_in => not adc_c_data_fifo_wrst_busy,
         rdata_out => adc_c_data_buf,
@@ -163,7 +190,7 @@ begin
     )port map(
         wclk => adc_c_d_dco,
         rclk => sys_clk,
-        rst => sys_rst,
+        rst => sys_rst_adc_c_d_2,
         wdata_in => adc_c_d_data_l,
         wen_in => not adc_d_data_fifo_wrst_busy,
         rdata_out => adc_d_data_buf,
@@ -201,7 +228,7 @@ begin
             C => adc_a_b_dco,
             CB => not adc_a_b_dco,
             D => adc_a_b_data(i),
-            R => sys_rst
+            R => sys_rst_adc_a_b_2
         );
     end generate adc_a_b_data_iddre1_gen;
     adc_c_d_data_iddre1_gen : for i in 0 to 11 generate
@@ -211,7 +238,7 @@ begin
             C => adc_c_d_dco,
             CB => not adc_c_d_dco,
             D => adc_c_d_data(i),
-            R => sys_rst
+            R => sys_rst_adc_c_d_2
         );
     end generate adc_c_d_data_iddre1_gen;
 
