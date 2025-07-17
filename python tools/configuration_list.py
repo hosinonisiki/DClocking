@@ -6,6 +6,7 @@ default_configuration.instantiation_head = ['-- Module unplugged']
 default_configuration.instantiation_tail = []
 default_configuration.port_signals = {}
 default_configuration.lpc_name = None # Decided runtime
+default_configuration.lpc_id = None # Decided runtime
 default_configuration.lpc_configuration = {
     'clk0': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'in', 'io_type_n': 'in', 'is_clock': False, 'is_clock_n': False },
     'clk1': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'in', 'io_type_n': 'in', 'is_clock': False, 'is_clock_n': False },
@@ -52,13 +53,11 @@ default_configuration.signal_mapping = []
 FL9781_configuration = ChipConfiguration('FL9781', 1)
 FL9781_configuration.instantiation_head = [
     'FL9781 : entity work.FL9781_adapter port map(\n', \
-    '    dac_a_data => dac_a_data_buf,\n', \
-    '    dac_b_data => dac_b_data_buf,\n', \
-    '    dac_c_data => dac_c_data_buf,\n', \
-    '    dac_d_data => dac_d_data_buf,\n', \
-    '    dac_a_b_spi_ss => dac_a_b_spi_ss,\n', \
-    '    dac_c_d_spi_ss => dac_c_d_spi_ss,\n', \
-    '    dac_clk_spi_ss => dac_clk_spi_ss,\n', \
+    '    dac_a_data => dac_buf(<natural>),\n', \
+    '    dac_b_data => dac_buf(<natural>),\n', \
+    '    dac_c_data => dac_buf(<natural>),\n', \
+    '    dac_d_data => dac_buf(<natural>),\n', \
+    '    dac_spi_ss => spi_ss(<SPI_SS_INDEX>),\n', \
     '    dac_spi_sck => spi_sclk,\n', \
     '    dac_spi_mosi => spi_mosi,\n', \
     '    dac_spi_miso => dac_spi_miso,\n', \
@@ -83,6 +82,7 @@ FL9781_configuration.port_signals = {
     'dac_eeprom_iic_sda_fmc' : 'std_logic'
 }
 FL9781_configuration.lpc_name = None # Decided runtime
+default_configuration.lpc_id = None # Decided runtime
 FL9781_configuration.lpc_configuration = {
     'clk0': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'in', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
     'clk1': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
@@ -181,6 +181,7 @@ FL1010_configuration.port_signals = {
     'lpc240p_eeprom_iic_sda_fmc' : 'std_logic'
 }
 FL1010_configuration.lpc_name = None # Decided runtime
+default_configuration.lpc_id = None # Decided runtime
 FL1010_configuration.lpc_configuration = {
     'clk0': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
     'clk1': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
@@ -298,16 +299,14 @@ FL1010_configuration.signal_mapping = [
 FL9627_configuration = ChipConfiguration('FL9627', 3)
 FL9627_configuration.instantiation_head = [
     'FL9627 : entity work.FL9627_adapter port map(\n', \
-    '    adc_a_data => adc_a_data_buf,\n', \
-    '    adc_b_data => adc_b_data_buf,\n', \
-    '    adc_c_data => adc_c_data_buf,\n', \
-    '    adc_d_data => adc_d_data_buf,\n', \
-    '    adc_a_b_spi_ss => adc_a_b_spi_ss,\n', \
-    '    adc_c_d_spi_ss => adc_c_d_spi_ss,\n', \
+    '    adc_a_data => adc_buf(<natural>),\n', \
+    '    adc_b_data => adc_buf(<natural>),\n', \
+    '    adc_c_data => adc_buf(<natural>),\n', \
+    '    adc_d_data => adc_buf(<natural>),\n', \
+    '    adc_spi_ss => spi_ss(<SPI_SS_INDEX>),\n', \
     '    adc_spi_sck => spi_sclk,\n', \
     '    adc_spi_mosi => spi_mosi,\n', \
-    '    adc1_spi_miso => adc1_spi_miso,\n', \
-    '    adc2_spi_miso => adc2_spi_miso,\n', \
+    '    adc_spi_miso => spi_miso_buf(<SPI_MISO_BUF_INDEX>),\n', \
     '    adc_spi_io_tri => spi_io_tri,\n', \
     '    sys_clk => sys_clk,\n', \
     '    adc_clk_125M => sys_clk_125M,\n', \
@@ -331,6 +330,7 @@ FL9627_configuration.port_signals = {
     'adc_eeprom_iic_sda_fmc' : 'std_logic'
 }
 FL9627_configuration.lpc_name = None # Decided runtime
+default_configuration.lpc_id = None # Decided runtime
 FL9627_configuration.lpc_configuration = {
     'clk0': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
     'clk1': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },

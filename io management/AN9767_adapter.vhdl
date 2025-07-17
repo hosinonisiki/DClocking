@@ -13,8 +13,8 @@ use work.mypak.all;
 
 entity AN9767_adapter is
     port(
-        dac_a_data      :   in  std_logic_vector(13 downto 0);
-        dac_b_data      :   in  std_logic_vector(13 downto 0);
+        dac_a_data      :   in  std_logic_vector(15 downto 0);
+        dac_b_data      :   in  std_logic_vector(15 downto 0);
 
         sys_clk         :   in  std_logic;
         dac_clk_125M         :   in  std_logic;
@@ -62,7 +62,7 @@ begin
         wclk => sys_clk,
         rclk => dac_clk_125M,
         rst => sys_rst,
-        wdata_in => dac_a_data,
+        wdata_in => dac_a_data(15 downto 2),
         wen_in => dac_a_data_fifo_wen,
         rdata_out => dac_a_data_buf,
         ren_in => dac_a_data_fifo_ren,
@@ -81,7 +81,7 @@ begin
         wclk => sys_clk,
         rclk => dac_clk_125M,
         rst => sys_rst,
-        wdata_in => dac_b_data,
+        wdata_in => dac_b_data(15 downto 2),
         wen_in => dac_b_data_fifo_wen,
         rdata_out => dac_b_data_buf,
         ren_in => dac_b_data_fifo_ren,

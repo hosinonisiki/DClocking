@@ -30,11 +30,22 @@ package mypak is
     constant BUS_PIDC_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(6, mbus_w)); -- Address of the PID controller module.
 
     -- Used in wrapper and central_control
-    constant SPI_DAC1_ADDR      : integer := 0; -- Address of chip DAC1, responsible for dac channel A and B.
-    constant SPI_DAC2_ADDR      : integer := 1; -- Address of chip DAC2, responsible for dac channel C and D.
-    constant SPI_CLK1_ADDR      : integer := 2; -- Address of chip CLK1, providing clocks for DAC1 and DAC2.
-    constant SPI_ADC1_ADDR      : integer := 3; -- Address of chip ADC1, responsible for adc channel A and B.
-    constant SPI_ADC2_ADDR      : integer := 4; -- Address of chip ADC2, responsible for adc channel C and D.
+    constant SPI_P1C1_ADDR      : integer := 0; -- Address of chip 1 on FMC Port 1.
+    constant SPI_P1C2_ADDR      : integer := 1; -- Address of chip 2 on FMC Port 1.
+    constant SPI_P1C3_ADDR      : integer := 2; -- Address of chip 3 on FMC Port 1.
+    constant SPI_P1C4_ADDR      : integer := 3; -- Address of chip 4 on FMC Port 1.
+    constant SPI_P2C1_ADDR      : integer := 4; -- Address of chip 1 on FMC Port 2.
+    constant SPI_P2C2_ADDR      : integer := 5; -- Address of chip 2 on FMC Port 2.
+    constant SPI_P2C3_ADDR      : integer := 6; -- Address of chip 3 on FMC Port 2.
+    constant SPI_P2C4_ADDR      : integer := 7; -- Address of chip 4 on FMC Port 2.
+    constant SPI_P3C1_ADDR      : integer := 8; -- Address of chip 1 on FMC Port 3.
+    constant SPI_P3C2_ADDR      : integer := 9; -- Address of chip 2 on FMC Port 3.
+    constant SPI_P3C3_ADDR      : integer := 10; -- Address of chip 3 on FMC Port 3.
+    constant SPI_P3C4_ADDR      : integer := 11; -- Address of chip 4 on FMC Port 3.
+    constant SPI_P4C1_ADDR      : integer := 12; -- Address of chip 1 on FMC Port 4.
+    constant SPI_P4C2_ADDR      : integer := 13; -- Address of chip 2 on FMC Port 4.
+    constant SPI_P4C3_ADDR      : integer := 14; -- Address of chip 3 on FMC Port 4.
+    constant SPI_P4C4_ADDR      : integer := 15; -- Address of chip 4 on FMC Port 4.
 
     type rdbus_type is array(0 to module_count) of std_logic_vector(rdbus_w - 1 downto 0); -- 0 is reserved for no module.
     type rsbus_type is array(0 to module_count) of std_logic_vector(rsbus_w - 1 downto 0);
@@ -45,7 +56,7 @@ package mypak is
 
     constant spi_clk_freq   :   integer := 10_000_000; -- SPI clock frequency in Hz.
 
-    type signal_array is array(natural range <>) of std_logic_vector(15 downto 0); -- Used in the router's io ports and mim_wrapper.
+    type signal_array is array(natural range <>) of std_logic_vector(15 downto 0); -- Used in the router's io ports and mim_wrapper and top interface.
 
     function ceillog2(n : natural) return natural;
     function triangular(n : natural) return natural;

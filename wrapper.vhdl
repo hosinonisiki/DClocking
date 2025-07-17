@@ -280,36 +280,18 @@ architecture peripheral_wrapper of wrapper is
     signal uart_rxd : std_logic;
     signal uart_err : std_logic;
 
-    -- To register an spi module:
-    -- 1.Follow the format below, connecting mosi, miso, sclk and one bit from ss to the module
-    -- 2.Register the address of the module in mypak
-    -- 3.Register the name of the module in uart_protocol
-    -- 4.Add corresponding lines in central_control
     signal spi_mosi : std_logic;
     signal spi_miso : std_logic;
     signal spi_sclk : std_logic;
-    signal spi_ss   : std_logic_vector(15 downto 0);
+    signal spi_ss   : std_logic_vector(0 to 15);
     signal spi_io_tri : std_logic;
 
-    signal dac_a_b_spi_ss : std_logic;
-    signal dac_c_d_spi_ss : std_logic;
-    signal dac_clk_spi_ss : std_logic;
-    signal dac_spi_miso : std_logic;
+    signal spi_miso_buf : std_logic_vector(0 to 3);
 
-    signal adc_a_b_spi_ss : std_logic;
-    signal adc_c_d_spi_ss : std_logic;
-    signal adc1_spi_miso : std_logic;
-    signal adc2_spi_miso : std_logic;
-
-    signal dac_a_data_buf : std_logic_vector(13 downto 0);
-    signal dac_b_data_buf : std_logic_vector(13 downto 0);
-    signal dac_c_data_buf : std_logic_vector(13 downto 0);
-    signal dac_d_data_buf : std_logic_vector(13 downto 0);
-     
-    signal adc_a_data_buf : std_logic_vector(11 downto 0);
-    signal adc_b_data_buf : std_logic_vector(11 downto 0);
-    signal adc_c_data_buf : std_logic_vector(11 downto 0);
-    signal adc_d_data_buf : std_logic_vector(11 downto 0);
+    constant ADC_channel_count : integer := 4;
+    constant DAC_channel_count : integer := 4;
+    signal adc_buf          : signal_array(0 to ADC_channel_count - 1);
+    signal dac_buf          : signal_array(0 to DAC_channel_count - 1);
 
     signal j2_40p           : std_logic_vector(3 to 36);
     signal j3_40p           : std_logic_vector(3 to 36);
@@ -557,7 +539,10 @@ architecture peripheral_wrapper of wrapper is
         );
     end component;
 begin
-    top : entity work.top port map(
+    top : entity work.top generic map(
+        ADC_channel_count => ADC_channel_count,
+        DAC_channel_count => DAC_channel_count
+    )port map(
         clk => sys_clk,
         rst => sys_rst,
         txd => uart_txd,
@@ -570,22 +555,17 @@ begin
         ss => spi_ss,
         io_tri => spi_io_tri,
 
-        adc_in_a => adc_a_data_buf,
-        adc_in_b => adc_b_data_buf,
-        adc_in_c => adc_c_data_buf,
-        adc_in_d => adc_d_data_buf,
+        adc_in => adc_buf,
 
-        dac_out_a => dac_a_data_buf,
-        dac_out_b => dac_b_data_buf,
-        dac_out_c => dac_c_data_buf,
-        dac_out_d => dac_d_data_buf
+        dac_out => dac_buf
     );
 
     -- Multiplexing SPI miso signals
     -- Using dac_spi_miso when spi_ss is selecting chips on the dac module
-    spi_miso <= dac_spi_miso when spi_ss(SPI_DAC1_ADDR) = '0' or spi_ss(SPI_DAC2_ADDR) = '0' or spi_ss(SPI_CLK1_ADDR) = '0' else
-                adc1_spi_miso when spi_ss(SPI_ADC1_ADDR) = '0' else
-                adc2_spi_miso when spi_ss(SPI_ADC2_ADDR) = '0' else
+    spi_miso <= spi_miso_buf(0) when and spi_ss(0 to 3) = '0' else
+                spi_miso_buf(1) when and spi_ss(4 to 7) = '0' else
+                spi_miso_buf(2) when and spi_ss(8 to 11) = '0' else
+                spi_miso_buf(3) when and spi_ss(12 to 15) = '0' else
                 '0';
 
     -- leds
@@ -596,15 +576,10 @@ begin
     panel_led_1 <= '1'; -- detects if the system is running
     panel_led_2 <= sys_rst; -- detects if the system is reset
 
-    -- FL9781 adapter
-    dac_a_b_spi_ss <= spi_ss(SPI_DAC1_ADDR);
-    dac_c_d_spi_ss <= spi_ss(SPI_DAC2_ADDR);
-    dac_clk_spi_ss <= spi_ss(SPI_CLK1_ADDR);
-
     -- AN9767 adapter
     AN9767_1 : entity work.AN9767_adapter(direct) port map(
-        dac_a_data => dac_a_data_buf,
-        dac_b_data => dac_b_data_buf,
+        dac_a_data => dac_buf(0),
+        dac_b_data => dac_buf(1),
 
         sys_clk => sys_clk,
         dac_clk_125M => sys_clk_125M,
@@ -614,9 +589,9 @@ begin
     );
 
     AN9767_2 : entity work.AN9767_adapter(direct) port map(
-        dac_a_data => dac_c_data_buf,
-        dac_b_data => dac_d_data_buf,
-        
+        dac_a_data => dac_buf(2),
+        dac_b_data => dac_buf(3),
+
         sys_clk => sys_clk,
         dac_clk_125M => sys_clk_125M,
         sys_rst => sys_rst,
@@ -624,23 +599,17 @@ begin
         j_40p => j3_40p
     );
 
-    -- FL9627 adapter
-    adc_a_b_spi_ss <= spi_ss(SPI_ADC1_ADDR);
-    adc_c_d_spi_ss <= spi_ss(SPI_ADC2_ADDR);
-
     -- ADAPTER INSTANTIATION GENERATION START
 
     FL9627 : entity work.FL9627_adapter port map(
-        adc_a_data => adc_a_data_buf,
-        adc_b_data => adc_b_data_buf,
-        adc_c_data => adc_c_data_buf,
-        adc_d_data => adc_d_data_buf,
-        adc_a_b_spi_ss => adc_a_b_spi_ss,
-        adc_c_d_spi_ss => adc_c_d_spi_ss,
+        adc_a_data => adc_buf(0),
+        adc_b_data => adc_buf(1),
+        adc_c_data => adc_buf(2),
+        adc_d_data => adc_buf(3),
+        adc_spi_ss => spi_ss(0 to 3),
         adc_spi_sck => spi_sclk,
         adc_spi_mosi => spi_mosi,
-        adc1_spi_miso => adc1_spi_miso,
-        adc2_spi_miso => adc2_spi_miso,
+        adc_spi_miso => spi_miso_buf(0),
         adc_spi_io_tri => spi_io_tri,
         sys_clk => sys_clk,
         adc_clk_125M => sys_clk_125M,
