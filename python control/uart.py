@@ -9,6 +9,10 @@ class MySerial(Serial):
     def post(self, message):
         self.write(message)
         response = self.read_until(b"!")
+        while True:
+            if response[-6] == 46 and response[-11] == 46:
+                break
+            response += self.read_until(b"!")
         print(response)
         response = self.read_until(b"!")
         print(response)
