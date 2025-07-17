@@ -27,8 +27,6 @@ end entity AN9767_adapter;
 architecture direct of AN9767_adapter is
     signal dac_a_data_buf   : std_logic_vector(13 downto 0);
     signal dac_b_data_buf   : std_logic_vector(13 downto 0);
-    signal dac_a_data_buf_1 : std_logic_vector(13 downto 0);
-    signal dac_b_data_buf_1 : std_logic_vector(13 downto 0);
     signal dac_a_wrt        : std_logic;
     signal dac_b_wrt        : std_logic;
 
