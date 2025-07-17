@@ -48,6 +48,6 @@ begin
         outputa         =>  outputa,
         outputb         =>  outputb,
         outputc         =>  outputc,
-        outputd         =>  open
+        outputd         =>  outputd
     );
 end architecture id_12;
