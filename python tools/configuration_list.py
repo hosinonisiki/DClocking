@@ -5,8 +5,8 @@ default_configuration = ChipConfiguration('default', 0)
 default_configuration.instantiation_head = ['-- Module unplugged']
 default_configuration.instantiation_tail = []
 default_configuration.port_signals = {}
-default_configuration.lpc_name = None # Decided runtime
-default_configuration.lpc_id = None # Decided runtime
+default_configuration.fmc_name = None # Decided runtime
+default_configuration.fmc_id = None # Decided runtime
 default_configuration.lpc_configuration = {
     'clk0': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'in', 'io_type_n': 'in', 'is_clock': False, 'is_clock_n': False },
     'clk1': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'in', 'io_type_n': 'in', 'is_clock': False, 'is_clock_n': False },
@@ -81,8 +81,8 @@ FL9781_configuration.port_signals = {
     'dac_eeprom_iic_scl_fmc' : 'std_logic', \
     'dac_eeprom_iic_sda_fmc' : 'std_logic'
 }
-FL9781_configuration.lpc_name = None # Decided runtime
-default_configuration.lpc_id = None # Decided runtime
+FL9781_configuration.fmc_name = None # Decided runtime
+default_configuration.fmc_id = None # Decided runtime
 FL9781_configuration.lpc_configuration = {
     'clk0': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'in', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
     'clk1': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
@@ -180,8 +180,8 @@ FL1010_configuration.port_signals = {
     'lpc240p_eeprom_iic_scl_fmc' : 'std_logic', \
     'lpc240p_eeprom_iic_sda_fmc' : 'std_logic'
 }
-FL1010_configuration.lpc_name = None # Decided runtime
-default_configuration.lpc_id = None # Decided runtime
+FL1010_configuration.fmc_name = None # Decided runtime
+default_configuration.fmc_id = None # Decided runtime
 FL1010_configuration.lpc_configuration = {
     'clk0': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
     'clk1': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
@@ -329,8 +329,8 @@ FL9627_configuration.port_signals = {
     'adc_eeprom_iic_scl_fmc' : 'std_logic', \
     'adc_eeprom_iic_sda_fmc' : 'std_logic'
 }
-FL9627_configuration.lpc_name = None # Decided runtime
-default_configuration.lpc_id = None # Decided runtime
+FL9627_configuration.fmc_name = None # Decided runtime
+default_configuration.fmc_id = None # Decided runtime
 FL9627_configuration.lpc_configuration = {
     'clk0': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
     'clk1': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
@@ -450,8 +450,8 @@ FL9613_configuration.port_signals = {
     'adc_eeprom_iic_scl_fmc' : 'std_logic', \
     'adc_eeprom_iic_sda_fmc' : 'std_logic'
 }
-FL9613_configuration.lpc_name = None # Decided runtime
-default_configuration.lpc_id = None # Decided runtime
+FL9613_configuration.fmc_name = None # Decided runtime
+default_configuration.fmc_id = None # Decided runtime
 FL9613_configuration.lpc_configuration = {
     'clk0': { 'is_differential': True, 'used_as_single_ended': False, 'io_type': 'out', 'is_clock': True },
     'clk1': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'in', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': True },
