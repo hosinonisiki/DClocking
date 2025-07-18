@@ -46,7 +46,8 @@ class ChipConfiguration:
         'adc_eeprom_iic_sda' : 'std_logic']
         '''
 
-        self.lpc_name = None
+        self.fmc_name = None
+        self.fmc_id = None
         self.lpc_configuration = None # Configuration of the LPC
         '''
         configuration format:
@@ -83,7 +84,8 @@ class ChipConfiguration:
         return self.instantiation_head is not None \
             and self.instantiation_tail is not None \
             and self.port_signals is not None \
-            and self.lpc_name is not None \
+            and self.fmc_name is not None \
+            and self.fmc_id is not None \
             and self.lpc_configuration is not None \
             and self.signal_mapping is not None
     
@@ -96,27 +98,30 @@ class ChipConfiguration:
             configuration = self.lpc_configuration[pin]
             if configuration['is_differential']:
                 if configuration['used_as_single_ended']:
-                    self.pin_declaration.append(f'{self.lpc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]} : {configuration["io_type"]} std_logic;' + '\n')
-                    self.pin_declaration.append(f'{self.lpc_name}_{pin}_n{self.iotype2suffix[configuration["io_type_n"]]} : {configuration["io_type_n"]} std_logic;' + '\n')
+                    self.pin_declaration.append(f'{self.fmc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]} : {configuration["io_type"]} std_logic;' + '\n')
+                    self.pin_declaration.append(f'{self.fmc_name}_{pin}_n{self.iotype2suffix[configuration["io_type_n"]]} : {configuration["io_type_n"]} std_logic;' + '\n')
                 else:
-                    self.pin_declaration.append(f'{self.lpc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]} : {configuration["io_type"]} std_logic;' + '\n')
-                    self.pin_declaration.append(f'{self.lpc_name}_{pin}_n{self.iotype2suffix[configuration["io_type"]]} : {configuration["io_type"]} std_logic;' + '\n')
+                    self.pin_declaration.append(f'{self.fmc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]} : {configuration["io_type"]} std_logic;' + '\n')
+                    self.pin_declaration.append(f'{self.fmc_name}_{pin}_n{self.iotype2suffix[configuration["io_type"]]} : {configuration["io_type"]} std_logic;' + '\n')
             else:
-                self.pin_declaration.append(f'{self.lpc_name}_{pin}{self.iotype2suffix[configuration["io_type"]]} : {configuration["io_type"]} std_logic;' + '\n')
+                self.pin_declaration.append(f'{self.fmc_name}_{pin}{self.iotype2suffix[configuration["io_type"]]} : {configuration["io_type"]} std_logic;' + '\n')
         # Generate signal declaration code
         # Note that signals associated with io buffers are generated in the later step
         self.signal_declaration = []
         for signal in self.port_signals:
-            self.signal_declaration.append(f'signal {signal}_buf : {self.port_signals[signal]};' + '\n')
+            self.signal_declaration.append(f'signal {self.fmc_name}_{signal}_buf : {self.port_signals[signal]};' + '\n')
         # Generate instantiation code
         self.instantiation_code = self.instantiation_head
         indent = ' ' * 4
         for i, signal in enumerate(self.port_signals):
             if i != len(self.port_signals) - 1:
-                self.instantiation_code.append(f'{indent}{signal} => {signal}_buf,' + '\n')
+                self.instantiation_code.append(f'{indent}{signal} => {self.fmc_name}_{signal}_buf,' + '\n')
             else:
-                self.instantiation_code.append(f'{indent}{signal} => {signal}_buf' + '\n')
+                self.instantiation_code.append(f'{indent}{signal} => {self.fmc_name}_{signal}_buf' + '\n')
         self.instantiation_code += self.instantiation_tail
+        # Replace "<SPI_SS_INDEX>" and "<SPI_MISO_BUF_INDEX>" with the actual index
+        self.instantiation_code = list(map(lambda x: x.replace('<SPI_SS_INDEX>', f'{self.fmc_id * 4 - 4} to {self.fmc_id * 4 - 1}'), self.instantiation_code))
+        self.instantiation_code = list(map(lambda x: x.replace('<SPI_MISO_BUF_INDEX>', f'{self.fmc_id - 1}'), self.instantiation_code))
         # Generate signal assignment code
         self.signal_assignment = []
         for mapping in self.signal_mapping:
@@ -131,11 +136,11 @@ class ChipConfiguration:
             elif suffix == '_n':
                 direction = configuration['io_type_n']
             index_suffix = f'({mapping["index"]})' if mapping["index"] is not None else ''
-            signal_name = f'{mapping["signal_name"]}_buf{index_suffix}'
+            signal_name = f'{self.fmc_name}_{mapping["signal_name"]}_buf{index_suffix}'
             if direction == 'out':
-                self.signal_assignment.append(f'{self.lpc_name}_{mapping["pin"]}{suffix} <= {signal_name};' + '\n')
+                self.signal_assignment.append(f'{self.fmc_name}_{mapping["pin"]}{suffix} <= {signal_name};' + '\n')
             else:
-                self.signal_assignment.append(f'{signal_name} <= {self.lpc_name}_{mapping["pin"]}{suffix};' + '\n')
+                self.signal_assignment.append(f'{signal_name} <= {self.fmc_name}_{mapping["pin"]}{suffix};' + '\n')
         # Generate io buffer code
         self.io_buffer = []
         self.signal_declaration.append('\n')
@@ -151,146 +156,146 @@ class ChipConfiguration:
                 if configuration['used_as_single_ended']:
                     if configuration['io_type'] == 'in':
                         if configuration['is_clock']:
-                            self.io_buffer.append(f'{self.lpc_name}_{pin}_p_ibuf : IBUFG port map(' + '\n')
-                            self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]},' + '\n')
-                            self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}_p_buf' + '\n')
+                            self.io_buffer.append(f'{self.fmc_name}_{pin}_p_ibuf : IBUFG port map(' + '\n')
+                            self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]},' + '\n')
+                            self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}_p_buf' + '\n')
                             self.io_buffer.append(');\n')
-                            self.io_buffer.append(f'{self.lpc_name}_{pin}_p_bufg : BUFG port map(' + '\n')
-                            self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_p_buf,' + '\n')
-                            self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}_p' + '\n')
+                            self.io_buffer.append(f'{self.fmc_name}_{pin}_p_bufg : BUFG port map(' + '\n')
+                            self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_p_buf,' + '\n')
+                            self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}_p' + '\n')
                             self.io_buffer.append(');\n')
-                            self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_p_buf : std_logic;' + '\n')
-                            self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_p : std_logic;' + '\n')
+                            self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_p_buf : std_logic;' + '\n')
+                            self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_p : std_logic;' + '\n')
                         else:
-                            self.io_buffer.append(f'{self.lpc_name}_{pin}_p_ibuf : IBUF port map(' + '\n')
-                            self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]},' + '\n')
-                            self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}_p' + '\n')
+                            self.io_buffer.append(f'{self.fmc_name}_{pin}_p_ibuf : IBUF port map(' + '\n')
+                            self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]},' + '\n')
+                            self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}_p' + '\n')
                             self.io_buffer.append(');\n')
-                            self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_p : std_logic;' + '\n')
+                            self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_p : std_logic;' + '\n')
                     elif configuration['io_type'] == 'out':
-                        self.io_buffer.append(f'{self.lpc_name}_{pin}_p_obuf : OBUF port map(' + '\n')
-                        self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_p,' + '\n')
-                        self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]}' + '\n')
+                        self.io_buffer.append(f'{self.fmc_name}_{pin}_p_obuf : OBUF port map(' + '\n')
+                        self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_p,' + '\n')
+                        self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]}' + '\n')
                         self.io_buffer.append(');\n')
-                        self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_p : std_logic;' + '\n')
+                        self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_p : std_logic;' + '\n')
                     elif configuration['io_type'] == 'inout':
-                        self.io_buffer.append(f'{self.lpc_name}_{pin}_p_iobuf : IOBUF port map(' + '\n')
-                        self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_po,' + '\n')
-                        self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}_pi,' + '\n')
-                        self.io_buffer.append(f'{indent}IO => {self.lpc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]},' + '\n')
-                        self.io_buffer.append(f'{indent}T => {self.lpc_name}_{pin}_pt' + '\n')
+                        self.io_buffer.append(f'{self.fmc_name}_{pin}_p_iobuf : IOBUF port map(' + '\n')
+                        self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_po,' + '\n')
+                        self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}_pi,' + '\n')
+                        self.io_buffer.append(f'{indent}IO => {self.fmc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]},' + '\n')
+                        self.io_buffer.append(f'{indent}T => {self.fmc_name}_{pin}_pt' + '\n')
                         self.io_buffer.append(');\n')
-                        self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_po : std_logic;' + '\n')
-                        self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_pi : std_logic;' + '\n')
-                        self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_pt : std_logic;' + '\n')
+                        self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_po : std_logic;' + '\n')
+                        self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_pi : std_logic;' + '\n')
+                        self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_pt : std_logic;' + '\n')
                     if configuration['io_type_n'] == 'in':
                         if configuration['is_clock_n']:
-                            self.io_buffer.append(f'{self.lpc_name}_{pin}_n_ibuf : IBUFG port map(' + '\n')
-                            self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_n{self.iotype2suffix[configuration["io_type_n"]]},' + '\n')
-                            self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}_n_buf' + '\n')
+                            self.io_buffer.append(f'{self.fmc_name}_{pin}_n_ibuf : IBUFG port map(' + '\n')
+                            self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_n{self.iotype2suffix[configuration["io_type_n"]]},' + '\n')
+                            self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}_n_buf' + '\n')
                             self.io_buffer.append(');\n')
-                            self.io_buffer.append(f'{self.lpc_name}_{pin}_n_bufg : BUFG port map(' + '\n')
-                            self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_n_buf,' + '\n')
-                            self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}_n' + '\n')
+                            self.io_buffer.append(f'{self.fmc_name}_{pin}_n_bufg : BUFG port map(' + '\n')
+                            self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_n_buf,' + '\n')
+                            self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}_n' + '\n')
                             self.io_buffer.append(');\n')
-                            self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_n_buf : std_logic;' + '\n')
-                            self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_n : std_logic;' + '\n')
+                            self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_n_buf : std_logic;' + '\n')
+                            self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_n : std_logic;' + '\n')
                         else:
-                            self.io_buffer.append(f'{self.lpc_name}_{pin}_n_ibuf : IBUF port map(' + '\n')
-                            self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_n{self.iotype2suffix[configuration["io_type_n"]]},' + '\n')
-                            self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}_n' + '\n')
+                            self.io_buffer.append(f'{self.fmc_name}_{pin}_n_ibuf : IBUF port map(' + '\n')
+                            self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_n{self.iotype2suffix[configuration["io_type_n"]]},' + '\n')
+                            self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}_n' + '\n')
                             self.io_buffer.append(');\n')
-                            self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_n : std_logic;' + '\n')
+                            self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_n : std_logic;' + '\n')
                     elif configuration['io_type_n'] == 'out':
-                        self.io_buffer.append(f'{self.lpc_name}_{pin}_n_obuf : OBUF port map(' + '\n')
-                        self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_n,' + '\n')
-                        self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}_n{self.iotype2suffix[configuration["io_type_n"]]}' + '\n')
+                        self.io_buffer.append(f'{self.fmc_name}_{pin}_n_obuf : OBUF port map(' + '\n')
+                        self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_n,' + '\n')
+                        self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}_n{self.iotype2suffix[configuration["io_type_n"]]}' + '\n')
                         self.io_buffer.append(');\n')
-                        self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_n : std_logic;' + '\n')
+                        self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_n : std_logic;' + '\n')
                     elif configuration['io_type_n'] == 'inout':
-                        self.io_buffer.append(f'{self.lpc_name}_{pin}_n_iobuf : IOBUF port map(' + '\n')
-                        self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_no,' + '\n')
-                        self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}_ni,' + '\n')
-                        self.io_buffer.append(f'{indent}IO => {self.lpc_name}_{pin}_n{self.iotype2suffix[configuration["io_type_n"]]},' + '\n')
-                        self.io_buffer.append(f'{indent}T => {self.lpc_name}_{pin}_nt' + '\n')
+                        self.io_buffer.append(f'{self.fmc_name}_{pin}_n_iobuf : IOBUF port map(' + '\n')
+                        self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_no,' + '\n')
+                        self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}_ni,' + '\n')
+                        self.io_buffer.append(f'{indent}IO => {self.fmc_name}_{pin}_n{self.iotype2suffix[configuration["io_type_n"]]},' + '\n')
+                        self.io_buffer.append(f'{indent}T => {self.fmc_name}_{pin}_nt' + '\n')
                         self.io_buffer.append(');\n')
-                        self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_no : std_logic;' + '\n')
-                        self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_ni : std_logic;' + '\n')
-                        self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_nt : std_logic;' + '\n')
+                        self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_no : std_logic;' + '\n')
+                        self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_ni : std_logic;' + '\n')
+                        self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_nt : std_logic;' + '\n')
                 elif not configuration['used_as_single_ended']: # Write the condition explicitly for clarity
                     if configuration['io_type'] == 'in':
                         if configuration['is_clock']:
-                            self.io_buffer.append(f'{self.lpc_name}_{pin}_ibufds : IBUFDS port map(' + '\n')
-                            self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]},' + '\n')
-                            self.io_buffer.append(f'{indent}IB => {self.lpc_name}_{pin}_n{self.iotype2suffix[configuration["io_type"]]},' + '\n')
-                            self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}_buf' + '\n')
+                            self.io_buffer.append(f'{self.fmc_name}_{pin}_ibufds : IBUFDS port map(' + '\n')
+                            self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]},' + '\n')
+                            self.io_buffer.append(f'{indent}IB => {self.fmc_name}_{pin}_n{self.iotype2suffix[configuration["io_type"]]},' + '\n')
+                            self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}_buf' + '\n')
                             self.io_buffer.append(');\n')
-                            self.io_buffer.append(f'{self.lpc_name}_{pin}_bufg : BUFG port map(' + '\n')
-                            self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_buf,' + '\n')
-                            self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}' + '\n')
+                            self.io_buffer.append(f'{self.fmc_name}_{pin}_bufg : BUFG port map(' + '\n')
+                            self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_buf,' + '\n')
+                            self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}' + '\n')
                             self.io_buffer.append(');\n')
-                            self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_buf : std_logic;' + '\n')
-                            self.signal_declaration.append(f'signal {self.lpc_name}_{pin} : std_logic;' + '\n')
+                            self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_buf : std_logic;' + '\n')
+                            self.signal_declaration.append(f'signal {self.fmc_name}_{pin} : std_logic;' + '\n')
                         else:
-                            self.io_buffer.append(f'{self.lpc_name}_{pin}_ibufds : IBUFDS port map(' + '\n')
-                            self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]},' + '\n')
-                            self.io_buffer.append(f'{indent}IB => {self.lpc_name}_{pin}_n{self.iotype2suffix[configuration["io_type"]]},' + '\n')
-                            self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}' + '\n')
+                            self.io_buffer.append(f'{self.fmc_name}_{pin}_ibufds : IBUFDS port map(' + '\n')
+                            self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]},' + '\n')
+                            self.io_buffer.append(f'{indent}IB => {self.fmc_name}_{pin}_n{self.iotype2suffix[configuration["io_type"]]},' + '\n')
+                            self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}' + '\n')
                             self.io_buffer.append(');\n')
-                            self.signal_declaration.append(f'signal {self.lpc_name}_{pin} : std_logic;' + '\n')
+                            self.signal_declaration.append(f'signal {self.fmc_name}_{pin} : std_logic;' + '\n')
                     elif configuration['io_type'] == 'out':
-                        self.io_buffer.append(f'{self.lpc_name}_{pin}_obufds : OBUFDS port map(' + '\n')
-                        self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin},' + '\n')
-                        self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]},' + '\n')
-                        self.io_buffer.append(f'{indent}OB => {self.lpc_name}_{pin}_n{self.iotype2suffix[configuration["io_type"]]}' + '\n')
+                        self.io_buffer.append(f'{self.fmc_name}_{pin}_obufds : OBUFDS port map(' + '\n')
+                        self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin},' + '\n')
+                        self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]},' + '\n')
+                        self.io_buffer.append(f'{indent}OB => {self.fmc_name}_{pin}_n{self.iotype2suffix[configuration["io_type"]]}' + '\n')
                         self.io_buffer.append(');\n')
-                        self.signal_declaration.append(f'signal {self.lpc_name}_{pin} : std_logic;' + '\n')
+                        self.signal_declaration.append(f'signal {self.fmc_name}_{pin} : std_logic;' + '\n')
                     elif configuration['io_type'] == 'inout':
-                        self.io_buffer.append(f'{self.lpc_name}_{pin}_iobufds : IOBUFDS port map(' + '\n')
-                        self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_o,' + '\n')
-                        self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}_i,' + '\n')
-                        self.io_buffer.append(f'{indent}IO => {self.lpc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]},' + '\n')
-                        self.io_buffer.append(f'{indent}T => {self.lpc_name}_{pin}_t,' + '\n')
-                        self.io_buffer.append(f'{indent}IOB => {self.lpc_name}_{pin}_n{self.iotype2suffix[configuration["io_type"]]}' + '\n')
+                        self.io_buffer.append(f'{self.fmc_name}_{pin}_iobufds : IOBUFDS port map(' + '\n')
+                        self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_o,' + '\n')
+                        self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}_i,' + '\n')
+                        self.io_buffer.append(f'{indent}IO => {self.fmc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]},' + '\n')
+                        self.io_buffer.append(f'{indent}T => {self.fmc_name}_{pin}_t,' + '\n')
+                        self.io_buffer.append(f'{indent}IOB => {self.fmc_name}_{pin}_n{self.iotype2suffix[configuration["io_type"]]}' + '\n')
                         self.io_buffer.append(');\n')
-                        self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_o : std_logic;' + '\n')
-                        self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_i : std_logic;' + '\n')
-                        self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_t : std_logic;' + '\n')
+                        self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_o : std_logic;' + '\n')
+                        self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_i : std_logic;' + '\n')
+                        self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_t : std_logic;' + '\n')
             elif not configuration['is_differential']: # Write the condition explicitly for clarity
                 if configuration['io_type'] == 'in':
                     if configuration['is_clock']:
-                        self.io_buffer.append(f'{self.lpc_name}_{pin}_ibuf : IBUF port map(' + '\n')
-                        self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}{self.iotype2suffix[configuration["io_type"]]},' + '\n')
-                        self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}_buf' + '\n')
+                        self.io_buffer.append(f'{self.fmc_name}_{pin}_ibuf : IBUF port map(' + '\n')
+                        self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}{self.iotype2suffix[configuration["io_type"]]},' + '\n')
+                        self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}_buf' + '\n')
                         self.io_buffer.append(');\n')
-                        self.io_buffer.append(f'{self.lpc_name}_{pin}_bufg : BUFG port map(' + '\n')
-                        self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_buf,' + '\n')
-                        self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}' + '\n')
+                        self.io_buffer.append(f'{self.fmc_name}_{pin}_bufg : BUFG port map(' + '\n')
+                        self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_buf,' + '\n')
+                        self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}' + '\n')
                         self.io_buffer.append(');\n')
-                        self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_buf : std_logic;' + '\n')
-                        self.signal_declaration.append(f'signal {self.lpc_name}_{pin} : std_logic;' + '\n')
+                        self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_buf : std_logic;' + '\n')
+                        self.signal_declaration.append(f'signal {self.fmc_name}_{pin} : std_logic;' + '\n')
                     else:
-                        self.io_buffer.append(f'{self.lpc_name}_{pin}_ibuf : IBUF port map(' + '\n')
-                        self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}{self.iotype2suffix[configuration["io_type"]]},' + '\n')
-                        self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}' + '\n')
+                        self.io_buffer.append(f'{self.fmc_name}_{pin}_ibuf : IBUF port map(' + '\n')
+                        self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}{self.iotype2suffix[configuration["io_type"]]},' + '\n')
+                        self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}' + '\n')
                         self.io_buffer.append(');\n')
-                        self.signal_declaration.append(f'signal {self.lpc_name}_{pin} : std_logic;' + '\n')
+                        self.signal_declaration.append(f'signal {self.fmc_name}_{pin} : std_logic;' + '\n')
                 elif configuration['io_type'] == 'out':
-                    self.io_buffer.append(f'{self.lpc_name}_{pin}_obuf : OBUF port map(' + '\n')
-                    self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin},' + '\n')
-                    self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}{self.iotype2suffix[configuration["io_type"]]}' + '\n')
+                    self.io_buffer.append(f'{self.fmc_name}_{pin}_obuf : OBUF port map(' + '\n')
+                    self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin},' + '\n')
+                    self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}{self.iotype2suffix[configuration["io_type"]]}' + '\n')
                     self.io_buffer.append(');\n')
-                    self.signal_declaration.append(f'signal {self.lpc_name}_{pin} : std_logic;' + '\n')
+                    self.signal_declaration.append(f'signal {self.fmc_name}_{pin} : std_logic;' + '\n')
                 elif configuration['io_type'] == 'inout':
-                    self.io_buffer.append(f'{self.lpc_name}_{pin}_iobuf : IOBUF port map(' + '\n')
-                    self.io_buffer.append(f'{indent}I => {self.lpc_name}_{pin}_o,' + '\n')
-                    self.io_buffer.append(f'{indent}O => {self.lpc_name}_{pin}_i,' + '\n')
-                    self.io_buffer.append(f'{indent}IO => {self.lpc_name}_{pin}{self.iotype2suffix[configuration["io_type"]]},' + '\n')
-                    self.io_buffer.append(f'{indent}T => {self.lpc_name}_{pin}_t' + '\n')
+                    self.io_buffer.append(f'{self.fmc_name}_{pin}_iobuf : IOBUF port map(' + '\n')
+                    self.io_buffer.append(f'{indent}I => {self.fmc_name}_{pin}_o,' + '\n')
+                    self.io_buffer.append(f'{indent}O => {self.fmc_name}_{pin}_i,' + '\n')
+                    self.io_buffer.append(f'{indent}IO => {self.fmc_name}_{pin}{self.iotype2suffix[configuration["io_type"]]},' + '\n')
+                    self.io_buffer.append(f'{indent}T => {self.fmc_name}_{pin}_t' + '\n')
                     self.io_buffer.append(');\n')
-                    self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_o : std_logic;' + '\n')
-                    self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_i : std_logic;' + '\n')
-                    self.signal_declaration.append(f'signal {self.lpc_name}_{pin}_t : std_logic;' + '\n')
+                    self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_o : std_logic;' + '\n')
+                    self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_i : std_logic;' + '\n')
+                    self.signal_declaration.append(f'signal {self.fmc_name}_{pin}_t : std_logic;' + '\n')
         self.make_ready = True
 
     def get_code(self, part_name, format = 'string'):
@@ -345,7 +350,8 @@ if __name__ == '__main__':
                             'adc_eeprom_iic_scl_fmc' : 'std_logic', \
                             'adc_eeprom_iic_sda_fmc' : 'std_logic'
                             }
-    config.lpc_name = 'fmc3_hpc'
+    config.fmc_name = 'fmc3_hpc'
+    config.fmc_id = 3
     config.lpc_configuration = {
         'clk0': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
         'clk1': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },

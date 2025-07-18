@@ -14,13 +14,11 @@ use work.mypak.all;
 
 entity FL9781_adapter is
     port(
-        dac_a_data      :   in  std_logic_vector(13 downto 0);
-        dac_b_data      :   in  std_logic_vector(13 downto 0);
-        dac_c_data      :   in  std_logic_vector(13 downto 0);
-        dac_d_data      :   in  std_logic_vector(13 downto 0);
-        dac_a_b_spi_ss  :   in  std_logic;
-        dac_c_d_spi_ss  :   in  std_logic;
-        dac_clk_spi_ss  :   in  std_logic;
+        dac_a_data      :   in  std_logic_vector(15 downto 0);
+        dac_b_data      :   in  std_logic_vector(15 downto 0);
+        dac_c_data      :   in  std_logic_vector(15 downto 0);
+        dac_d_data      :   in  std_logic_vector(15 downto 0);
+        dac_spi_ss      :   in  std_logic_vector(0 to 3);
         dac_spi_sck     :   in  std_logic;
         dac_spi_mosi    :   in  std_logic;
         dac_spi_miso    :   out std_logic;
@@ -103,7 +101,7 @@ begin
         wclk => sys_clk,
         rclk => dac_a_b_dco,
         rst => sys_rst_bar,
-        wdata_in => dac_a_data,
+        wdata_in => dac_a_data(15 downto 2),
         wen_in => not dac_a_data_fifo_wrst_busy,
         rdata_out => dac_a_b_data_h_buf,
         ren_in => dac_a_data_fifo_ren,
@@ -123,7 +121,7 @@ begin
         wclk => sys_clk,
         rclk => dac_a_b_dco,
         rst => sys_rst_bar,
-        wdata_in => dac_b_data,
+        wdata_in => dac_b_data(15 downto 2),
         wen_in => not dac_b_data_fifo_wrst_busy,
         rdata_out => dac_a_b_data_l_buf,
         ren_in => dac_b_data_fifo_ren,
@@ -154,7 +152,7 @@ begin
         wclk => sys_clk,
         rclk => dac_c_d_dco,
         rst => sys_rst_bar,
-        wdata_in => dac_c_data,
+        wdata_in => dac_c_data(15 downto 2),
         wen_in => not dac_c_data_fifo_wrst_busy,
         rdata_out => dac_c_d_data_h_buf,
         ren_in => dac_c_data_fifo_ren,
@@ -172,7 +170,7 @@ begin
         wclk => sys_clk,
         rclk => dac_c_d_dco,
         rst => sys_rst_bar,
-        wdata_in => dac_d_data,
+        wdata_in => dac_d_data(15 downto 2),
         wen_in => not dac_d_data_fifo_wrst_busy,
         rdata_out => dac_c_d_data_l_buf,
         ren_in => dac_d_data_fifo_ren,
@@ -244,9 +242,9 @@ begin
     dac_c_d_dci_fmc <= dac_c_d_dci;
     dac_a_b_dco <= dac_a_b_dco_fmc;
     dac_c_d_dco <= dac_c_d_dco_fmc;
-    dac_a_b_spi_ss_fmc <= dac_a_b_spi_ss;
-    dac_c_d_spi_ss_fmc <= dac_c_d_spi_ss;
-    dac_clk_spi_ss_fmc <= dac_clk_spi_ss;
+    dac_a_b_spi_ss_fmc <= dac_spi_ss(0);
+    dac_c_d_spi_ss_fmc <= dac_spi_ss(1);
+    dac_clk_spi_ss_fmc <= dac_spi_ss(2);
     dac_spi_sck_fmc <= dac_spi_sck;
     dac_spi_mosi_fmc <= dac_spi_mosi;
     dac_spi_miso <= dac_spi_miso_fmc;

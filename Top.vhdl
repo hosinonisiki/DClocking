@@ -32,6 +32,10 @@ use ieee.numeric_std.all;
 use work.mypak.all;
 
 entity top is
+    generic(
+        ADC_channel_count   : integer := 4; -- Number of ADC channels
+        DAC_channel_count   : integer := 4  -- Number of DAC channels
+    );
     port(
         clk         :   in  std_logic;
         rst         :   in  std_logic;
@@ -42,18 +46,12 @@ entity top is
         mosi        :   out std_logic;
         miso        :   in  std_logic;
         sclk        :   out std_logic;
-        ss          :   out std_logic_vector(15 downto 0);
+        ss          :   out std_logic_vector(0 to 15);
         io_tri      :   out std_logic;
 
-        adc_in_a    :   in  std_logic_vector(11 downto 0);
-        adc_in_b    :   in  std_logic_vector(11 downto 0);
-        adc_in_c    :   in  std_logic_vector(11 downto 0);
-        adc_in_d    :   in  std_logic_vector(11 downto 0);
+        adc_in      :   in  signal_array(0 to ADC_channel_count - 1); -- ADC input signals
 
-        dac_out_a   :   out std_logic_vector(13 downto 0);
-        dac_out_b   :   out std_logic_vector(13 downto 0);
-        dac_out_c   :   out std_logic_vector(13 downto 0);
-        dac_out_d   :   out std_logic_vector(13 downto 0)
+        dac_out     :   out signal_array(0 to DAC_channel_count - 1) -- DAC output signals
     );
     attribute dont_touch : string;
     attribute dont_touch of top : entity is "true";
@@ -76,22 +74,19 @@ architecture structural of top is
     signal rsp_data     :   std_logic_vector(rdbus_w - 1 downto 0) := (others => '0'); -- response data from sub modules
     signal rsp_stat     :   std_logic_vector(rsbus_w - 1 downto 0) := (others => '0'); -- response status from sub modules
 
-    signal adc_a        :   std_logic_vector(11 downto 0) := "000000000000";
-    signal adc_b        :   std_logic_vector(11 downto 0) := "000000000000";
-    signal adc_c        :   std_logic_vector(11 downto 0) := "000000000000";
-    signal adc_d        :   std_logic_vector(11 downto 0) := "000000000000";
+    signal adc          :   signal_array(0 to ADC_channel_count - 1) := (others => (others => '0')); -- ADC input signals
 
-    signal dac_a        :   std_logic_vector(13 downto 0) := "00000000000000";
-    signal dac_b        :   std_logic_vector(13 downto 0) := "00000000000000";
-    signal dac_c        :   std_logic_vector(13 downto 0) := "00000000000000";
-    signal dac_d        :   std_logic_vector(13 downto 0) := "00000000000000";
+    signal dac          :   signal_array(0 to DAC_channel_count - 1) := (others => (others => '0')); -- DAC output signals
 
     signal sig_bank_in      :   signal_array(63 downto 0) := (others => (others => '0'));
     signal sig_bank_out     :   signal_array(63 downto 0) := (others => (others => '0'));
     signal ctrl_bank_in     :   std_logic_vector(63 downto 0) := (others => '0');
     signal ctrl_bank_out    :   std_logic_vector(63 downto 0) := (others => '0');
 begin
-
+    assert ADC_channel_count <= 8 and DAC_channel_count <= 8
+        report "ADC and DAC channel count must be less than or equal to 8"
+        severity failure;
+        
     -- The main control module handles all ios and communication with the modules.
     main_control : entity work.main_control port map(
         clk             =>  clk,
@@ -262,32 +257,25 @@ begin
     end block module_6_block;
 
     -- signal banks provided by the router
+    -- Last 8 channels reserved for top adc and dac ports
     
-    sig_bank_in(6) <= adc_a & x"0";
-    sig_bank_in(7) <= adc_b & x"0";
-    sig_bank_in(8) <= adc_c & x"0";
-    sig_bank_in(9) <= adc_d & x"0";
-    
-    dac_a <= sig_bank_out(0)(15 downto 2);
-    dac_b <= sig_bank_out(1)(15 downto 2);
-    dac_c <= sig_bank_out(2)(15 downto 2);
-    dac_d <= sig_bank_out(3)(15 downto 2);
+    adc_gen : for i in 0 to ADC_channel_count - 1 generate
+        sig_bank_in(i + 56) <= adc(i);
+    end generate;
+
+    dac_gen : for i in 0 to DAC_channel_count - 1 generate
+        dac(i) <= sig_bank_out(i + 56);
+    end generate;
 
     -- analog front
-    -- pipeline only the output but not the input
+    -- stage only the output
     process(clk)
     begin
         if rising_edge(clk) then
-            dac_out_a <= dac_a;
-            dac_out_b <= dac_b;
-            dac_out_c <= dac_c;
-            dac_out_d <= dac_d;
+            dac_out <= dac;
         end if;
     end process;
 
-    adc_a <= adc_in_a;
-    adc_b <= adc_in_b;
-    adc_c <= adc_in_c;
-    adc_d <= adc_in_d;
+    adc <= adc_in;
     
 end architecture structural;

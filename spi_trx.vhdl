@@ -17,7 +17,7 @@ entity spi_trx is
         rst         :   in  std_logic; -- Reset
         spi_en_in   :   in  std_logic; -- SPI enable. Transmission initiated with a high pulse
         ss_in       :   in  std_logic_vector(3 downto 0); -- Slave select input encoded in binary
-        ss_out      :   out std_logic_vector(15 downto 0); -- Slave select output encoded as one-hot
+        ss_out      :   out std_logic_vector(0 to 15); -- Slave select output encoded as one-hot
         mosi        :   out std_logic; -- Master out slave in
         miso        :   in  std_logic; -- Master in slave out
         sclk_out    :   out std_logic; -- SPI clock
