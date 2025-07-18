@@ -14,36 +14,30 @@ use work.mypak.all;
 
 entity FL9613_adapter is
     port(
-        adc_a_data      :   out std_logic_vector(11 downto 0);
-        adc_b_data      :   out std_logic_vector(11 downto 0);
-        adc_c_data      :   out std_logic_vector(11 downto 0);
-        adc_d_data      :   out std_logic_vector(11 downto 0);
-        adc_a_b_spi_ss  :   in  std_logic;
-        adc_c_d_spi_ss  :   in  std_logic;
-        adc_clk_spi_ss  :   in  std_logic;
+        adc_a_data      :   out std_logic_vector(15 downto 0);
+        adc_b_data      :   out std_logic_vector(15 downto 0);
+        adc_c_data      :   out std_logic_vector(15 downto 0);
+        adc_d_data      :   out std_logic_vector(15 downto 0);
+        adc_spi_ss      :   in  std_logic_vector(0 to 3);
         adc_spi_sck     :   in  std_logic;
         adc_spi_mosi    :   in  std_logic;
-        adc1_spi_miso   :   out std_logic;
-        adc2_spi_miso   :   out std_logic;
-        adc_clk_spi_miso:   out std_logic;
+        adc_spi_miso    :   out  std_logic;
         adc_spi_io_tri  :   in  std_logic;
         sys_clk         :   in  std_logic;
-        adc_clk_250M    :   out std_logic;
+        adc_clk_250M    :   in std_logic;
         sys_rst         :   in  std_logic;
 
         adc_a_b_data_fmc : in std_logic_vector(11 downto 0);
         adc_c_d_data_fmc : in std_logic_vector(11 downto 0);
         adc_a_b_dco_fmc : in std_logic;
         adc_c_d_dco_fmc : in std_logic;
-        adc_a_b_or_fmc : in std_logic;
-        adc_c_d_or_fmc : in std_logic;
         adc_a_b_spi_ss_fmc : out std_logic;
         adc_c_d_spi_ss_fmc : out std_logic;
         adc_clk_spi_ss_fmc : out std_logic;
         adc_spi_sck_fmc : out std_logic;
         adc_spi_mosi_fmc : out std_logic;
-        adc1_spi_miso_fmc : in std_logic;
-        adc2_spi_miso_fmc : in std_logic;
+        adc_a_b_spi_miso_fmc : in std_logic;
+        adc_c_d_spi_miso_fmc : in std_logic;
         adc_clk_spi_miso_fmc : in std_logic;
         adc_spi_io_tri_fmc : out std_logic;
         adc_clk_250M_fmc : out std_logic;
@@ -176,10 +170,10 @@ begin
             adc_a_data_fifo_ren_1 <= adc_a_data_fifo_ren;
             adc_b_data_fifo_ren_1 <= adc_b_data_fifo_ren;
             if adc_a_data_fifo_ren_1 = '1' then
-                adc_a_data <= adc_a_data_buf;
+                adc_a_data <= adc_a_data_buf & x"0";
             end if;
             if adc_b_data_fifo_ren_1 = '1' then
-                adc_b_data <= adc_b_data_buf;
+                adc_b_data <= adc_b_data_buf & x"0";
             end if;
         end if;
     end process;
@@ -227,10 +221,10 @@ begin
             adc_c_data_fifo_ren_1 <= adc_c_data_fifo_ren;
             adc_d_data_fifo_ren_1 <= adc_d_data_fifo_ren;
             if adc_c_data_fifo_ren_1 = '1' then
-                adc_c_data <= adc_c_data_buf;
+                adc_c_data <= adc_c_data_buf & x"0";
             end if;
             if adc_d_data_fifo_ren_1 = '1' then
-                adc_d_data <= adc_d_data_buf;
+                adc_d_data <= adc_d_data_buf & x"0";
             end if;
         end if;
     end process;
@@ -264,14 +258,15 @@ begin
     adc_c_d_data <= adc_c_d_data_fmc;
     adc_a_b_dco <= adc_a_b_dco_fmc;
     adc_c_d_dco <= adc_c_d_dco_fmc;
-    adc_a_b_spi_ss_fmc <= adc_a_b_spi_ss;
-    adc_c_d_spi_ss_fmc <= adc_c_d_spi_ss;
-    adc_clk_spi_ss_fmc <= adc_clk_spi_ss;
+    adc_a_b_spi_ss_fmc <= adc_spi_ss(0);
+    adc_c_d_spi_ss_fmc <= adc_spi_ss(1);
+    adc_clk_spi_ss_fmc <= adc_spi_ss(2);
     adc_spi_sck_fmc <= adc_spi_sck;
     adc_spi_mosi_fmc <= adc_spi_mosi;
-    adc1_spi_miso <= adc1_spi_miso_fmc;
-    adc2_spi_miso <= adc2_spi_miso_fmc;
-    adc_clk_spi_miso <= adc_clk_spi_miso_fmc;
+    adc_spi_miso <= adc_a_b_spi_miso_fmc when adc_spi_ss(0) = '0' else
+                    adc_c_d_spi_miso_fmc when adc_spi_ss(1) = '0' else
+                    adc_clk_spi_miso_fmc when adc_spi_ss(2) = '0' else
+                    '0';
     adc_spi_io_tri_fmc <= adc_spi_io_tri;
     adc_clk_250M_fmc <= adc_clk_250M;
     adc_eeprom_iic_scl_fmc <= adc_eeprom_iic_scl;

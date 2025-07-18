@@ -22,7 +22,7 @@ class MySerial(Serial):
 
    
 if __name__ == "__main__":
-    ser = MySerial("COM3", baudrate = 57600, parity = "E", timeout = 0.5)
+    ser = MySerial("COM3", baudrate = 19200, parity = "E", timeout = 0.5)
 
     # refresh
     print("refreshing bus modules")

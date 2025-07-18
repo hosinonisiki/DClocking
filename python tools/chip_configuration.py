@@ -47,6 +47,7 @@ class ChipConfiguration:
         '''
 
         self.lpc_name = None
+        self.lpc_id = None
         self.lpc_configuration = None # Configuration of the LPC
         '''
         configuration format:
@@ -84,6 +85,7 @@ class ChipConfiguration:
             and self.instantiation_tail is not None \
             and self.port_signals is not None \
             and self.lpc_name is not None \
+            and self.lpc_id is not None \
             and self.lpc_configuration is not None \
             and self.signal_mapping is not None
     
@@ -107,16 +109,19 @@ class ChipConfiguration:
         # Note that signals associated with io buffers are generated in the later step
         self.signal_declaration = []
         for signal in self.port_signals:
-            self.signal_declaration.append(f'signal {signal}_buf : {self.port_signals[signal]};' + '\n')
+            self.signal_declaration.append(f'signal {self.lpc_name}_{signal}_buf : {self.port_signals[signal]};' + '\n')
         # Generate instantiation code
         self.instantiation_code = self.instantiation_head
         indent = ' ' * 4
         for i, signal in enumerate(self.port_signals):
             if i != len(self.port_signals) - 1:
-                self.instantiation_code.append(f'{indent}{signal} => {signal}_buf,' + '\n')
+                self.instantiation_code.append(f'{indent}{signal} => {self.lpc_name}_{signal}_buf,' + '\n')
             else:
-                self.instantiation_code.append(f'{indent}{signal} => {signal}_buf' + '\n')
+                self.instantiation_code.append(f'{indent}{signal} => {self.lpc_name}_{signal}_buf' + '\n')
         self.instantiation_code += self.instantiation_tail
+        # Replace "<SPI_SS_INDEX>" and "<SPI_MISO_BUF_INDEX>" with the actual index
+        self.instantiation_code = list(map(lambda x: x.replace('<SPI_SS_INDEX>', f'{self.lpc_id * 4 - 4} to {self.lpc_id * 4 - 1}'), self.instantiation_code))
+        self.instantiation_code = list(map(lambda x: x.replace('<SPI_MISO_BUF_INDEX>', f'{self.lpc_id - 1}'), self.instantiation_code))
         # Generate signal assignment code
         self.signal_assignment = []
         for mapping in self.signal_mapping:
@@ -131,7 +136,7 @@ class ChipConfiguration:
             elif suffix == '_n':
                 direction = configuration['io_type_n']
             index_suffix = f'({mapping["index"]})' if mapping["index"] is not None else ''
-            signal_name = f'{mapping["signal_name"]}_buf{index_suffix}'
+            signal_name = f'{self.lpc_name}_{mapping["signal_name"]}_buf{index_suffix}'
             if direction == 'out':
                 self.signal_assignment.append(f'{self.lpc_name}_{mapping["pin"]}{suffix} <= {signal_name};' + '\n')
             else:
@@ -346,6 +351,7 @@ if __name__ == '__main__':
                             'adc_eeprom_iic_sda_fmc' : 'std_logic'
                             }
     config.lpc_name = 'fmc3_hpc'
+    config.lpc_id = 3
     config.lpc_configuration = {
         'clk0': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
         'clk1': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },

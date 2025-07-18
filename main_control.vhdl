@@ -20,7 +20,7 @@ entity main_control is
         mosi_out        :   out std_logic;
         miso_in         :   in  std_logic;
         sclk_out        :   out std_logic;
-        ss_out          :   out std_logic_vector(15 downto 0);
+        ss_out          :   out std_logic_vector(0 to 15);
         io_tri_out      :   out std_logic;
         dbus_out        :   out std_logic_vector(dbus_w - 1 downto 0);
         abus_out        :   out std_logic_vector(abus_w - 1 downto 0);
