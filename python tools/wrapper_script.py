@@ -1,9 +1,11 @@
 from configuration_list import *
 
-configurations = [FL9627_configuration, FL1010_configuration, default_configuration]
-lpc_name = ["fmc1_lpc", "fmc2_lpc", "fmc3_hpc"]
+configurations = [FL9627_configuration, FL1010_configuration, FL9613_configuration]
+fmc_name = ["fmc1_lpc", "fmc2_lpc", "fmc3_hpc"]
+fmc_id = [1, 2, 3]
 for i in range(3):
-    configurations[i].lpc_name = lpc_name[i]
+    configurations[i].fmc_name = fmc_name[i]
+    configurations[i].fmc_id = fmc_id[i]
     configurations[i].make()
 
 filename = "wrapper.vhdl"

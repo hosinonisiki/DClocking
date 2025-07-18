@@ -26,11 +26,22 @@ package uart_protocol is
     -- :ERR_!
 
     constant u_SPACE_SPI    : std_logic_vector(31 downto 0) := x"5350495f"; -- ASCII 'SPI_'
-        constant u_DEVICE_DAC1  : std_logic_vector(31 downto 0) := x"44414331"; -- ASCII 'DAC1'
-        constant u_DEVICE_DAC2  : std_logic_vector(31 downto 0) := x"44414332"; -- ASCII 'DAC2'
-        constant u_DEVICE_CLK1  : std_logic_vector(31 downto 0) := x"434c4b31"; -- ASCII 'CLK1'
-        constant u_DEVICE_ADC1  : std_logic_vector(31 downto 0) := x"41444331"; -- ASCII 'ADC1'
-        constant u_DEVICE_ADC2  : std_logic_vector(31 downto 0) := x"41444332"; -- ASCII 'ADC2'
+        constant u_DEVICE_P1C1 : std_logic_vector(31 downto 0) := x"50314331"; -- ASCII 'P1C1', FMC Port 1 Chip 1, same for below
+        constant u_DEVICE_P1C2 : std_logic_vector(31 downto 0) := x"50314332"; -- ASCII 'P1C2'
+        constant u_DEVICE_P1C3 : std_logic_vector(31 downto 0) := x"50314333"; -- ASCII 'P1C3'
+        constant u_DEVICE_P1C4 : std_logic_vector(31 downto 0) := x"50314334"; -- ASCII 'P1C4'
+        constant u_DEVICE_P2C1 : std_logic_vector(31 downto 0) := x"50324331"; -- ASCII 'P2C1'
+        constant u_DEVICE_P2C2 : std_logic_vector(31 downto 0) := x"50324332"; -- ASCII 'P2C2'
+        constant u_DEVICE_P2C3 : std_logic_vector(31 downto 0) := x"50324333"; -- ASCII 'P2C3'
+        constant u_DEVICE_P2C4 : std_logic_vector(31 downto 0) := x"50324334"; -- ASCII 'P2C4'
+        constant u_DEVICE_P3C1 : std_logic_vector(31 downto 0) := x"50334331"; -- ASCII 'P3C1'
+        constant u_DEVICE_P3C2 : std_logic_vector(31 downto 0) := x"50334332"; -- ASCII 'P3C2'
+        constant u_DEVICE_P3C3 : std_logic_vector(31 downto 0) := x"50334333"; -- ASCII 'P3C3'
+        constant u_DEVICE_P3C4 : std_logic_vector(31 downto 0) := x"50334334"; -- ASCII 'P3C4'
+        constant u_DEVICE_P4C1 : std_logic_vector(31 downto 0) := x"50344331"; -- ASCII 'P4C1'
+        constant u_DEVICE_P4C2 : std_logic_vector(31 downto 0) := x"50344332"; -- ASCII 'P4C2'
+        constant u_DEVICE_P4C3 : std_logic_vector(31 downto 0) := x"50344333"; -- ASCII 'P4C3'
+        constant u_DEVICE_P4C4 : std_logic_vector(31 downto 0) := x"50344334"; -- ASCII 'P4C4'
 
     constant u_SPACE_BUS    : std_logic_vector(31 downto 0) := x"4255535f"; -- ASCII 'BUS_'
         constant u_DEVICE_ROUT  : std_logic_vector(31 downto 0) := x"524f5554"; -- ASCII 'ROUT'
