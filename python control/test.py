@@ -30,6 +30,7 @@ if VERBOSE:
     acc.write(0, "00000000")
 
     # FL9781 initial settings
+    '''
     print("writing configuration for P1C3")
     spi.write("P1C3", 3, 3, "00003C")
     spi.write("P1C3", 3, 3, "000018")
@@ -82,18 +83,92 @@ if VERBOSE:
     spi.write("P1C1", 2, 2, "1100")
     spi.write("P1C1", 2, 2, "1200")
 
-    print("writing configuration for P2C2")
-    spi.write("P2C2", 2, 2, "0200")
-    spi.write("P2C2", 2, 2, "0459")
-    spi.write("P2C2", 2, 2, "0506")
-    spi.write("P2C2", 2, 2, "0B00")
-    spi.write("P2C2", 2, 2, "0C02")
-    spi.write("P2C2", 2, 2, "0D00")
-    spi.write("P2C2", 2, 2, "0E02")
-    spi.write("P2C2", 2, 2, "0F00")
-    spi.write("P2C2", 2, 2, "1002")
-    spi.write("P2C2", 2, 2, "1100")
-    spi.write("P2C2", 2, 2, "1200")
+    print("writing configuration for P1C2")
+    spi.write("P1C2", 2, 2, "0200")
+    spi.write("P1C2", 2, 2, "0459")
+    spi.write("P1C2", 2, 2, "0506")
+    spi.write("P1C2", 2, 2, "0B00")
+    spi.write("P1C2", 2, 2, "0C02")
+    spi.write("P1C2", 2, 2, "0D00")
+    spi.write("P1C2", 2, 2, "0E02")
+    spi.write("P1C2", 2, 2, "0F00")
+    spi.write("P1C2", 2, 2, "1002")
+    spi.write("P1C2", 2, 2, "1100")
+    spi.write("P1C2", 2, 2, "1200")
+    '''
+
+    #FL9627 initial settings
+    print("writing configuration for P1C1")
+    spi.write("P1C1", 3, 3, "00003C") # Soft Reset
+    spi.write("P1C1", 3, 3, "000018") # Set
+    spi.write("P3C1", 3, 3, "000503") # Channel Select
+    spi.write("P1C1", 3, 3, "001441") # Output Mode
+    # spi.write("P1C1", 3, 3, "001701") # Output Delay
+    spi.write("P1C1", 3, 3, "00FF01") # Transfer
+
+    print("writing configuration for P1C2")
+    spi.write("P1C2", 3, 3, "00003C") # Soft Reset
+    spi.write("P1C2", 3, 3, "000018") # Set
+    spi.write("P3C1", 3, 3, "000503") # Channel Select
+    spi.write("P1C2", 3, 3, "001441") # Output Mode
+    # spi.write("P1C2", 3, 3, "001701") # Output Delay
+    spi.write("P1C2", 3, 3, "00FF01") # Transfer
+
+    #FL9613 initial settings
+    print("writing configuration for P3C1")
+    spi.write("P3C1", 3, 3, "00003C") # Soft Reset
+    spi.write("P3C1", 3, 3, "000018") # Set
+    spi.write("P3C1", 3, 3, "000503") # Channel Select
+    spi.write("P3C1", 3, 3, "001405") # Output Mode
+    # spi.write("P3C1", 3, 3, "001781") # Output Delay
+    spi.write("P3C1", 3, 3, "00FF01") # Transfer
+
+    print("writing configuration for P3C2")
+    spi.write("P3C2", 3, 3, "00003C") # Soft Reset
+    spi.write("P3C2", 3, 3, "000018") # Set
+    spi.write("P3C2", 3, 3, "000503") # Channel Select
+    spi.write("P3C2", 3, 3, "001405") # Output Mode
+    # spi.write("P3C2", 3, 3, "001781") # Output Delay
+    spi.write("P3C2", 3, 3, "00FF01") # Transfer
+
+    print("writing configuration for P3C3")
+    spi.write("P3C3", 3, 3, "00003C") # Soft Reset
+    spi.write("P3C3", 3, 3, "000018") # Set
+    spi.write("P3C3", 3, 3, "000400") # Read Back Active Register
+    spi.write("P3C3", 3, 3, "00107C") # PLL power-down deassert
+    spi.write("P3C3", 3, 3, "001101") # PLL R divider LSB
+    spi.write("P3C3", 3, 3, "001200") # PLL R divider MSB
+    spi.write("P3C3", 3, 3, "001300") # PLL A counter
+    spi.write("P3C3", 3, 3, "00140A") # PLL B divider LSB
+    spi.write("P3C3", 3, 3, "001500") # PLL B divider MSB
+    spi.write("P3C3", 3, 3, "001604") # PLL control 1
+    spi.write("P3C3", 3, 3, "0017B4") # PLL control 2
+    spi.write("P3C3", 3, 3, "001806") # PLL control 3
+    spi.write("P3C3", 3, 3, "001900") # PLL control 4
+    spi.write("P3C3", 3, 3, "001A00") # PLL control 5
+    spi.write("P3C3", 3, 3, "001B00") # PLL control 6
+    spi.write("P3C3", 3, 3, "001C02") # PLL control 7
+    spi.write("P3C3", 3, 3, "001D00") # PLL control 8
+    spi.write("P3C3", 3, 3, "023201") # Update all registers
+    spi.write("P3C3", 3, 3, "00F008") # LVPECL output 0
+    spi.write("P3C3", 3, 3, "00F108") # LVPECL output 1
+    spi.write("P3C3", 3, 3, "00F208") # LVPECL output 2
+    spi.write("P3C3", 3, 3, "00F30A") # LVPECL output 3
+    spi.write("P3C3", 3, 3, "00F408") # LVPECL output 4
+    spi.write("P3C3", 3, 3, "00F50A") # LVPECL output 5
+    spi.write("P3C3", 3, 3, "019011") # Divider 0
+    spi.write("P3C3", 3, 3, "019100") # Divider 0
+    spi.write("P3C3", 3, 3, "019200") # Divider 0
+    spi.write("P3C3", 3, 3, "019311") # Divider 1
+    spi.write("P3C3", 3, 3, "019400") # Divider 1
+    spi.write("P3C3", 3, 3, "019500") # Divider 1
+    spi.write("P3C3", 3, 3, "019611") # Divider 2
+    spi.write("P3C3", 3, 3, "019700") # Divider 2
+    spi.write("P3C3", 3, 3, "019800") # Divider 2
+    spi.write("P3C3", 3, 3, "01E000") # VCO devider
+    spi.write("P3C3", 3, 3, "01E102") # Input clock select
+    spi.write("P3C3", 3, 3, "001807") # VCO cal now
+    spi.write("P3C3", 3, 3, "023201") # Update all registers
 
     router.set_routing(OUTPUT_C, SCALER_OUT)
     router.set_routing(SCALER_IN, PID_OUT)
