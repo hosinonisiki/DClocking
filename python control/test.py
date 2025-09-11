@@ -18,11 +18,11 @@ pid = module.ModulePID(bus, "PIDC")
 spi = spi.Spi(ser)
 
 def recal():
-    spi.write("CLK2", 3, 3, "001806")
-    spi.write("CLK2", 3, 3, "023201")
-    spi.write("CLK2", 3, 3, "001807")
-    spi.write("CLK2", 3, 3, "023201")
-    spi.write("CLK2", 3, 2, "801F") # Check if PLL caled
+    spi.write("P3C3", 3, 3, "001806")
+    spi.write("P3C3", 3, 3, "023201")
+    spi.write("P3C3", 3, 3, "001807")
+    spi.write("P3C3", 3, 3, "023201")
+    spi.write("P3C3", 3, 2, "801F") # Check if PLL caled
 
 VERBOSE = True
 if VERBOSE:
@@ -107,42 +107,25 @@ if VERBOSE:
 
     #FL9627 initial settings
     print("writing configuration for P1C1")
-    spi.write("P1C1", 3, 3, "00003C") # Soft Reset
-    spi.write("P1C1", 3, 3, "000018") # Set
-    spi.write("P3C1", 3, 3, "000503") # Channel Select
+    #spi.write("P1C1", 3, 3, "00003C") # Soft Reset
+    #spi.write("P1C1", 3, 3, "000018") # Set
+    #spi.write("P3C1", 3, 3, "000503") # Channel Select
     spi.write("P1C1", 3, 3, "001441") # Output Mode
-    # spi.write("P1C1", 3, 3, "001701") # Output Delay
+    spi.write("P1C1", 3, 3, "001701") # Output Delay
     spi.write("P1C1", 3, 3, "00FF01") # Transfer
 
     print("writing configuration for P1C2")
-    spi.write("P1C2", 3, 3, "00003C") # Soft Reset
-    spi.write("P1C2", 3, 3, "000018") # Set
-    spi.write("P3C1", 3, 3, "000503") # Channel Select
+    #spi.write("P1C2", 3, 3, "00003C") # Soft Reset
+    #spi.write("P1C2", 3, 3, "000018") # Set
+    #spi.write("P3C1", 3, 3, "000503") # Channel Select
     spi.write("P1C2", 3, 3, "001441") # Output Mode
-    # spi.write("P1C2", 3, 3, "001701") # Output Delay
+    spi.write("P1C2", 3, 3, "001701") # Output Delay
     spi.write("P1C2", 3, 3, "00FF01") # Transfer
-
-    #FL9613 initial settings
-    print("writing configuration for P3C1")
-    spi.write("P3C1", 3, 3, "00003C") # Soft Reset
-    spi.write("P3C1", 3, 3, "000018") # Set
-    spi.write("P3C1", 3, 3, "000503") # Channel Select
-    spi.write("P3C1", 3, 3, "001405") # Output Mode
-    # spi.write("P3C1", 3, 3, "001781") # Output Delay
-    spi.write("P3C1", 3, 3, "00FF01") # Transfer
-
-    print("writing configuration for P3C2")
-    spi.write("P3C2", 3, 3, "00003C") # Soft Reset
-    spi.write("P3C2", 3, 3, "000018") # Set
-    spi.write("P3C2", 3, 3, "000503") # Channel Select
-    spi.write("P3C2", 3, 3, "001405") # Output Mode
-    # spi.write("P3C2", 3, 3, "001781") # Output Delay
-    spi.write("P3C2", 3, 3, "00FF01") # Transfer
 
     print("writing configuration for P3C3")
     spi.write("P3C3", 3, 3, "00003C") # Soft Reset
     spi.write("P3C3", 3, 3, "000018") # Set
-    spi.write("P3C3", 3, 3, "000400") # Read Back Active Register
+    spi.write("P3C3", 3, 3, "000401") # Read Back Active Register
     spi.write("P3C3", 3, 3, "00107C") # PLL power-down deassert
     spi.write("P3C3", 3, 3, "001101") # PLL R divider LSB
     spi.write("P3C3", 3, 3, "001200") # PLL R divider MSB
@@ -177,6 +160,39 @@ if VERBOSE:
     spi.write("P3C3", 3, 3, "01E102") # Input clock select
     spi.write("P3C3", 3, 3, "001807") # VCO cal now
     spi.write("P3C3", 3, 3, "023201") # Update all registers
+
+    #FL9613 initial settings
+    print("writing configuration for P3C1")
+    #spi.write("P3C1", 3, 3, "00003C") # Soft Reset
+    #spi.write("P3C1", 3, 3, "000018") # Set
+    spi.write("P3C1", 3, 3, "000503") # Enable
+    spi.write("P3C1", 3, 3, "000800") # Power mode
+    spi.write("P3C1", 3, 3, "000901") # Global clock
+    spi.write("P3C1", 3, 3, "000B00") # Clock divide
+    spi.write("P3C1", 3, 3, "000D00") # Test mode control
+    spi.write("P3C1", 3, 3, "001000") # Offset adjust
+    spi.write("P3C1", 3, 3, "001405") # Output Mode
+    spi.write("P3C1", 3, 3, "001501") # Output adjust
+    spi.write("P3C1", 3, 3, "001600") # Clock phase control
+    spi.write("P3C1", 3, 3, "001789") # DCO clock delay
+    spi.write("P3C1", 3, 3, "001800") # Input span select
+    spi.write("P3C1", 3, 3, "00FF01") # Transfer
+
+    print("writing configuration for P3C2")
+    #spi.write("P3C2", 3, 3, "00003C") # Soft Reset
+    #spi.write("P3C2", 3, 3, "000018") # Set
+    spi.write("P3C2", 3, 3, "000503") # Enable
+    spi.write("P3C2", 3, 3, "000800") # Power mode
+    spi.write("P3C2", 3, 3, "000901") # Global clock
+    spi.write("P3C2", 3, 3, "000B00") # Clock divide
+    spi.write("P3C2", 3, 3, "000D00") # Test mode control
+    spi.write("P3C2", 3, 3, "001000") # Offset adjust
+    spi.write("P3C2", 3, 3, "001405") # Output Mode
+    spi.write("P3C2", 3, 3, "001501") # Output adjust
+    spi.write("P3C2", 3, 3, "001600") # Clock phase control
+    spi.write("P3C2", 3, 3, "001789") # DCO clock delay
+    spi.write("P3C2", 3, 3, "001800") # Input span select
+    spi.write("P3C2", 3, 3, "00FF01") # Transfer
 
     router.set_routing(OUTPUT_C, SCALER_OUT)
     router.set_routing(SCALER_IN, PID_OUT)

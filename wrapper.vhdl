@@ -181,8 +181,8 @@ entity wrapper is
         fmc2_lpc_scl_b : out std_logic;
         fmc2_lpc_sda_b : out std_logic;
 
-        fmc3_hpc_clk0_p_b : out std_logic;
-        fmc3_hpc_clk0_n_b : out std_logic;
+        fmc3_hpc_clk0_p_b : in std_logic;
+        fmc3_hpc_clk0_n_b : in std_logic;
         fmc3_hpc_clk1_p_b : in std_logic;
         fmc3_hpc_clk1_n_b : out std_logic;
         fmc3_hpc_la00_p_b : in std_logic;
@@ -454,6 +454,9 @@ architecture peripheral_wrapper of wrapper is
     signal fmc3_hpc_adc_c_d_data_fmc_buf : std_logic_vector(11 downto 0);
     signal fmc3_hpc_adc_a_b_dco_fmc_buf : std_logic;
     signal fmc3_hpc_adc_c_d_dco_fmc_buf : std_logic;
+    signal fmc3_hpc_adc_ad_sync_fmc_buf : std_logic;
+    signal fmc3_hpc_adc_clk_sync_fmc_buf : std_logic;
+    signal fmc3_hpc_adc_clk_reset_fmc_buf : std_logic;
     signal fmc3_hpc_adc_a_b_spi_ss_fmc_buf : std_logic;
     signal fmc3_hpc_adc_c_d_spi_ss_fmc_buf : std_logic;
     signal fmc3_hpc_adc_clk_spi_ss_fmc_buf : std_logic;
@@ -463,10 +466,11 @@ architecture peripheral_wrapper of wrapper is
     signal fmc3_hpc_adc_c_d_spi_miso_fmc_buf : std_logic;
     signal fmc3_hpc_adc_clk_spi_miso_fmc_buf : std_logic;
     signal fmc3_hpc_adc_spi_io_tri_fmc_buf : std_logic;
-    signal fmc3_hpc_adc_clk_250M_fmc_buf : std_logic;
+    signal fmc3_hpc_adc_ext_clk_fmc_buf : std_logic;
     signal fmc3_hpc_adc_eeprom_iic_scl_fmc_buf : std_logic;
     signal fmc3_hpc_adc_eeprom_iic_sda_fmc_buf : std_logic;
     
+    signal fmc3_hpc_clk0_buf : std_logic;
     signal fmc3_hpc_clk0 : std_logic;
     signal fmc3_hpc_clk1_p : std_logic;
     signal fmc3_hpc_clk1_n : std_logic;
@@ -648,12 +652,15 @@ begin
         adc_spi_miso => spi_miso_buf(2),
         adc_spi_io_tri => spi_io_tri,
         sys_clk => sys_clk,
-        adc_clk_250M => sys_clk_250M,
+        adc_ext_clk => open,
         sys_rst => sys_rst,
         adc_a_b_data_fmc => fmc3_hpc_adc_a_b_data_fmc_buf,
         adc_c_d_data_fmc => fmc3_hpc_adc_c_d_data_fmc_buf,
         adc_a_b_dco_fmc => fmc3_hpc_adc_a_b_dco_fmc_buf,
         adc_c_d_dco_fmc => fmc3_hpc_adc_c_d_dco_fmc_buf,
+        adc_ad_sync_fmc => fmc3_hpc_adc_ad_sync_fmc_buf,
+        adc_clk_sync_fmc => fmc3_hpc_adc_clk_sync_fmc_buf,
+        adc_clk_reset_fmc => fmc3_hpc_adc_clk_reset_fmc_buf,
         adc_a_b_spi_ss_fmc => fmc3_hpc_adc_a_b_spi_ss_fmc_buf,
         adc_c_d_spi_ss_fmc => fmc3_hpc_adc_c_d_spi_ss_fmc_buf,
         adc_clk_spi_ss_fmc => fmc3_hpc_adc_clk_spi_ss_fmc_buf,
@@ -663,7 +670,7 @@ begin
         adc_c_d_spi_miso_fmc => fmc3_hpc_adc_c_d_spi_miso_fmc_buf,
         adc_clk_spi_miso_fmc => fmc3_hpc_adc_clk_spi_miso_fmc_buf,
         adc_spi_io_tri_fmc => fmc3_hpc_adc_spi_io_tri_fmc_buf,
-        adc_clk_250M_fmc => fmc3_hpc_adc_clk_250M_fmc_buf,
+        adc_ext_clk_fmc => fmc3_hpc_adc_ext_clk_fmc_buf,
         adc_eeprom_iic_scl_fmc => fmc3_hpc_adc_eeprom_iic_scl_fmc_buf,
         adc_eeprom_iic_sda_fmc => fmc3_hpc_adc_eeprom_iic_sda_fmc_buf
     );
@@ -784,7 +791,7 @@ begin
     fmc2_lpc_scl <= fmc2_lpc_lpc240p_eeprom_iic_scl_fmc_buf;
     fmc2_lpc_sda <= fmc2_lpc_lpc240p_eeprom_iic_sda_fmc_buf;
 
-    fmc3_hpc_clk0 <= fmc3_hpc_adc_clk_250M_fmc_buf;
+    fmc3_hpc_adc_ext_clk_fmc_buf <= fmc3_hpc_clk0;
     fmc3_hpc_adc_a_b_dco_fmc_buf <= fmc3_hpc_la00;
     fmc3_hpc_adc_a_b_data_fmc_buf(0) <= fmc3_hpc_la02;
     fmc3_hpc_adc_a_b_data_fmc_buf(1) <= fmc3_hpc_la06;
@@ -811,6 +818,9 @@ begin
     fmc3_hpc_adc_c_d_data_fmc_buf(9) <= fmc3_hpc_la28;
     fmc3_hpc_adc_c_d_data_fmc_buf(10) <= fmc3_hpc_la31;
     fmc3_hpc_adc_c_d_data_fmc_buf(11) <= fmc3_hpc_la30;
+    fmc3_hpc_la15_n <= fmc3_hpc_adc_ad_sync_fmc_buf;
+    fmc3_hpc_la16_n <= fmc3_hpc_adc_clk_sync_fmc_buf;
+    fmc3_hpc_la33_p <= fmc3_hpc_adc_clk_reset_fmc_buf;
     fmc3_hpc_la03_p <= fmc3_hpc_adc_a_b_spi_ss_fmc_buf;
     fmc3_hpc_la16_p <= fmc3_hpc_adc_c_d_spi_ss_fmc_buf;
     fmc3_hpc_la32_n <= fmc3_hpc_adc_clk_spi_ss_fmc_buf;
@@ -1443,10 +1453,14 @@ begin
         O => fmc2_lpc_sda_b
     );
 
-    fmc3_hpc_clk0_obufds : OBUFDS port map(
-        I => fmc3_hpc_clk0,
-        O => fmc3_hpc_clk0_p_b,
-        OB => fmc3_hpc_clk0_n_b
+    fmc3_hpc_clk0_ibufds : IBUFDS port map(
+        I => fmc3_hpc_clk0_p_b,
+        IB => fmc3_hpc_clk0_n_b,
+        O => fmc3_hpc_clk0_buf
+    );
+    fmc3_hpc_clk0_bufg : BUFG port map(
+        I => fmc3_hpc_clk0_buf,
+        O => fmc3_hpc_clk0
     );
     fmc3_hpc_clk1_p_ibuf : IBUF port map(
         I => fmc3_hpc_clk1_p_b,
