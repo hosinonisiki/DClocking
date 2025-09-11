@@ -31,14 +31,14 @@ entity wrapper is
 
         -- PIN DECLARATION GENERATION START
 
-        fmc1_lpc_clk0_p_b : out std_logic;
-        fmc1_lpc_clk0_n_b : out std_logic;
-        fmc1_lpc_clk1_p_b : out std_logic;
+        fmc1_lpc_clk0_p_b : in std_logic;
+        fmc1_lpc_clk0_n_b : in std_logic;
+        fmc1_lpc_clk1_p_b : in std_logic;
         fmc1_lpc_clk1_n_b : out std_logic;
         fmc1_lpc_la00_p_b : in std_logic;
         fmc1_lpc_la00_n_b : in std_logic;
-        fmc1_lpc_la01_p_b : out std_logic;
-        fmc1_lpc_la01_n_b : out std_logic;
+        fmc1_lpc_la01_p_b : in std_logic;
+        fmc1_lpc_la01_n_b : in std_logic;
         fmc1_lpc_la02_p_b : in std_logic;
         fmc1_lpc_la02_n_b : in std_logic;
         fmc1_lpc_la03_p_b : out std_logic;
@@ -65,12 +65,12 @@ entity wrapper is
         fmc1_lpc_la13_n_b : in std_logic;
         fmc1_lpc_la14_p_b : in std_logic;
         fmc1_lpc_la14_n_b : in std_logic;
-        fmc1_lpc_la15_p_b : in std_logic;
+        fmc1_lpc_la15_p_b : inout std_logic;
         fmc1_lpc_la15_n_b : out std_logic;
-        fmc1_lpc_la16_p_b : in std_logic;
-        fmc1_lpc_la16_n_b : in std_logic;
-        fmc1_lpc_la17_p_b : out std_logic;
-        fmc1_lpc_la17_n_b : out std_logic;
+        fmc1_lpc_la16_p_b : out std_logic;
+        fmc1_lpc_la16_n_b : out std_logic;
+        fmc1_lpc_la17_p_b : in std_logic;
+        fmc1_lpc_la17_n_b : in std_logic;
         fmc1_lpc_la18_p_b : in std_logic;
         fmc1_lpc_la18_n_b : in std_logic;
         fmc1_lpc_la19_p_b : in std_logic;
@@ -99,9 +99,9 @@ entity wrapper is
         fmc1_lpc_la30_n_b : in std_logic;
         fmc1_lpc_la31_p_b : in std_logic;
         fmc1_lpc_la31_n_b : in std_logic;
-        fmc1_lpc_la32_p_b : in std_logic;
+        fmc1_lpc_la32_p_b : out std_logic;
         fmc1_lpc_la32_n_b : out std_logic;
-        fmc1_lpc_la33_p_b : in std_logic;
+        fmc1_lpc_la33_p_b : out std_logic;
         fmc1_lpc_la33_n_b : in std_logic;
         fmc1_lpc_scl_b : out std_logic;
         fmc1_lpc_sda_b : out std_logic;
@@ -265,6 +265,8 @@ architecture peripheral_wrapper of wrapper is
     signal sys_clk_buf : std_logic;
     signal sys_clk_125M : std_logic;
     signal sys_clk_125M_buf : std_logic;
+    signal sys_clk_250M : std_logic;
+    signal sys_clk_250M_buf : std_logic;
     signal sys_rst : std_logic := '0';
     signal sys_rst_raw : std_logic;
     signal sys_rst_bar : std_logic;
@@ -298,8 +300,10 @@ architecture peripheral_wrapper of wrapper is
 
     signal adc_a_b_spi_ss : std_logic;
     signal adc_c_d_spi_ss : std_logic;
+    signal adc_clk_spi_ss : std_logic;
     signal adc1_spi_miso : std_logic;
     signal adc2_spi_miso : std_logic;
+    signal adc_clk_spi_miso : std_logic;
 
     signal dac_a_data_buf : std_logic_vector(13 downto 0);
     signal dac_b_data_buf : std_logic_vector(13 downto 0);
@@ -320,25 +324,29 @@ architecture peripheral_wrapper of wrapper is
     signal adc_c_d_data_fmc_buf : std_logic_vector(11 downto 0);
     signal adc_a_b_dco_fmc_buf : std_logic;
     signal adc_c_d_dco_fmc_buf : std_logic;
+    signal adc_ad_sync_fmc_buf : std_logic;
+    signal adc_clk_sync_fmc_buf : std_logic;
+    signal adc_clk_reset_fmc_buf : std_logic;
     signal adc_a_b_spi_ss_fmc_buf : std_logic;
     signal adc_c_d_spi_ss_fmc_buf : std_logic;
+    signal adc_clk_spi_ss_fmc_buf : std_logic;
     signal adc_spi_sck_fmc_buf : std_logic;
     signal adc_spi_mosi_fmc_buf : std_logic;
     signal adc1_spi_miso_fmc_buf : std_logic;
     signal adc2_spi_miso_fmc_buf : std_logic;
+    signal adc_clk_spi_miso_fmc_buf : std_logic;
     signal adc_spi_io_tri_fmc_buf : std_logic;
-    signal adc_clk_125M_fmc_buf : std_logic;
+    signal adc_ext_clk_fmc_buf : std_logic;
     signal adc_eeprom_iic_scl_fmc_buf : std_logic;
     signal adc_eeprom_iic_sda_fmc_buf : std_logic;
     
-    signal fmc1_lpc_clk0_p : std_logic;
-    signal fmc1_lpc_clk0_n : std_logic;
+    signal fmc1_lpc_clk0_buf : std_logic;
+    signal fmc1_lpc_clk0 : std_logic;
     signal fmc1_lpc_clk1_p : std_logic;
     signal fmc1_lpc_clk1_n : std_logic;
     signal fmc1_lpc_la00_buf : std_logic;
     signal fmc1_lpc_la00 : std_logic;
-    signal fmc1_lpc_la01_p : std_logic;
-    signal fmc1_lpc_la01_n : std_logic;
+    signal fmc1_lpc_la01 : std_logic;
     signal fmc1_lpc_la02 : std_logic;
     signal fmc1_lpc_la03_p : std_logic;
     signal fmc1_lpc_la03_no : std_logic;
@@ -355,12 +363,13 @@ architecture peripheral_wrapper of wrapper is
     signal fmc1_lpc_la12 : std_logic;
     signal fmc1_lpc_la13 : std_logic;
     signal fmc1_lpc_la14 : std_logic;
-    signal fmc1_lpc_la15_p : std_logic;
+    signal fmc1_lpc_la15_po : std_logic;
+    signal fmc1_lpc_la15_pi : std_logic;
+    signal fmc1_lpc_la15_pt : std_logic;
     signal fmc1_lpc_la15_n : std_logic;
     signal fmc1_lpc_la16_p : std_logic;
     signal fmc1_lpc_la16_n : std_logic;
-    signal fmc1_lpc_la17_p : std_logic;
-    signal fmc1_lpc_la17_n : std_logic;
+    signal fmc1_lpc_la17 : std_logic;
     signal fmc1_lpc_la18_buf : std_logic;
     signal fmc1_lpc_la18 : std_logic;
     signal fmc1_lpc_la19 : std_logic;
@@ -550,6 +559,7 @@ architecture peripheral_wrapper of wrapper is
         port (
             clk_out1            : out    std_logic;
             clk_out2            : out    std_logic;
+            clk_out3            : out    std_logic;
             reset               : in     std_logic;
             locked              : out    std_logic;
             clk_in1_p           : in     std_logic;
@@ -586,6 +596,7 @@ begin
     spi_miso <= dac_spi_miso when spi_ss(SPI_DAC1_ADDR) = '0' or spi_ss(SPI_DAC2_ADDR) = '0' or spi_ss(SPI_CLK1_ADDR) = '0' else
                 adc1_spi_miso when spi_ss(SPI_ADC1_ADDR) = '0' else
                 adc2_spi_miso when spi_ss(SPI_ADC2_ADDR) = '0' else
+                adc_clk_spi_miso when spi_ss(SPI_CLK2_ADDR) = '0' else
                 '0';
 
     -- leds
@@ -627,36 +638,44 @@ begin
     -- FL9627 adapter
     adc_a_b_spi_ss <= spi_ss(SPI_ADC1_ADDR);
     adc_c_d_spi_ss <= spi_ss(SPI_ADC2_ADDR);
+    adc_clk_spi_ss <= spi_ss(SPI_CLK2_ADDR);
 
     -- ADAPTER INSTANTIATION GENERATION START
 
-    FL9627 : entity work.FL9627_adapter port map(
+    FL9613 : entity work.FL9613_adapter port map(
         adc_a_data => adc_a_data_buf,
         adc_b_data => adc_b_data_buf,
         adc_c_data => adc_c_data_buf,
         adc_d_data => adc_d_data_buf,
         adc_a_b_spi_ss => adc_a_b_spi_ss,
         adc_c_d_spi_ss => adc_c_d_spi_ss,
+        adc_clk_spi_ss => adc_clk_spi_ss,
         adc_spi_sck => spi_sclk,
         adc_spi_mosi => spi_mosi,
         adc1_spi_miso => adc1_spi_miso,
         adc2_spi_miso => adc2_spi_miso,
+        adc_clk_spi_miso => adc_clk_spi_miso,
         adc_spi_io_tri => spi_io_tri,
         sys_clk => sys_clk,
-        adc_clk_125M => sys_clk_125M,
+        adc_ext_clk => open,
         sys_rst => sys_rst,
         adc_a_b_data_fmc => adc_a_b_data_fmc_buf,
         adc_c_d_data_fmc => adc_c_d_data_fmc_buf,
         adc_a_b_dco_fmc => adc_a_b_dco_fmc_buf,
         adc_c_d_dco_fmc => adc_c_d_dco_fmc_buf,
+        adc_ad_sync_fmc => adc_ad_sync_fmc_buf,
+        adc_clk_sync_fmc => adc_clk_sync_fmc_buf,
+        adc_clk_reset_fmc => adc_clk_reset_fmc_buf,
         adc_a_b_spi_ss_fmc => adc_a_b_spi_ss_fmc_buf,
         adc_c_d_spi_ss_fmc => adc_c_d_spi_ss_fmc_buf,
+        adc_clk_spi_ss_fmc => adc_clk_spi_ss_fmc_buf,
         adc_spi_sck_fmc => adc_spi_sck_fmc_buf,
         adc_spi_mosi_fmc => adc_spi_mosi_fmc_buf,
         adc1_spi_miso_fmc => adc1_spi_miso_fmc_buf,
         adc2_spi_miso_fmc => adc2_spi_miso_fmc_buf,
+        adc_clk_spi_miso_fmc => adc_clk_spi_miso_fmc_buf,
         adc_spi_io_tri_fmc => adc_spi_io_tri_fmc_buf,
-        adc_clk_125M_fmc => adc_clk_125M_fmc_buf,
+        adc_ext_clk_fmc => adc_ext_clk_fmc_buf,
         adc_eeprom_iic_scl_fmc => adc_eeprom_iic_scl_fmc_buf,
         adc_eeprom_iic_sda_fmc => adc_eeprom_iic_sda_fmc_buf
     );
@@ -675,7 +694,7 @@ begin
 
     -- SIGNAL ASSIGNMENT GENERATION START
 
-    fmc1_lpc_la01_p <= adc_clk_125M_fmc_buf;
+    adc_ext_clk_fmc_buf <= fmc1_lpc_clk0;
     adc_a_b_dco_fmc_buf <= fmc1_lpc_la00;
     adc_a_b_data_fmc_buf(0) <= fmc1_lpc_la02;
     adc_a_b_data_fmc_buf(1) <= fmc1_lpc_la06;
@@ -689,7 +708,6 @@ begin
     adc_a_b_data_fmc_buf(9) <= fmc1_lpc_la11;
     adc_a_b_data_fmc_buf(10) <= fmc1_lpc_la13;
     adc_a_b_data_fmc_buf(11) <= fmc1_lpc_la14;
-    fmc1_lpc_la17_p <= adc_clk_125M_fmc_buf;
     adc_c_d_dco_fmc_buf <= fmc1_lpc_la18;
     adc_c_d_data_fmc_buf(0) <= fmc1_lpc_la20;
     adc_c_d_data_fmc_buf(1) <= fmc1_lpc_la19;
@@ -703,18 +721,26 @@ begin
     adc_c_d_data_fmc_buf(9) <= fmc1_lpc_la28;
     adc_c_d_data_fmc_buf(10) <= fmc1_lpc_la31;
     adc_c_d_data_fmc_buf(11) <= fmc1_lpc_la30;
+    fmc1_lpc_la15_n <= adc_ad_sync_fmc_buf;
+    fmc1_lpc_la16_n <= adc_clk_sync_fmc_buf;
+    fmc1_lpc_la33_p <= adc_clk_reset_fmc_buf;
     fmc1_lpc_la03_p <= adc_a_b_spi_ss_fmc_buf;
-    fmc1_lpc_la17_n <= adc_c_d_spi_ss_fmc_buf;
-    fmc1_lpc_la01_n <= adc_spi_sck_fmc_buf;
+    fmc1_lpc_la16_p <= adc_c_d_spi_ss_fmc_buf;
+    fmc1_lpc_la32_n <= adc_clk_spi_ss_fmc_buf;
+    fmc1_lpc_clk1_n <= adc_spi_sck_fmc_buf;
     fmc1_lpc_la23_n <= adc_spi_sck_fmc_buf;
+    fmc1_lpc_la32_p <= adc_spi_sck_fmc_buf;
     fmc1_lpc_la03_no <= adc_spi_mosi_fmc_buf;
     fmc1_lpc_la23_po <= adc_spi_mosi_fmc_buf;
+    fmc1_lpc_la15_po <= adc_spi_mosi_fmc_buf;
     adc1_spi_miso_fmc_buf <= fmc1_lpc_la03_ni;
     adc2_spi_miso_fmc_buf <= fmc1_lpc_la23_pi;
+    adc_clk_spi_miso_fmc_buf <= fmc1_lpc_la15_pi;
     fmc1_lpc_scl <= adc_eeprom_iic_scl_fmc_buf;
     fmc1_lpc_sda <= adc_eeprom_iic_sda_fmc_buf;
     fmc1_lpc_la03_nt <= adc_spi_io_tri_fmc_buf;
     fmc1_lpc_la23_pt <= adc_spi_io_tri_fmc_buf;
+    fmc1_lpc_la15_pt <= adc_spi_io_tri_fmc_buf;
 
     fmc2_lpc_la17_n <= j2_40p_fmc_buf(3);
     fmc2_lpc_la17_p <= j2_40p_fmc_buf(4);
@@ -796,6 +822,7 @@ begin
     sys_clk_mmcm_inst : sys_clk_mmcm port map(
         clk_out1 => sys_clk_buf,
         clk_out2 => sys_clk_125M_buf,
+        clk_out3 => sys_clk_250M_buf,
         reset => '0',
         locked => sys_clk_locked,
         clk_in1_p => sys_clk_p,
@@ -810,6 +837,11 @@ begin
         O => sys_clk_125M,
         CE => sys_clk_locked,
         I => sys_clk_125M_buf
+    );
+    sys_clk_250M_bufgce : BUFGCE port map(
+        O => sys_clk_250M,
+        CE => sys_clk_locked,
+        I => sys_clk_250M_buf
     );
 
     -- rst
@@ -868,17 +900,18 @@ begin
 
     -- IO BUFFER GENERATION START
 
-    fmc1_lpc_clk0_p_obuf : OBUF port map(
-        I => fmc1_lpc_clk0_p,
-        O => fmc1_lpc_clk0_p_b
+    fmc1_lpc_clk0_ibufds : IBUFDS port map(
+        I => fmc1_lpc_clk0_p_b,
+        IB => fmc1_lpc_clk0_n_b,
+        O => fmc1_lpc_clk0_buf
     );
-    fmc1_lpc_clk0_n_obuf : OBUF port map(
-        I => fmc1_lpc_clk0_n,
-        O => fmc1_lpc_clk0_n_b
+    fmc1_lpc_clk0_bufg : BUFG port map(
+        I => fmc1_lpc_clk0_buf,
+        O => fmc1_lpc_clk0
     );
-    fmc1_lpc_clk1_p_obuf : OBUF port map(
-        I => fmc1_lpc_clk1_p,
-        O => fmc1_lpc_clk1_p_b
+    fmc1_lpc_clk1_p_ibuf : IBUF port map(
+        I => fmc1_lpc_clk1_p_b,
+        O => fmc1_lpc_clk1_p
     );
     fmc1_lpc_clk1_n_obuf : OBUF port map(
         I => fmc1_lpc_clk1_n,
@@ -893,13 +926,10 @@ begin
         I => fmc1_lpc_la00_buf,
         O => fmc1_lpc_la00
     );
-    fmc1_lpc_la01_p_obuf : OBUF port map(
-        I => fmc1_lpc_la01_p,
-        O => fmc1_lpc_la01_p_b
-    );
-    fmc1_lpc_la01_n_obuf : OBUF port map(
-        I => fmc1_lpc_la01_n,
-        O => fmc1_lpc_la01_n_b
+    fmc1_lpc_la01_ibufds : IBUFDS port map(
+        I => fmc1_lpc_la01_p_b,
+        IB => fmc1_lpc_la01_n_b,
+        O => fmc1_lpc_la01
     );
     fmc1_lpc_la02_ibufds : IBUFDS port map(
         I => fmc1_lpc_la02_p_b,
@@ -971,29 +1001,28 @@ begin
         IB => fmc1_lpc_la14_n_b,
         O => fmc1_lpc_la14
     );
-    fmc1_lpc_la15_p_ibuf : IBUF port map(
-        I => fmc1_lpc_la15_p_b,
-        O => fmc1_lpc_la15_p
+    fmc1_lpc_la15_p_iobuf : IOBUF port map(
+        I => fmc1_lpc_la15_po,
+        O => fmc1_lpc_la15_pi,
+        IO => fmc1_lpc_la15_p_b,
+        T => fmc1_lpc_la15_pt
     );
     fmc1_lpc_la15_n_obuf : OBUF port map(
         I => fmc1_lpc_la15_n,
         O => fmc1_lpc_la15_n_b
     );
-    fmc1_lpc_la16_p_ibuf : IBUF port map(
-        I => fmc1_lpc_la16_p_b,
-        O => fmc1_lpc_la16_p
+    fmc1_lpc_la16_p_obuf : OBUF port map(
+        I => fmc1_lpc_la16_p,
+        O => fmc1_lpc_la16_p_b
     );
-    fmc1_lpc_la16_n_ibuf : IBUF port map(
-        I => fmc1_lpc_la16_n_b,
-        O => fmc1_lpc_la16_n
+    fmc1_lpc_la16_n_obuf : OBUF port map(
+        I => fmc1_lpc_la16_n,
+        O => fmc1_lpc_la16_n_b
     );
-    fmc1_lpc_la17_p_obuf : OBUF port map(
-        I => fmc1_lpc_la17_p,
-        O => fmc1_lpc_la17_p_b
-    );
-    fmc1_lpc_la17_n_obuf : OBUF port map(
-        I => fmc1_lpc_la17_n,
-        O => fmc1_lpc_la17_n_b
+    fmc1_lpc_la17_ibufds : IBUFDS port map(
+        I => fmc1_lpc_la17_p_b,
+        IB => fmc1_lpc_la17_n_b,
+        O => fmc1_lpc_la17
     );
     fmc1_lpc_la18_ibufds : IBUFDS port map(
         I => fmc1_lpc_la18_p_b,
@@ -1074,17 +1103,17 @@ begin
         IB => fmc1_lpc_la31_n_b,
         O => fmc1_lpc_la31
     );
-    fmc1_lpc_la32_p_ibuf : IBUF port map(
-        I => fmc1_lpc_la32_p_b,
-        O => fmc1_lpc_la32_p
+    fmc1_lpc_la32_p_obuf : OBUF port map(
+        I => fmc1_lpc_la32_p,
+        O => fmc1_lpc_la32_p_b
     );
     fmc1_lpc_la32_n_obuf : OBUF port map(
         I => fmc1_lpc_la32_n,
         O => fmc1_lpc_la32_n_b
     );
-    fmc1_lpc_la33_p_ibuf : IBUF port map(
-        I => fmc1_lpc_la33_p_b,
-        O => fmc1_lpc_la33_p
+    fmc1_lpc_la33_p_obuf : OBUF port map(
+        I => fmc1_lpc_la33_p,
+        O => fmc1_lpc_la33_p_b
     );
     fmc1_lpc_la33_n_ibuf : IBUF port map(
         I => fmc1_lpc_la33_n_b,

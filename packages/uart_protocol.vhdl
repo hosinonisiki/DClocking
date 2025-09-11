@@ -31,6 +31,7 @@ package uart_protocol is
         constant u_DEVICE_CLK1  : std_logic_vector(31 downto 0) := x"434c4b31"; -- ASCII 'CLK1'
         constant u_DEVICE_ADC1  : std_logic_vector(31 downto 0) := x"41444331"; -- ASCII 'ADC1'
         constant u_DEVICE_ADC2  : std_logic_vector(31 downto 0) := x"41444332"; -- ASCII 'ADC2'
+        constant u_DEVICE_CLK2  : std_logic_vector(31 downto 0) := x"434c4b32"; -- ASCII 'CLK2'
 
     constant u_SPACE_BUS    : std_logic_vector(31 downto 0) := x"4255535f"; -- ASCII 'BUS_'
         constant u_DEVICE_ROUT  : std_logic_vector(31 downto 0) := x"524f5554"; -- ASCII 'ROUT'

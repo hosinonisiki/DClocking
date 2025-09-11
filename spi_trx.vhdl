@@ -34,7 +34,7 @@ architecture behavioral of spi_trx is
     constant clk_period         : unsigned(7 downto 0) := to_unsigned(clk_freq / spi_clk_freq, 8); -- SPI clock period
     constant half_clk_period    : unsigned(7 downto 0) := clk_period / 2; -- Half SPI clock period
 
-    type state_type is (s_idle, s_load, s_transmit, s_end);
+    type state_type is (s_idle, s_delay_high, s_load, s_transmit, s_end, s_delay_low);
     signal state        : state_type := s_idle;
 
     signal sclk         : std_logic; -- SPI clock
@@ -42,6 +42,8 @@ architecture behavioral of spi_trx is
     signal bit_cnt      : unsigned(4 downto 0); -- Counts for how many bits have been transmitted
     signal sclk_edge    : std_logic; -- Indicates if sclk is at an edge
     signal sample_edge  : std_logic; -- Indicates if the coming edge is a sample edge
+
+    signal delay_cnt    : unsigned(7 downto 0); -- Delay counter.
 
     signal width        : unsigned(4 downto 0); -- Width of the spi transmission. 0-31 represents 1-32 bits
     signal write_count  : unsigned(4 downto 0); -- Counter for write bits. 0-31 represents 1-32 bits
@@ -60,6 +62,10 @@ begin
                 case state is
                     when s_idle =>
                         if spi_en_in = '1' then
+                            state <= s_delay_high;
+                        end if;
+                    when s_delay_high =>
+                        if delay_cnt = to_unsigned(1280, 8) then -- 5us delay at 250MHz clk
                             state <= s_load;
                         end if;
                     when s_load =>
@@ -70,8 +76,14 @@ begin
                         end if;
                     when s_end =>
                         if sclk_edge = '1' then
+                            state <= s_delay_low;
+                        end if;
+                    when s_delay_low =>
+                        if delay_cnt = to_unsigned(1280, 8) then -- 5us delay at 250MHz clk
                             state <= s_idle;
                         end if;
+                    when others =>
+                        state <= s_idle;
                 end case;
             end if;
         end if;
@@ -171,6 +183,18 @@ begin
         end if;
     end process;
 
+    -- Delay counter
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            if state = s_delay_high or state = s_delay_low then
+                delay_cnt <= delay_cnt + x"01";
+            else
+                delay_cnt <= (others => '0');
+            end if;
+        end if;
+    end process;
+
     sclk_edge <= '1' when cycle_cnt = half_clk_period + x"FF" else '0';
     sample_edge <= not cpol xor cpha xor sclk;
 
@@ -184,6 +208,7 @@ begin
 
     -- ss binary to one-hot conversion
     one_hot : for i in 0 to 15 generate
-        ss_out(i) <= '0' when ss_in = std_logic_vector(to_unsigned(i, 4)) and state /= s_idle else '1';
+        ss_out(i) <= '1' when state = s_delay_high else
+                        '0' when ss_in = std_logic_vector(to_unsigned(i, 4)) and state /= s_idle else '1';
     end generate;
 end behavioral;

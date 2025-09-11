@@ -35,6 +35,7 @@ package mypak is
     constant SPI_CLK1_ADDR      : integer := 2; -- Address of chip CLK1, providing clocks for DAC1 and DAC2.
     constant SPI_ADC1_ADDR      : integer := 3; -- Address of chip ADC1, responsible for adc channel A and B.
     constant SPI_ADC2_ADDR      : integer := 4; -- Address of chip ADC2, responsible for adc channel C and D.
+    constant SPI_CLK2_ADDR      : integer := 5; -- Address of chip CLK2, providing clocks for ADC1 and ADC2.
 
     type rdbus_type is array(0 to module_count) of std_logic_vector(rdbus_w - 1 downto 0); -- 0 is reserved for no module.
     type rsbus_type is array(0 to module_count) of std_logic_vector(rsbus_w - 1 downto 0);
@@ -43,7 +44,7 @@ package mypak is
     constant baudrate       :   integer := 19200; -- Baudrate for the UART.
     -- constant baudrate       :   integer := 3_906_250; -- Only use in simulation.
 
-    constant spi_clk_freq   :   integer := 10_000_000; -- SPI clock frequency in Hz.
+    constant spi_clk_freq   :   integer := 1_000_000; -- SPI clock frequency in Hz.
 
     type signal_array is array(natural range <>) of std_logic_vector(15 downto 0); -- Used in the router's io ports and mim_wrapper.
 

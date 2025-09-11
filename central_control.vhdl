@@ -222,6 +222,9 @@ begin
                                 when u_DEVICE_ADC2 =>
                                     spi_ss_buf <= std_logic_vector(to_unsigned(SPI_ADC2_ADDR, 4));
                                     state <= s_spi_parse_control;
+                                when u_DEVICE_CLK2 =>
+                                    spi_ss_buf <= std_logic_vector(to_unsigned(SPI_CLK2_ADDR, 4));
+                                    state <= s_spi_parse_control;
                                 when others =>
                                     response_err_buf <= x"44564345"; -- "DVCE" for device error
                                     state <= s_respond_exception;
