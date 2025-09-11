@@ -24,13 +24,16 @@ entity FL9613_adapter is
         adc_spi_miso    :   out  std_logic;
         adc_spi_io_tri  :   in  std_logic;
         sys_clk         :   in  std_logic;
-        adc_clk_250M    :   in std_logic;
+        adc_ext_clk     :   out std_logic;
         sys_rst         :   in  std_logic;
 
         adc_a_b_data_fmc : in std_logic_vector(11 downto 0);
         adc_c_d_data_fmc : in std_logic_vector(11 downto 0);
         adc_a_b_dco_fmc : in std_logic;
         adc_c_d_dco_fmc : in std_logic;
+        adc_ad_sync_fmc : out std_logic;
+        adc_clk_sync_fmc : out std_logic;
+        adc_clk_reset_fmc : out std_logic;
         adc_a_b_spi_ss_fmc : out std_logic;
         adc_c_d_spi_ss_fmc : out std_logic;
         adc_clk_spi_ss_fmc : out std_logic;
@@ -40,7 +43,7 @@ entity FL9613_adapter is
         adc_c_d_spi_miso_fmc : in std_logic;
         adc_clk_spi_miso_fmc : in std_logic;
         adc_spi_io_tri_fmc : out std_logic;
-        adc_clk_250M_fmc : out std_logic;
+        adc_ext_clk_fmc : in std_logic;
         adc_eeprom_iic_scl_fmc : out std_logic;
         adc_eeprom_iic_sda_fmc : out std_logic
     );
@@ -64,8 +67,6 @@ architecture structural of FL9613_adapter is
     signal adc_c_d_data         : std_logic_vector(11 downto 0);
     signal adc_a_b_dco          : std_logic;
     signal adc_c_d_dco          : std_logic;
-    signal adc_a_b_or           : std_logic;
-    signal adc_c_d_or           : std_logic;
     signal adc_clk_reset        : std_logic;
     signal adc_clk_sync         : std_logic;
     signal adc_sync             : std_logic;
@@ -258,6 +259,9 @@ begin
     adc_c_d_data <= adc_c_d_data_fmc;
     adc_a_b_dco <= adc_a_b_dco_fmc;
     adc_c_d_dco <= adc_c_d_dco_fmc;
+    adc_ad_sync_fmc <= '0';
+    adc_clk_sync_fmc <= '1';
+    adc_clk_reset_fmc <= '1'; -- active low
     adc_a_b_spi_ss_fmc <= adc_spi_ss(0);
     adc_c_d_spi_ss_fmc <= adc_spi_ss(1);
     adc_clk_spi_ss_fmc <= adc_spi_ss(2);
@@ -268,7 +272,7 @@ begin
                     adc_clk_spi_miso_fmc when adc_spi_ss(2) = '0' else
                     '0';
     adc_spi_io_tri_fmc <= adc_spi_io_tri;
-    adc_clk_250M_fmc <= adc_clk_250M;
+    adc_ext_clk <= adc_ext_clk_fmc;
     adc_eeprom_iic_scl_fmc <= adc_eeprom_iic_scl;
     adc_eeprom_iic_sda_fmc <= adc_eeprom_iic_sda;
 end architecture structural;

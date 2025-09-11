@@ -428,7 +428,7 @@ FL9613_configuration.instantiation_head = [
     '    adc_spi_miso => spi_miso_buf(<SPI_MISO_BUF_INDEX>),\n', \
     '    adc_spi_io_tri => spi_io_tri,\n', \
     '    sys_clk => sys_clk,\n', \
-    '    adc_clk_250M => sys_clk_250M,\n', \
+    '    adc_ext_clk => open,\n', \
     '    sys_rst => sys_rst,\n'
 ]
 FL9613_configuration.instantiation_tail = [');\n']
@@ -437,6 +437,9 @@ FL9613_configuration.port_signals = {
     'adc_c_d_data_fmc' : 'std_logic_vector(11 downto 0)', \
     'adc_a_b_dco_fmc' : 'std_logic', \
     'adc_c_d_dco_fmc' : 'std_logic', \
+    'adc_ad_sync_fmc' : 'std_logic', \
+    'adc_clk_sync_fmc' : 'std_logic', \
+    'adc_clk_reset_fmc' : 'std_logic', \
     'adc_a_b_spi_ss_fmc' : 'std_logic', \
     'adc_c_d_spi_ss_fmc' : 'std_logic', \
     'adc_clk_spi_ss_fmc' : 'std_logic', \
@@ -446,14 +449,14 @@ FL9613_configuration.port_signals = {
     'adc_c_d_spi_miso_fmc' : 'std_logic', \
     'adc_clk_spi_miso_fmc' : 'std_logic', \
     'adc_spi_io_tri_fmc' : 'std_logic', \
-    'adc_clk_250M_fmc' : 'std_logic', \
+    'adc_ext_clk_fmc' : 'std_logic', \
     'adc_eeprom_iic_scl_fmc' : 'std_logic', \
     'adc_eeprom_iic_sda_fmc' : 'std_logic'
 }
 FL9613_configuration.fmc_name = None # Decided runtime
 default_configuration.fmc_id = None # Decided runtime
 FL9613_configuration.lpc_configuration = {
-    'clk0': { 'is_differential': True, 'used_as_single_ended': False, 'io_type': 'out', 'is_clock': True },
+    'clk0': { 'is_differential': True, 'used_as_single_ended': False, 'io_type': 'in', 'is_clock': True },
     'clk1': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'in', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': True },
     'la00': { 'is_differential': True, 'used_as_single_ended': False, 'io_type': 'in', 'is_clock': True },
     'la01': { 'is_differential': True, 'used_as_single_ended': False, 'io_type': 'in', 'is_clock': False },
@@ -493,7 +496,7 @@ FL9613_configuration.lpc_configuration = {
     'sda': { 'is_differential': False, 'io_type': 'out', 'is_clock': False }
 }
 FL9613_configuration.signal_mapping = [
-    { 'signal_name': 'adc_clk_250M_fmc', 'index': None, 'pin': 'clk0', 'pin_suffix': '' },
+    { 'signal_name': 'adc_ext_clk_fmc', 'index': None, 'pin': 'clk0', 'pin_suffix': '' },
     { 'signal_name': 'adc_a_b_dco_fmc', 'index': None, 'pin': 'la00', 'pin_suffix': '' },
     { 'signal_name': 'adc_a_b_data_fmc', 'index': 0, 'pin': 'la02', 'pin_suffix': '' },
     { 'signal_name': 'adc_a_b_data_fmc', 'index': 1, 'pin': 'la06', 'pin_suffix': '' },
@@ -520,6 +523,9 @@ FL9613_configuration.signal_mapping = [
     { 'signal_name': 'adc_c_d_data_fmc', 'index': 9, 'pin': 'la28', 'pin_suffix': '' },
     { 'signal_name': 'adc_c_d_data_fmc', 'index': 10, 'pin': 'la31', 'pin_suffix': '' },
     { 'signal_name': 'adc_c_d_data_fmc', 'index': 11, 'pin': 'la30', 'pin_suffix': '' },
+    { 'signal_name': 'adc_ad_sync_fmc', 'index': None, 'pin': 'la15', 'pin_suffix': '_n' },
+    { 'signal_name': 'adc_clk_sync_fmc', 'index': None, 'pin': 'la16', 'pin_suffix': '_n' },
+    { 'signal_name': 'adc_clk_reset_fmc', 'index': None, 'pin': 'la33', 'pin_suffix': '_p' },
     { 'signal_name': 'adc_a_b_spi_ss_fmc', 'index': None, 'pin': 'la03', 'pin_suffix': '_p' },
     { 'signal_name': 'adc_c_d_spi_ss_fmc', 'index': None, 'pin': 'la16', 'pin_suffix': '_p' },
     { 'signal_name': 'adc_clk_spi_ss_fmc', 'index': None, 'pin': 'la32', 'pin_suffix': '_n' },

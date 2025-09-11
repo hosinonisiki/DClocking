@@ -4,10 +4,11 @@ import module
 import module_signal_router
 import spi
 from port_numbers import *
+import time
 
 import code
 
-ser = uart.MySerial("COM3", baudrate = 19200, parity = "E", timeout = 0.5)
+ser = uart.MySerial("COM6", baudrate = 19200, parity = "E", timeout = 0.5)
 bus = bus.Bus(ser)
 router = module_signal_router.ModuleSignalRouter(bus)
 tri = module.ModuleBase(bus, "TRIG")
@@ -15,6 +16,13 @@ acc = module.ModuleAccumulator(bus, "ACCM")
 sclr = module.ModuleScaler(bus, "SCLR")
 pid = module.ModulePID(bus, "PIDC")
 spi = spi.Spi(ser)
+
+def recal():
+    spi.write("CLK2", 3, 3, "001806")
+    spi.write("CLK2", 3, 3, "023201")
+    spi.write("CLK2", 3, 3, "001807")
+    spi.write("CLK2", 3, 3, "023201")
+    spi.write("CLK2", 3, 2, "801F") # Check if PLL caled
 
 VERBOSE = True
 if VERBOSE:
