@@ -8,7 +8,7 @@ import time
 
 import code
 
-ser = uart.MySerial("COM6", baudrate = 19200, parity = "E", timeout = 0.5)
+ser = uart.MySerial("COM7", baudrate = 19200, parity = "E", timeout = 0.5)
 bus = bus.Bus(ser)
 router = module_signal_router.ModuleSignalRouter(bus)
 tri = module.ModuleBase(bus, "TRIG")
