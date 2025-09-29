@@ -48,7 +48,8 @@ class ChipConfiguration:
 
         self.fmc_name = None
         self.fmc_id = None
-        self.lpc_configuration = None # Configuration of the LPC
+        self.fmc_type = None # 'lpc' or 'hpc'
+        self.fmc_configuration = None # Configuration of the FMC
         '''
         configuration format:
         {
@@ -71,8 +72,8 @@ class ChipConfiguration:
             {
                 'signal_name': <str>, # Name of the signal in the top level entity
                 'index': <int> | None, # Index of the signal if it is a vector element, None if it is a single bit
-                'pin': <str>, # Name of the pin in the lpc_configuration
-                'pin_suffix': <str> # Suffix of the pin, must be compatible with the lpc_configuration.
+                'pin': <str>, # Name of the pin in the fmc_configuration
+                'pin_suffix': <str> # Suffix of the pin, must be compatible with the fmc_configuration.
                 # e.g. '_nt' only when the pin in question is differential but used as single-ended, while the io_type of the n side is 'inout'
                 # '' when no extra suffix is needed to specify the target signal
             }
@@ -86,7 +87,7 @@ class ChipConfiguration:
             and self.port_signals is not None \
             and self.fmc_name is not None \
             and self.fmc_id is not None \
-            and self.lpc_configuration is not None \
+            and self.fmc_configuration is not None \
             and self.signal_mapping is not None
     
     def make(self):
@@ -94,8 +95,8 @@ class ChipConfiguration:
         assert self.is_complete(), 'Chip configuration is not complete'
         # Generate lpc pin declaration code
         self.pin_declaration = []
-        for pin in self.lpc_configuration:
-            configuration = self.lpc_configuration[pin]
+        for pin in self.fmc_configuration:
+            configuration = self.fmc_configuration[pin]
             if configuration['is_differential']:
                 if configuration['used_as_single_ended']:
                     self.pin_declaration.append(f'{self.fmc_name}_{pin}_p{self.iotype2suffix[configuration["io_type"]]} : {configuration["io_type"]} std_logic;' + '\n')
@@ -125,7 +126,7 @@ class ChipConfiguration:
         # Generate signal assignment code
         self.signal_assignment = []
         for mapping in self.signal_mapping:
-            configuration = self.lpc_configuration[mapping['pin']]
+            configuration = self.fmc_configuration[mapping['pin']]
             suffix = mapping['pin_suffix']
             if suffix == '_po' or suffix == '_pt' or suffix == '_no' or suffix == '_nt' or suffix == '_o' or suffix == '_t':
                 direction = 'out'
@@ -146,8 +147,8 @@ class ChipConfiguration:
         self.signal_declaration.append('\n')
         indent = ' ' * 4
         first_buffer = True
-        for pin in self.lpc_configuration:
-            configuration = self.lpc_configuration[pin]
+        for pin in self.fmc_configuration:
+            configuration = self.fmc_configuration[pin]
             if not first_buffer:
                 self.io_buffer.append('\n')
                 first_buffer = False
@@ -352,7 +353,7 @@ if __name__ == '__main__':
                             }
     config.fmc_name = 'fmc3_hpc'
     config.fmc_id = 3
-    config.lpc_configuration = {
+    config.fmc_configuration = {
         'clk0': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
         'clk1': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
         'la00': { 'is_differential': True, 'used_as_single_ended': False, 'io_type': 'in', 'is_clock': True },

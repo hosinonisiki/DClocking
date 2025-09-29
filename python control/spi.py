@@ -33,13 +33,13 @@ class Spi():
         time.sleep(0.1)
         return response[-1 - read_length:-1]
 
-class SpiChip(Spi):
-    def __init__(self, name, serial):
-        super().__init__(serial)
+class SpiChip():
+    def __init__(self, name, spi):
         self.name = name.upper().ljust(4, '_')
+        self.spi = spi
 
     def write(self, data):
-        return super().write(self.name, 3, 3, data).hex()
+        return self.spi.write(self.name, 3, 3, data).hex()
     
     def read(self, data):
-        return super().write(self.name, 3, 2, data).hex()
+        return self.spi.write(self.name, 3, 2, data).hex()

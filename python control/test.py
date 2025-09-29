@@ -3,6 +3,7 @@ import bus
 import module
 import module_signal_router
 import spi
+from boards import *
 from port_numbers import *
 import time
 
@@ -103,7 +104,7 @@ if VERBOSE:
     spi.write("P1C2", 2, 2, "1002")
     spi.write("P1C2", 2, 2, "1100")
     spi.write("P1C2", 2, 2, "1200")
-    '''
+    
 
     #FL9627 initial settings
     print("writing configuration for P1C1")
@@ -193,6 +194,8 @@ if VERBOSE:
     spi.write("P3C2", 3, 3, "001789") # DCO clock delay
     spi.write("P3C2", 3, 3, "001800") # Input span select
     spi.write("P3C2", 3, 3, "00FF01") # Transfer
+    '''
+    init_FH8052(spi, 3)
 
     router.set_routing(OUTPUT_C, SCALER_OUT)
     router.set_routing(SCALER_IN, PID_OUT)
