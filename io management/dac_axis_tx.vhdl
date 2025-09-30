@@ -48,7 +48,7 @@ begin
         end if;
     end process;
 
-    channel_a_upsampling : entity work.fir_filter_upsample_4 port map(
+    channel_a_upsampling : entity work.fir_filter_upsample_4(equiripple63) port map(
         clk => clk,
         rst => rst,
         data_in => data_a_in,
@@ -58,7 +58,7 @@ begin
         data_3_out => data_a_3_buf
     );
 
-    channel_b_upsampling : entity work.fir_filter_upsample_4 port map(
+    channel_b_upsampling : entity work.fir_filter_upsample_4(equiripple63) port map(
         clk => clk,
         rst => rst,
         data_in => data_b_in,
