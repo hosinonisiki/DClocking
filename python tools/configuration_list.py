@@ -560,7 +560,7 @@ FH8052_configuration.instantiation_head = [
     '    dac_b_data => dac_buf(<natural>),\n', \
     '    sys_clk_250M => sys_clk,\n', \
     '    sys_clk_125M => sys_clk_125M,\n', \
-    '    sys_rst => sys_rst,\n'
+    '    sys_rst => sys_rst,\n', \
     '    spi_ss => spi_ss(<SPI_SS_INDEX>),\n', \
     '    spi_sck => spi_sclk,\n', \
     '    spi_mosi => spi_mosi,\n', \
@@ -747,4 +747,141 @@ FH8052_configuration.signal_mapping = [
     { 'signal_name': 'clk_status_fmc', 'index': 1, 'pin': 'la07', 'pin_suffix': '_n' },
     { 'signal_name': 'eeprom_iic_scl_fmc', 'index': None, 'pin': 'scl', 'pin_suffix': '' },
     { 'signal_name': 'eeprom_iic_sda_fmc', 'index': None, 'pin': 'sda', 'pin_suffix': '' }
+]
+
+# Configuration for FH9767D
+FH9767D_configuration = ChipConfiguration('FH9767D', 6)
+FH9767D_configuration.instantiation_head = [
+    'FH9767D : entity work.FH9767D_adapter port map(\n', \
+    '    dac_a_data => dac_buf(<natural>),\n', \
+    '    dac_b_data => dac_buf(<natural>),\n', \
+    '    dac_c_data => dac_buf(<natural>),\n', \
+    '    dac_d_data => dac_buf(<natural>),\n', \
+    '    sys_clk => sys_clk,\n', \
+    '    dac_clk_125M => sys_clk_125M,\n', \
+    '    sys_rst => sys_rst,\n'
+]
+FH9767D_configuration.instantiation_tail = [');\n']
+FH9767D_configuration.port_signals = {
+    'dac_a_data_fmc' : 'std_logic_vector(13 downto 0)', \
+    'dac_b_data_fmc' : 'std_logic_vector(13 downto 0)', \
+    'dac_c_data_fmc' : 'std_logic_vector(13 downto 0)', \
+    'dac_d_data_fmc' : 'std_logic_vector(13 downto 0)', \
+    'dac_a_wrt_fmc' : 'std_logic', \
+    'dac_b_wrt_fmc' : 'std_logic', \
+    'dac_c_wrt_fmc' : 'std_logic', \
+    'dac_d_wrt_fmc' : 'std_logic', \
+    'dac_a_clk_fmc' : 'std_logic', \
+    'dac_b_clk_fmc' : 'std_logic', \
+    'dac_c_clk_fmc' : 'std_logic', \
+    'dac_d_clk_fmc' : 'std_logic' \
+}
+FH9767D_configuration.fmc_name = None # Decided runtime
+FH9767D_configuration.fmc_id = None # Decided runtime
+FH9767D_configuration.fmc_type = "lpc"
+FH9767D_configuration.fmc_configuration = {
+    'clk0': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'in', 'io_type_n': 'in', 'is_clock': False, 'is_clock_n': False },
+    'clk1': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'in', 'io_type_n': 'in', 'is_clock': False, 'is_clock_n': False },
+    'la00': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': True, 'is_clock_n': False },
+    'la01': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': True, 'is_clock_n': False },
+    'la02': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la03': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la04': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la05': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la06': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la07': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la08': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la09': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la10': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la11': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la12': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la13': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la14': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la15': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la16': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la17': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': True, 'is_clock_n': False },
+    'la18': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': True, 'is_clock_n': False },
+    'la19': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la20': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la21': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la22': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la23': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la24': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la25': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la26': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'in', 'io_type_n': 'in', 'is_clock': False, 'is_clock_n': False },
+    'la27': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'in', 'io_type_n': 'in', 'is_clock': False, 'is_clock_n': False },
+    'la28': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la29': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la30': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la31': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la32': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'la33': { 'is_differential': True, 'used_as_single_ended': True, 'io_type': 'out', 'io_type_n': 'out', 'is_clock': False, 'is_clock_n': False },
+    'scl': { 'is_differential': False, 'io_type': 'in', 'is_clock': False },
+    'sda': { 'is_differential': False, 'io_type': 'in', 'is_clock': False }
+}
+FH9767D_configuration.signal_mapping = [
+    { 'signal_name': 'dac_a_data_fmc', 'index': 0, 'pin': 'la07', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_a_data_fmc', 'index': 1, 'pin': 'la07', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_a_data_fmc', 'index': 2, 'pin': 'la08', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_a_data_fmc', 'index': 3, 'pin': 'la08', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_a_data_fmc', 'index': 4, 'pin': 'la05', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_a_data_fmc', 'index': 5, 'pin': 'la06', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_a_data_fmc', 'index': 6, 'pin': 'la04', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_a_data_fmc', 'index': 7, 'pin': 'la04', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_a_data_fmc', 'index': 8, 'pin': 'la03', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_a_data_fmc', 'index': 9, 'pin': 'la03', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_a_data_fmc', 'index': 10, 'pin': 'la05', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_a_data_fmc', 'index': 11, 'pin': 'la06', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_a_data_fmc', 'index': 12, 'pin': 'la02', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_a_data_fmc', 'index': 13, 'pin': 'la02', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_b_data_fmc', 'index': 0, 'pin': 'la14', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_b_data_fmc', 'index': 1, 'pin': 'la14', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_b_data_fmc', 'index': 2, 'pin': 'la13', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_b_data_fmc', 'index': 3, 'pin': 'la13', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_b_data_fmc', 'index': 4, 'pin': 'la16', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_b_data_fmc', 'index': 5, 'pin': 'la16', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_b_data_fmc', 'index': 6, 'pin': 'la10', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_b_data_fmc', 'index': 7, 'pin': 'la09', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_b_data_fmc', 'index': 8, 'pin': 'la10', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_b_data_fmc', 'index': 9, 'pin': 'la11', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_b_data_fmc', 'index': 10, 'pin': 'la11', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_b_data_fmc', 'index': 11, 'pin': 'la09', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_b_data_fmc', 'index': 12, 'pin': 'la12', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_b_data_fmc', 'index': 13, 'pin': 'la12', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_c_data_fmc', 'index': 0, 'pin': 'la25', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_c_data_fmc', 'index': 1, 'pin': 'la25', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_c_data_fmc', 'index': 2, 'pin': 'la21', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_c_data_fmc', 'index': 3, 'pin': 'la21', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_c_data_fmc', 'index': 4, 'pin': 'la22', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_c_data_fmc', 'index': 5, 'pin': 'la22', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_c_data_fmc', 'index': 6, 'pin': 'la23', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_c_data_fmc', 'index': 7, 'pin': 'la23', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_c_data_fmc', 'index': 8, 'pin': 'la20', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_c_data_fmc', 'index': 9, 'pin': 'la19', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_c_data_fmc', 'index': 10, 'pin': 'la19', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_c_data_fmc', 'index': 11, 'pin': 'la20', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_c_data_fmc', 'index': 12, 'pin': 'la15', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_c_data_fmc', 'index': 13, 'pin': 'la15', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_d_data_fmc', 'index': 0, 'pin': 'la32', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_d_data_fmc', 'index': 1, 'pin': 'la32', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_d_data_fmc', 'index': 2, 'pin': 'la33', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_d_data_fmc', 'index': 3, 'pin': 'la33', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_d_data_fmc', 'index': 4, 'pin': 'la30', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_d_data_fmc', 'index': 5, 'pin': 'la30', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_d_data_fmc', 'index': 6, 'pin': 'la31', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_d_data_fmc', 'index': 7, 'pin': 'la31', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_d_data_fmc', 'index': 8, 'pin': 'la29', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_d_data_fmc', 'index': 9, 'pin': 'la28', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_d_data_fmc', 'index': 10, 'pin': 'la28', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_d_data_fmc', 'index': 11, 'pin': 'la29', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_d_data_fmc', 'index': 12, 'pin': 'la24', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_d_data_fmc', 'index': 13, 'pin': 'la24', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_a_wrt_fmc', 'index': None, 'pin': 'la00', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_b_wrt_fmc', 'index': None, 'pin': 'la01', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_c_wrt_fmc', 'index': None, 'pin': 'la18', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_d_wrt_fmc', 'index': None, 'pin': 'la17', 'pin_suffix': '_n' },
+    { 'signal_name': 'dac_a_clk_fmc', 'index': None, 'pin': 'la00', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_b_clk_fmc', 'index': None, 'pin': 'la01', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_c_clk_fmc', 'index': None, 'pin': 'la18', 'pin_suffix': '_p' },
+    { 'signal_name': 'dac_d_clk_fmc', 'index': None, 'pin': 'la17', 'pin_suffix': '_p' }
 ]
