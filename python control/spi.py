@@ -30,9 +30,10 @@ class Spi():
         response = self.serial.post(message)
 
         read_length = length - write_length
-        time.sleep(0.1)
+        time.sleep(0.01)
         return response[-1 - read_length:-1]
 
+# Applies for specific ADI chips where register address length is 2 bytes
 class SpiChip():
     def __init__(self, name, spi):
         self.name = name.upper().ljust(4, '_')
