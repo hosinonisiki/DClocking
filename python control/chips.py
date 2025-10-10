@@ -205,7 +205,7 @@ def init_AD9528(spi, port, chip):
     chip.write("000F01") # update all
     time.sleep(0.5)
     ret = chip.read("8508")
-    if ret != "f2":
+    if ret != "f2": # Could be f3 if pll1 was previously locked to an external ref
         raise Exception("AD9528 not locked, status: " + ret + " at x0508.")
     
 def init_AD9528_ext_ref(spi, port, chip):
@@ -315,7 +315,6 @@ def init_AD9528_ext_ref(spi, port, chip):
     chip.write("000F01") # update all
     time.sleep(0.5)
     ret = chip.read("8508")
-    print("AD9528 status: " + ret + " at x0508.")
-    #if ret != "f2":
-    #    raise Exception("AD9528 not locked, status: " + ret + " at x0508.")
+    if ret != "e7":
+        raise Exception("AD9528 not locked, status: " + ret + " at x0508.")
 

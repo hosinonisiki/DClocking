@@ -4,6 +4,7 @@ import module
 import module_signal_router
 import spi
 from boards import *
+from chips import *
 from port_numbers import *
 import time
 
