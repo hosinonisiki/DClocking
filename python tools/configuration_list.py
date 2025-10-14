@@ -565,7 +565,9 @@ FH8052_configuration.instantiation_head = [
     '    spi_sck => spi_sclk,\n', \
     '    spi_mosi => spi_mosi,\n', \
     '    spi_miso => spi_miso_buf(<SPI_MISO_BUF_INDEX>),\n', \
-    '    spi_io_tri => spi_io_tri,\n'
+    '    spi_io_tri => spi_io_tri,\n', \
+    '    ref_clk_p => ref_clk_p,\n', \
+    '    ref_clk_n => ref_clk_n,\n'
 ]
 FH8052_configuration.instantiation_tail = [');\n']
 FH8052_configuration.port_signals = {

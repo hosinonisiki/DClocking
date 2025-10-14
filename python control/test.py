@@ -124,6 +124,7 @@ if VERBOSE:
     spi.write("P1C2", 3, 3, "001701") # Output Delay
     spi.write("P1C2", 3, 3, "00FF01") # Transfer
 
+    #FL9613 initial settings
     print("writing configuration for P3C3")
     spi.write("P3C3", 3, 3, "00003C") # Soft Reset
     spi.write("P3C3", 3, 3, "000018") # Set
@@ -163,7 +164,6 @@ if VERBOSE:
     spi.write("P3C3", 3, 3, "001807") # VCO cal now
     spi.write("P3C3", 3, 3, "023201") # Update all registers
 
-    #FL9613 initial settings
     print("writing configuration for P3C1")
     #spi.write("P3C1", 3, 3, "00003C") # Soft Reset
     #spi.write("P3C1", 3, 3, "000018") # Set
@@ -196,7 +196,11 @@ if VERBOSE:
     spi.write("P3C2", 3, 3, "001800") # Input span select
     spi.write("P3C2", 3, 3, "00FF01") # Transfer
     '''
-    init_FH8052(spi, 3)
+    try:
+        init_FL9627(spi, 1)
+        init_FH8052(spi, 3)
+    except Exception as e:
+        print("Error during board initialization: {}".format(e))
 
     router.set_routing(OUTPUT_C, SCALER_OUT)
     router.set_routing(SCALER_IN, PID_OUT)

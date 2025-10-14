@@ -14,3 +14,8 @@ def init_FH8052_ext_ref(spi, port):
     init_AD9152(spi, port, 2)
     return
 
+def init_FL9627(spi, port):
+    print("Configuring FL9627 on fmc port {}".format(port))
+    init_AD9627(spi, port, 1)
+    init_AD9627(spi, port, 2)
+    return

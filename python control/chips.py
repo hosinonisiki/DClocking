@@ -259,10 +259,10 @@ def init_AD9528_ext_ref(spi, port, chip):
     chip.write("030F00")
     chip.write("031000")
     chip.write("0311FF")
-    # channel 6, 0312 to 0314, dac core clk to fpga, 250MHz
+    # channel 6, 0312 to 0314, dac core clk to fpga, 200MHz, used as system reference clk
     chip.write("031200")
     chip.write("031300")
-    chip.write("031403")
+    chip.write("031404")
     # channel 7, 0315 to 0317, dac refclk to fpga, 250MHz
     chip.write("031500")
     chip.write("031600")
@@ -275,10 +275,10 @@ def init_AD9528_ext_ref(spi, port, chip):
     chip.write("031B00")
     chip.write("031C00")
     chip.write("031DFF")
-    # channel 10, 031E to 0320, adc core clk to fpga, 250MHz
+    # channel 10, 031E to 0320, adc core clk to fpga, 200MHz, used as system reference clk
     chip.write("031E00")
     chip.write("031F00")
-    chip.write("032003")
+    chip.write("032004")
     # channel 13, 0327 to 0329, adc refclk to fpga, 250MHz
     chip.write("032700")
     chip.write("032800")
@@ -318,3 +318,13 @@ def init_AD9528_ext_ref(spi, port, chip):
     if ret != "e7":
         raise Exception("AD9528 not locked, status: " + ret + " at x0508.")
 
+def init_AD9627(spi, port, chip):
+    print("Configuring AD9627 on fmc port {}, chip {}".format(port, chip))
+    name = "P{}C{}".format(port, chip)
+    chip = sp.SpiChip(name, spi)
+    chip.write("00003C") # Soft Reset
+    chip.write("000018") # Set
+    chip.write("000503") # Enable
+    chip.write("001441") # Output Mode 2's comp
+    chip.write("001701") # Output Delay
+    chip.write("00FF01") # Transfer

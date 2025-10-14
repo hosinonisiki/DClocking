@@ -25,6 +25,8 @@ entity FH8052_adapter is
         spi_mosi        :   in  std_logic;
         spi_miso        :   out std_logic;
         spi_io_tri      :   in  std_logic;
+        ref_clk_p       :   out std_logic;
+        ref_clk_n       :   out std_logic;
         
         -- fmc ports
         tx_ref_clk_p_fmc    :   in  std_logic;
@@ -358,4 +360,6 @@ begin
     dac_txen_fmc <= '1';
     eeprom_iic_scl_fmc <= '1';
     eeprom_iic_sda_fmc <= '0';
+    ref_clk_p <= rx_core_clk_p_fmc;
+    ref_clk_n <= rx_core_clk_n_fmc;
 end architecture structural;
