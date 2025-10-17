@@ -96,7 +96,7 @@ architecture structural of FL9627_adapter is
     attribute ASYNC_REG of sys_rst_adc_c_d_1 : signal is "TRUE";
     attribute ASYNC_REG of sys_rst_adc_c_d_2 : signal is "TRUE";
 begin
-    -- 1 bit cdc syncronizer for sys_rst
+    -- 1 bit cdc synchronizer for sys_rst
     process(adc_a_b_dco)
     begin
         if rising_edge(adc_a_b_dco) then

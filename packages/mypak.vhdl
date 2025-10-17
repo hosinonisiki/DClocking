@@ -54,7 +54,7 @@ package mypak is
     constant baudrate       :   integer := 19200; -- Baudrate for the UART.
     -- constant baudrate       :   integer := 3_906_250; -- Only use in simulation.
 
-    constant spi_clk_freq   :   integer := 10_000_000; -- SPI clock frequency in Hz.
+    constant spi_clk_freq   :   integer := 1_000_000; -- SPI clock frequency in Hz.
 
     type signal_array is array(natural range <>) of std_logic_vector(15 downto 0); -- Used in the router's io ports and mim_wrapper and top interface.
 

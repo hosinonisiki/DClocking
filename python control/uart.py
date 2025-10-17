@@ -6,16 +6,25 @@ class MySerial(Serial):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def post(self, message):
+    def post(self, message, repeated = True, verbose = False):
         self.write(message)
+        if repeated:
+            response = self.read_until(b"!")
+            while True:
+                if response[-6] == 46 and response[-11] == 46:
+                    break
+                response += self.read_until(b"!")
+            if verbose:
+                print(response)
+            if response != message:
+                raise Exception("Error in transmission. Sent: " + message.decode() + ", Received: " + response.decode())
         response = self.read_until(b"!")
         while True:
-            if response[-6] == 46 and response[-11] == 46:
+            if response[-6] == 46 or response[-6] == 58:
                 break
             response += self.read_until(b"!")
-        print(response)
-        response = self.read_until(b"!")
-        print(response)
+        if verbose:
+            print(response)
         if response[:5] != b":ACKN":
             raise Exception("Error in transmission. Received: " + response.decode())
         return response

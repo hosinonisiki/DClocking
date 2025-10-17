@@ -34,6 +34,8 @@ entity async_fifo is
         wfull_out       :   out std_logic;
         rfull_out       :   out std_logic
     );
+    attribute DONT_TOUCH : string;
+    attribute DONT_TOUCH of async_fifo : entity is "TRUE";
 end entity async_fifo;
 
 architecture structural of async_fifo is
@@ -49,6 +51,9 @@ architecture structural of async_fifo is
     attribute ASYNC_REG of empty_2 : signal is "TRUE";
     attribute ASYNC_REG of full_1 : signal is "TRUE";
     attribute ASYNC_REG of full_2 : signal is "TRUE";
+    
+    attribute DONT_TOUCH of structural : architecture is "TRUE";
+    attribute DONT_TOUCH of async_fifo_inst : label is "TRUE";
 begin
     async_fifo_inst : xpm_fifo_async generic map(
         CASCADE_HEIGHT => 0,        -- DECIMAL
