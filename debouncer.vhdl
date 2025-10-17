@@ -29,12 +29,12 @@ architecture behavioral of debouncer is
     signal counter      : unsigned(31 downto 0) := (others => '0');
     signal input_stable : std_logic := '0';
 begin
-    process(clk)
+    process(clk, rst)
     begin
-        if rising_edge(clk) then
-            if rst = '1' then
-                counter <= (others => '0');
-            else
+        if rst = '1' then
+            counter <= (others => '0');
+        else
+            if rising_edge(clk) then
                 if input_stable = '0' and input_1 = input then
                     counter <= counter + x"00000001";
                 else
@@ -44,12 +44,12 @@ begin
         end if;
     end process;
 
-    process(clk)
+    process(clk, rst)
     begin
-        if rising_edge(clk) then
-            if rst = '1' then
-                input_stable <= '0';
-            else
+        if rst = '1' then
+            input_stable <= '0';
+        else
+            if rising_edge(clk) then
                 if input_stable = '1' and input_1 /= input then
                     input_stable <= '0';
                 elsif input_stable = '0' and counter = debounce_cycles_unsigned then
@@ -59,12 +59,12 @@ begin
         end if;
     end process;
 
-    process(clk)
+    process(clk, rst)
     begin
-        if rising_edge(clk) then
-            if rst = '1' then
-                output <= default_output;
-            else
+        if rst = '1' then
+            output <= default_output;
+        else
+            if rising_edge(clk) then
                 if input_stable = '1' then
                     output <= input_2;
                 end if;
@@ -72,11 +72,16 @@ begin
         end if;
     end process;
 
-    process(clk)
+    process(clk, rst)
     begin
-        if rising_edge(clk) then
-            input_1 <= input;
-            input_2 <= input_1;
+        if rst = '1' then
+            input_1 <= default_output;
+            input_2 <= default_output;
+        else
+            if rising_edge(clk) then
+                input_1 <= input;
+                input_2 <= input_1;
+            end if;
         end if;
     end process;
 end architecture behavioral;

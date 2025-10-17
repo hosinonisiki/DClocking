@@ -16,6 +16,7 @@ entity wrapper is
         sys_clk_p       :   in  std_logic;
         sys_clk_n       :   in  std_logic;
         rst             :   in  std_logic;
+        sys_mmcm_sel_cmd_raw    :   in std_logic; -- User key that flips clock source selection
 
         -- To serial port
         uart_txd_o      :   out std_logic;
@@ -102,8 +103,6 @@ entity wrapper is
         fmc1_lpc_la32_n_b : out std_logic;
         fmc1_lpc_la33_p_b : in std_logic;
         fmc1_lpc_la33_n_b : in std_logic;
-        fmc1_lpc_scl_b : out std_logic;
-        fmc1_lpc_sda_b : out std_logic;
 
         fmc2_lpc_clk0_p_b : in std_logic;
         fmc2_lpc_clk0_n_b : in std_logic;
@@ -177,8 +176,6 @@ entity wrapper is
         fmc2_lpc_la32_n_b : out std_logic;
         fmc2_lpc_la33_p_b : out std_logic;
         fmc2_lpc_la33_n_b : out std_logic;
-        fmc2_lpc_scl_b : in std_logic;
-        fmc2_lpc_sda_b : in std_logic;
 
         fmc3_hpc_clk0_p_b : in std_logic;
         fmc3_hpc_clk0_n_b : in std_logic;
@@ -361,6 +358,15 @@ architecture peripheral_wrapper of wrapper is
     signal sys_rst : std_logic := '0';
     signal sys_rst_raw : std_logic;
     signal sys_rst_bar : std_logic;
+    signal ref_clk_p : std_logic := '0';
+    signal ref_clk_n : std_logic := '1';
+    signal sys_mmcm_rst : std_logic := '0';
+    signal sys_mmcm_sel : std_logic := '1';
+
+    signal sys_clk_in_buf : std_logic;
+    signal sys_clk_in : std_logic;
+    signal sys_mmcm_sel_cmd_buf : std_logic := '1';
+    signal sys_mmcm_sel_cmd     : std_logic := '1';
 
     signal led_1 : std_logic;
     signal led_2 : std_logic;
@@ -764,8 +770,10 @@ architecture peripheral_wrapper of wrapper is
             clk_out3            : out    std_logic;
             reset               : in     std_logic;
             locked              : out    std_logic;
-            clk_in1_p           : in     std_logic;
-            clk_in1_n           : in     std_logic
+            clk_in1             : in     std_logic;
+            clk_in2_p           : in     std_logic;
+            clk_in2_n           : in     std_logic;
+            clk_in_sel          : in     std_logic
         );
     end component;
 begin
@@ -799,19 +807,19 @@ begin
                 '0';
 
     -- leds
-    led_1 <= not uart_rxd; -- detects input bit flow
-    led_2 <= not uart_txd; -- detects output bit flow
+    led_1 <= not sys_mmcm_sel; -- indicates which clock source is selected, dark for internal, lit for external
+    led_2 <= uart_rxd nand uart_txd; -- detects uart bit flow
     led_3 <= uart_err; -- detects uart error
     led_4 <= not (and spi_ss); -- detects if any spi chip is selected
-    panel_led_1 <= '1'; -- detects if the system is running
+    panel_led_1 <= sys_rst; -- detects if the system is reset
 
     -- ADAPTER INSTANTIATION GENERATION START
 
     FL9627 : entity work.FL9627_adapter port map(
-        adc_a_data => adc_buf(<natural>),
-        adc_b_data => adc_buf(<natural>),
-        adc_c_data => adc_buf(<natural>),
-        adc_d_data => adc_buf(<natural>),
+        adc_a_data => adc_buf(0),
+        adc_b_data => adc_buf(1),
+        adc_c_data => adc_buf(2),
+        adc_d_data => adc_buf(3),
         adc_spi_ss => spi_ss(0 to 3),
         adc_spi_sck => spi_sclk,
         adc_spi_mosi => spi_mosi,
@@ -837,10 +845,10 @@ begin
     );
 
     FH9767D : entity work.FH9767D_adapter port map(
-        dac_a_data => dac_buf(<natural>),
-        dac_b_data => dac_buf(<natural>),
-        dac_c_data => dac_buf(<natural>),
-        dac_d_data => dac_buf(<natural>),
+        dac_a_data => dac_buf(0),
+        dac_b_data => dac_buf(1),
+        dac_c_data => dac_buf(2),
+        dac_d_data => dac_buf(3),
         sys_clk => sys_clk,
         dac_clk_125M => sys_clk_125M,
         sys_rst => sys_rst,
@@ -859,10 +867,10 @@ begin
     );
 
     FH8052 : entity work.FH8052_adapter port map(
-        adc_a_data => adc_buf(<natural>),
-        adc_b_data => adc_buf(<natural>),
-        dac_a_data => dac_buf(<natural>),
-        dac_b_data => dac_buf(<natural>),
+        adc_a_data => adc_buf(4),
+        adc_b_data => adc_buf(5),
+        dac_a_data => dac_buf(4),
+        dac_b_data => dac_buf(5),
         sys_clk_250M => sys_clk,
         sys_clk_125M => sys_clk_125M,
         sys_rst => sys_rst,
@@ -871,6 +879,8 @@ begin
         spi_mosi => spi_mosi,
         spi_miso => spi_miso_buf(2),
         spi_io_tri => spi_io_tri,
+        ref_clk_p => ref_clk_p,
+        ref_clk_n => ref_clk_n,
         tx_ref_clk_p_fmc => fmc3_hpc_tx_ref_clk_p_fmc_buf,
         tx_ref_clk_n_fmc => fmc3_hpc_tx_ref_clk_n_fmc_buf,
         rx_ref_clk_p_fmc => fmc3_hpc_rx_ref_clk_p_fmc_buf,
@@ -1076,14 +1086,25 @@ begin
     -- io management
 
     -- clk
+    sys_clk_ibufds : IBUFDS port map(
+        I => sys_clk_p,
+        IB => sys_clk_n,
+        O => sys_clk_in_buf
+    );
+    sys_clk_in_bufg : BUFG port map(
+        I => sys_clk_in_buf,
+        O => sys_clk_in
+    );
     sys_clk_mmcm_inst : sys_clk_mmcm port map(
         clk_out1 => sys_clk_buf,
         clk_out2 => sys_clk_125M_buf,
         clk_out3 => sys_clk_250M_buf,
-        reset => '0',
+        reset => sys_mmcm_rst,
         locked => sys_clk_locked,
-        clk_in1_p => sys_clk_p,
-        clk_in1_n => sys_clk_n
+        clk_in1 => sys_clk_in,
+        clk_in2_p => ref_clk_p,
+        clk_in2_n => ref_clk_n,
+        clk_in_sel => sys_mmcm_sel -- '1' for sys_clk, '0' for ref_clk
     );
     sys_clk_bufgce : BUFGCE port map(
         O => sys_clk,
@@ -1099,6 +1120,28 @@ begin
         O => sys_clk_250M,
         CE => sys_clk_locked,
         I => sys_clk_250M_buf
+    );
+
+    -- clk selection
+    sys_mmcm_sel_cmd_ibuf : IBUF port map(
+        O => sys_mmcm_sel_cmd_buf,
+        I => sys_mmcm_sel_cmd_raw
+    );
+    sys_mmcm_sel_cmd_debouncer : entity work.debouncer generic map(
+        debounce_time => 10, -- 10ms debounce time
+        default_output => '1' -- key suspended high
+    )port map(
+        clk => sys_clk_in, 
+        rst => '0', -- Do not reset the debouncer during clock switching
+        input => sys_mmcm_sel_cmd_buf,
+        output => sys_mmcm_sel_cmd
+    );
+    sys_mmcm_sel_ctrl_inst : entity work.sys_mmcm_sel_ctrl port map(
+        clk => sys_clk_in, -- Don't use clock from MMCM
+        rst => '0', -- Do not reset the controller during clock switching
+        sys_mmcm_sel_cmd => sys_mmcm_sel_cmd,
+        sys_mmcm_sel => sys_mmcm_sel,
+        sys_mmcm_rst => sys_mmcm_rst
     );
 
     -- rst
@@ -1374,14 +1417,6 @@ begin
     fmc1_lpc_la33_n_ibuf : IBUF port map(
         I => fmc1_lpc_la33_n_b,
         O => fmc1_lpc_la33_n
-    );
-    fmc1_lpc_scl_obuf : OBUF port map(
-        I => fmc1_lpc_scl,
-        O => fmc1_lpc_scl_b
-    );
-    fmc1_lpc_sda_obuf : OBUF port map(
-        I => fmc1_lpc_sda,
-        O => fmc1_lpc_sda_b
     );
 
     fmc2_lpc_clk0_p_ibuf : IBUF port map(
@@ -1671,14 +1706,6 @@ begin
     fmc2_lpc_la33_n_obuf : OBUF port map(
         I => fmc2_lpc_la33_n,
         O => fmc2_lpc_la33_n_b
-    );
-    fmc2_lpc_scl_ibuf : IBUF port map(
-        I => fmc2_lpc_scl_b,
-        O => fmc2_lpc_scl
-    );
-    fmc2_lpc_sda_ibuf : IBUF port map(
-        I => fmc2_lpc_sda_b,
-        O => fmc2_lpc_sda
     );
 
     fmc3_hpc_clk0_p_ibuf : IBUF port map(
