@@ -19,12 +19,6 @@
 
 -- All flags are high-active.
 
--- hardware types:
--- board : AXKU041
--- FPGA : XCKU040-FFVA1156-2-I
--- adc : FL9613 12 bit
--- dac : FL9781 14 bit
-
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -255,6 +249,182 @@ begin
             auto_reset_in   => ctrl_bank_out(1)
         );
     end block module_6_block;
+
+    module_7_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_FIRF_ADDR else '0'; -- constant defined in mypak
+        module_7 : entity work.module_fir_filter port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(7),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(7),
+            rsp_stat_out    =>  rsbus(7),
+            
+            sig_in          => sig_bank_out(11),
+            sig_out         => sig_bank_in(15)
+        );
+    end block module_7_block;
+
+    module_8_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_MIXR_ADDR else '0'; -- constant defined in mypak
+        module_8 : entity work.module_mixer port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(8),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(8),
+            rsp_stat_out    =>  rsbus(8),
+            
+            sig_a_in        => sig_bank_out(12),
+            sig_b_in        => sig_bank_out(13),
+            sig_out         => sig_bank_in(16)
+        );
+    end block module_8_block;
+
+    module_9_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_SCL2_ADDR else '0'; -- constant defined in mypak
+        module_9 : entity work.module_scaler port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(9),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(9),
+            rsp_stat_out    =>  rsbus(9),
+            
+            sig_in         => sig_bank_out(14),
+            sig_out        => sig_bank_in(17)
+        );
+    end block module_9_block;
+
+    module_10_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_SCL3_ADDR else '0'; -- constant defined in mypak
+        module_10 : entity work.module_scaler port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(10),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(10),
+            rsp_stat_out    =>  rsbus(10),
+            
+            sig_in         => sig_bank_out(15),
+            sig_out        => sig_bank_in(18)
+        );
+    end block module_10_block;
+
+    module_11_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_SCL4_ADDR else '0'; -- constant defined in mypak
+        module_11 : entity work.module_scaler port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(11),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(11),
+            rsp_stat_out    =>  rsbus(11),
+            
+            sig_in         => sig_bank_out(16),
+            sig_out        => sig_bank_in(19)
+        );
+    end block module_11_block;
+
+    module_12_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_ATAN_ADDR else '0'; -- constant defined in mypak
+        module_12 : entity work.module_inv_trigonometric port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(12),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(12),
+            rsp_stat_out    =>  rsbus(12),
+            
+            sin_in         => sig_bank_out(17),
+            cos_in         => sig_bank_out(18),
+            phase_out      => sig_bank_in(20)
+        );
+    end block module_12_block;
+
+    module_13_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_FIR2_ADDR else '0'; -- constant defined in mypak
+        module_13 : entity work.module_fir_filter port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(13),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(13),
+            rsp_stat_out    =>  rsbus(13),
+            
+            sig_in          => sig_bank_out(19),
+            sig_out         => sig_bank_in(21)
+        );
+    end block module_13_block;
+
+    module_14_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_MIX2_ADDR else '0'; -- constant defined in mypak
+        module_14 : entity work.module_mixer port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(14),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(14),
+            rsp_stat_out    =>  rsbus(14),
+            
+            sig_a_in        => sig_bank_out(20),
+            sig_b_in        => sig_bank_out(21),
+            sig_out         => sig_bank_in(22)
+        );
+    end block module_14_block;
+
+    module_15_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_UNWR_ADDR else '0'; -- constant defined in mypak
+        module_15 : entity work.module_unwrapper port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(15),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(15),
+            rsp_stat_out    =>  rsbus(15),
+            
+            sig_in          => sig_bank_out(22),
+            sig_out         => sig_bank_in(23),
+
+            auto_reset_in   => ctrl_bank_out(2)
+        );
+    end block module_15_block;
 
     -- signal banks provided by the router
     -- Last 8 channels reserved for top adc and dac ports

@@ -363,6 +363,8 @@ architecture peripheral_wrapper of wrapper is
     signal sys_clk_125M_buf : std_logic;
     signal sys_clk_250M : std_logic;
     signal sys_clk_250M_buf : std_logic;
+    signal sys_clk_500M : std_logic;
+    signal sys_clk_500M_buf : std_logic;
     signal sys_rst : std_logic := '0';
     signal sys_rst_raw : std_logic;
     signal sys_rst_bar : std_logic;
@@ -781,6 +783,7 @@ architecture peripheral_wrapper of wrapper is
             clk_out1            : out    std_logic;
             clk_out2            : out    std_logic;
             clk_out3            : out    std_logic;
+            clk_out4            : out    std_logic;
             reset               : in     std_logic;
             locked              : out    std_logic;
             clk_in1             : in     std_logic;
@@ -916,6 +919,7 @@ begin
         sys_clk_250M => sys_clk,
         sys_clk_125M => sys_clk_125M,
         sys_rst => sys_rst,
+        jesd204_rst => sys_mmcm_sel or (not sys_clk_locked),
         spi_ss => spi_ss(8 to 11),
         spi_sck => spi_sclk,
         spi_mosi => spi_mosi,
@@ -1148,6 +1152,7 @@ begin
         clk_out1 => sys_clk_buf,
         clk_out2 => sys_clk_125M_buf,
         clk_out3 => sys_clk_250M_buf,
+        clk_out4 => sys_clk_500M_buf,
         reset => sys_mmcm_rst,
         locked => sys_clk_locked,
         clk_in1 => sys_clk_in,
@@ -1169,6 +1174,11 @@ begin
         O => sys_clk_250M,
         CE => sys_clk_locked,
         I => sys_clk_250M_buf
+    );
+    sys_clk_500M_bufgce : BUFGCE port map(
+        O => sys_clk_500M,
+        CE => sys_clk_locked,
+        I => sys_clk_500M_buf
     );
 
     -- clk selection

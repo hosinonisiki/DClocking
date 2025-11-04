@@ -12,7 +12,7 @@ package mypak is
     type buf_type is (buf_for_io, buf_i_only, buf_o_only, buf_none); -- Universal io buffer type for the core modules.
 
     constant dbus_w     :   integer := 32; -- Width of the data bus.
-    constant abus_w     :   integer := 6; -- Width of the address bus. This determines the size of individual memories in each module.
+    constant abus_w     :   integer := 7; -- Width of the address bus. This determines the size of individual memories in each module.
     constant mbus_w     :   integer := 5; -- Width of the module selection bus. This determines the max number of modules that can be connected to the bus.
     constant cbus_w     :   integer := 5; -- Width of the control bus.
     constant rdbus_w    :   integer := 32; -- Width of the response data bus.
@@ -21,13 +21,22 @@ package mypak is
 
     constant log_dbus_w :   integer := 5; -- Log2 of the data bus width.
 
-    constant module_count   : integer := 6; -- Number of modules connected to the bus.
+    constant module_count   : integer := 15; -- Number of modules connected to the bus.
     constant BUS_ROUT_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(1, mbus_w)); -- Address of the router module.
     constant BUS_TRIG_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(2, mbus_w)); -- Address of the trigonometric module.
     constant BUS_ACCM_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(3, mbus_w)); -- Address of the accumulator module.
     constant BUS_SCLR_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(4, mbus_w)); -- Address of the scalar module.
     constant BUS_MMWR_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(5, mbus_w)); -- Address of the mim_wrapper module.
     constant BUS_PIDC_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(6, mbus_w)); -- Address of the PID controller module.
+    constant BUS_FIRF_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(7, mbus_w)); -- Address of the FIR filter module.
+    constant BUS_MIXR_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(8, mbus_w)); -- Address of the mixer module.
+    constant BUS_SCL2_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(9, mbus_w)); -- Address of the 2nd scalar module.
+    constant BUS_SCL3_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(10, mbus_w)); -- Address of the 3rd scalar module.
+    constant BUS_SCL4_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(11, mbus_w)); -- Address of the 4th scalar module.
+    constant BUS_ATAN_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(12, mbus_w)); -- Address of the inverse trigonometric module.
+    constant BUS_FIR2_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(13, mbus_w)); -- Address of the 2nd FIR filter module.
+    constant BUS_MIX2_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(14, mbus_w)); -- Address of the 2nd mixer module.
+    constant BUS_UNWR_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(15, mbus_w)); -- Address of the unwrapper module.
 
     -- Used in wrapper and central_control
     constant SPI_P1C1_ADDR      : integer := 0; -- Address of chip 1 on FMC Port 1.

@@ -561,6 +561,7 @@ FH8052_configuration.instantiation_head = [
     '    sys_clk_250M => sys_clk,\n', \
     '    sys_clk_125M => sys_clk_125M,\n', \
     '    sys_rst => sys_rst,\n', \
+    '    jesd204_rst => sys_mmcm_sel or (not sys_clk_locked),\n', \
     '    spi_ss => spi_ss(<SPI_SS_INDEX>),\n', \
     '    spi_sck => spi_sclk,\n', \
     '    spi_mosi => spi_mosi,\n', \

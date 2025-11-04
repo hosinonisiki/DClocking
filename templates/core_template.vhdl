@@ -25,7 +25,7 @@ entity <module_name> is
         -- data flow ports
 
         -- control ports
-        auto_reset_in   :   in  std_logic
+        auto_reset_in   :   in  std_logic -- Remove if the module does not need reset commands from other modules
     );
 end entity <module_name>;
 
