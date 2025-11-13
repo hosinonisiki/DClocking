@@ -32,6 +32,7 @@
 
 -- Two additional banks are added to handle 
 -- inter-module 1-bit control signals.
+--sig_in是一个有64个数据的数组，每个数据16位
 
 library ieee;
 use ieee.std_logic_1164.all;

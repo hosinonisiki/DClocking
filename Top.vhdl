@@ -256,6 +256,30 @@ begin
         );
     end block module_6_block;
 
+    -- module_pdh_state_machine
+    module_7_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_PDHS_ADDR else '0'; 
+        module_7 : entity work.module_pdh_state_machine port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(7),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(7),
+            rsp_stat_out    =>  rsbus(7),
+            
+            -- 数据/控制流接口
+            -- 注意：这些连接是示例，你需要根据实际设计连接到正确的信号
+            sig_in          =>  sig_bank_out(11), -- 示例：连接到信号路由器的输出端口 11
+            pid_enable      =>  ctrl_bank_in(2),  -- 示例：连接到控制路由器的输入端口 2
+            mixer_enable    =>  ctrl_bank_in(3),  -- 示例：连接到控制路由器的输入端口 3
+            sawtooth_enable =>  ctrl_bank_in(4)   -- 示例：连接到控制路由器的输入端口 4
+        );
+    end block module_7_block;
+
     -- signal banks provided by the router
     -- Last 8 channels reserved for top adc and dac ports
     
