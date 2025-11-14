@@ -11,7 +11,7 @@ entity pdh_state_machine is
     port (
         clk             : in  std_logic;  -- System clock
         rst             : in  std_logic;  -- System reset
-        core_param_in   : in  std_logic_vector(127 downto 0); -- Standard parameter bus
+        core_param_in   : in  std_logic_vector(255 downto 0); -- Standard parameter bus
 
         -- Data flow ports (to/from signal_router)
         sig_in          : in  std_logic_vector(15 downto 0);  -- Input signal for validity check

@@ -271,12 +271,10 @@ begin
             rsp_data_out    =>  rdbus(7),
             rsp_stat_out    =>  rsbus(7),
             
-            -- 数据/控制流接口
-            -- 注意：这些连接是示例，你需要根据实际设计连接到正确的信号
-            sig_in          =>  sig_bank_out(11), -- 示例：连接到信号路由器的输出端口 11
-            pid_enable      =>  ctrl_bank_in(2),  -- 示例：连接到控制路由器的输入端口 2
-            mixer_enable    =>  ctrl_bank_in(3),  -- 示例：连接到控制路由器的输入端口 3
-            sawtooth_enable =>  ctrl_bank_in(4)   -- 示例：连接到控制路由器的输入端口 4
+            sig_in          =>  sig_bank_out(11), 
+            pid_enable      =>  ctrl_bank_in(2),  
+            mixer_enable    =>  ctrl_bank_in(3),  
+            sawtooth_enable =>  ctrl_bank_in(4)   
         );
     end block module_7_block;
 
