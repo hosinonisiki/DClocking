@@ -16,6 +16,7 @@ entity FH8052_adapter is
         sys_clk_250M    :   in  std_logic;
         sys_clk_125M    :   in  std_logic;
         sys_rst         :   in  std_logic;
+        jesd204_rst     :   in  std_logic;
         adc_a_data      :   out std_logic_vector(15 downto 0);
         adc_b_data      :   out std_logic_vector(15 downto 0);
         dac_a_data      :   in  std_logic_vector(15 downto 0);
@@ -64,6 +65,7 @@ entity FH8052_adapter is
         eeprom_iic_scl_fmc  :   out std_logic;
         eeprom_iic_sda_fmc  :   out std_logic
     );
+    attribute DONT_TOUCH : string;
 end entity FH8052_adapter;
 
 architecture structural of FH8052_adapter is
@@ -123,6 +125,11 @@ architecture structural of FH8052_adapter is
     signal dac_b_data_fifo_rrst_busy : std_logic;
     signal dac_b_data_fifo_empty : std_logic;
     signal dac_b_data_fifo_full  : std_logic;
+
+    signal tx_core_clk_debug    : std_logic := '0';
+    signal rx_core_clk_debug    : std_logic := '0';
+    attribute DONT_TOUCH of tx_core_clk_debug : signal is "TRUE";
+    attribute DONT_TOUCH of rx_core_clk_debug : signal is "TRUE";
 
     component PZ8052_adapter_bd is
         port (
@@ -193,10 +200,10 @@ begin
         rx_ref_clk_n => rx_ref_clk_n_fmc,
         tx_core_clk => tx_core_clk,
         rx_core_clk => rx_core_clk,
-        tx_core_reset => core_rst_2,
-        rx_core_reset => core_rst_2,
-        tx_phy_reset => core_rst_2,
-        rx_phy_reset => core_rst_2,
+        tx_core_reset => jesd204_rst,
+        rx_core_reset => jesd204_rst,
+        tx_phy_reset => jesd204_rst,
+        rx_phy_reset => jesd204_rst,
         tx_sysref => tx_sysref_fmc,
         rx_sysref => rx_sysref_fmc,
         tx_sync => tx_sync_fmc,
@@ -357,9 +364,22 @@ begin
     spi_io_tri_fmc <= spi_io_tri;
     adc_pwdn_fmc <= '0';
     dac_rstn_fmc <= '1';
-    dac_txen_fmc <= '1';
+    dac_txen_fmc <= not jesd204_rst;
     eeprom_iic_scl_fmc <= '1';
     eeprom_iic_sda_fmc <= '0';
     ref_clk_p <= rx_core_clk_p_fmc;
     ref_clk_n <= rx_core_clk_n_fmc;
+
+    process(tx_core_clk(0))
+    begin
+        if rising_edge(tx_core_clk(0)) then
+            tx_core_clk_debug <= not tx_core_clk_debug;
+        end if;
+    end process;
+    process(rx_core_clk(0))
+    begin
+        if rising_edge(rx_core_clk(0)) then
+            rx_core_clk_debug <= not rx_core_clk_debug;
+        end if;
+    end process;
 end architecture structural;

@@ -205,9 +205,17 @@ def init_AD9528(spi, port, chip):
     chip.write("000F01") # update all
     time.sleep(0.5)
     ret = chip.read("8508")
-    if ret != "f2": # Could be f3 if pll1 was previously locked to an external ref
+    if not ret in ["f2", "f3", "e6", "e7"]:
         raise Exception("AD9528 not locked, status: " + ret + " at x0508.")
-    
+    if ret[0] == "f":
+        print("Info: no external reference detected by AD9528.")
+    else:
+        print("Warning: external reference detected by AD9528. Make sure you don't want reference.")
+    if ret[1] == "2" or ret[1] == "6":
+        print("Info: PLL1 not locked.")
+    else:
+        print("Warning: PLL1 locked. Make sure you don't want reference.")
+
 def init_AD9528_ext_ref(spi, port, chip):
     print("Configuring AD9528 (external ref) on fmc port {}, chip {}".format(port, chip))
     name = "P{}C{}".format(port, chip)
@@ -315,8 +323,16 @@ def init_AD9528_ext_ref(spi, port, chip):
     chip.write("000F01") # update all
     time.sleep(0.5)
     ret = chip.read("8508")
-    if ret != "e7":
+    if not ret in ["f2", "f3", "e6", "e7"]:
         raise Exception("AD9528 not locked, status: " + ret + " at x0508.")
+    if ret[0] == "f":
+        print("Warning: no external reference detected by AD9528.")
+    else:
+        print("Info: external reference detected by AD9528.")
+    if ret[1] == "2" or ret[1] == "6":
+        print("Warning: PLL1 not locked.")
+    else:
+        print("Info: PLL1 locked.")
 
 def init_AD9627(spi, port, chip):
     print("Configuring AD9627 on fmc port {}, chip {}".format(port, chip))

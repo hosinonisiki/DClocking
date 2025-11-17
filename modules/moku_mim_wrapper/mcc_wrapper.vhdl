@@ -408,3 +408,11 @@ begin
         control15 => core_param_in(511 downto 480)
     );
 end architecture pdh;
+
+architecture idle of mcc_wrapper is
+begin
+    outputa <= (others => '0');
+    outputb <= (others => '0');
+    outputc <= (others => '0');
+    outputd <= (others => '0');
+end architecture idle;
