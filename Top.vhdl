@@ -426,6 +426,207 @@ begin
         );
     end block module_15_block;
 
+    module_16_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_TRI2_ADDR else '0'; -- constant defined in mypak
+        module_16 : entity work.module_trigonometric port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(16),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(16),
+            rsp_stat_out    =>  rsbus(16),
+            
+            phase_in        =>  sig_bank_out(23),
+            sin_out         =>  sig_bank_in(24),
+            cos_out         =>  sig_bank_in(25)
+        );
+    end block module_16_block;
+
+    module_17_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_ACC2_ADDR else '0'; -- constant defined in mypak
+        module_17 : entity work.module_accumulator port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(17),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(17),
+            rsp_stat_out    =>  rsbus(17),
+            
+            acc_out         =>  sig_bank_in(26),
+
+            auto_reset_in   =>  ctrl_bank_out(3)
+        );
+    end block module_17_block;
+
+    module_18_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_PID2_ADDR else '0'; -- constant defined in mypak
+        module_18 : entity work.module_pid_controller port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(18),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(18),
+            rsp_stat_out    =>  rsbus(18),
+            
+            error_in        => sig_bank_out(24),
+            feedback_out    => sig_bank_in(27),
+
+            auto_reset_in   => ctrl_bank_out(4)
+        );
+    end block module_18_block;
+
+    module_19_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_LTRN_ADDR else '0'; -- constant defined in mypak
+        module_19 : entity work.module_linear_transformer port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(19),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(19),
+            rsp_stat_out    =>  rsbus(19),
+            
+            sig_a_in        => sig_bank_out(25),
+            sig_b_in        => sig_bank_out(26),
+            sig_a_out       => sig_bank_in(28),
+            sig_b_out       => sig_bank_in(29)
+        );
+    end block module_19_block;
+
+    module_20_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_LTR2_ADDR else '0'; -- constant defined in mypak
+        module_20 : entity work.module_linear_transformer port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(20),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(20),
+            rsp_stat_out    =>  rsbus(20),
+            
+            sig_a_in        => sig_bank_out(27),
+            sig_b_in        => sig_bank_out(28),
+            sig_a_out       => sig_bank_in(30),
+            sig_b_out       => sig_bank_in(31)
+        );
+    end block module_20_block;
+
+    module_21_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_MIX3_ADDR else '0'; -- constant defined in mypak
+        module_21 : entity work.module_mixer port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(21),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(21),
+            rsp_stat_out    =>  rsbus(21),
+            
+            sig_a_in        => sig_bank_out(29),
+            sig_b_in        => sig_bank_out(30),
+            sig_out         => sig_bank_in(32)
+        );
+    end block module_21_block;
+
+    module_22_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_MIX4_ADDR else '0'; -- constant defined in mypak
+        module_22 : entity work.module_mixer port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(22),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(22),
+            rsp_stat_out    =>  rsbus(22),
+            
+            sig_a_in        => sig_bank_out(31),
+            sig_b_in        => sig_bank_out(32),
+            sig_out         => sig_bank_in(33)
+        );
+    end block module_22_block;
+
+    module_23_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_FIR3_ADDR else '0'; -- constant defined in mypak
+        module_23 : entity work.module_fir_filter port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(23),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(23),
+            rsp_stat_out    =>  rsbus(23),
+            
+            sig_in          => sig_bank_out(33),
+            sig_out         => sig_bank_in(34)
+        );
+    end block module_23_block;
+
+    module_24_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_FIR4_ADDR else '0'; -- constant defined in mypak
+        module_24 : entity work.module_fir_filter port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(24),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(24),
+            rsp_stat_out    =>  rsbus(24),
+            
+            sig_in          => sig_bank_out(34),
+            sig_out         => sig_bank_in(35)
+        );
+    end block module_24_block;
+
+    module_25_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_ATA2_ADDR else '0'; -- constant defined in mypak
+        module_25 : entity work.module_inv_trigonometric port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(25),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(25),
+            rsp_stat_out    =>  rsbus(25),
+            
+            sin_in         => sig_bank_out(35),
+            cos_in         => sig_bank_out(36),
+            phase_out      => sig_bank_in(36)
+        );
+    end block module_25_block;
+
     -- signal banks provided by the router
     -- Last 8 channels reserved for top adc and dac ports
     

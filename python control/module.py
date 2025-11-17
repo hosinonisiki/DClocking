@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.signal as signal
 
 # Defines methods for module manipulation
 
@@ -420,3 +421,136 @@ class ModuleFIRFilter(ModuleBase):
             raise ValueError("Normalization factor must be between 1 and 16")
         self.write(64, int(norm * (2 ** 13 - 1)))
         return
+    
+    def design_lowpass(self, freq_pass, freq_stop, freq_sample, weight = 1):
+        coef = signal.remez(64, [0, freq_pass, freq_stop, freq_sample / 2], [1, 0], fs = freq_sample, weight = [1, weight])
+        coef = np.array(coef)
+        coef = coef / np.max(np.abs(coef)) * 0.98
+        l1_norm = sum(np.abs(coef))
+        norm = 32 / l1_norm * 0.98
+        self.load_coef(coef, norm)
+
+class ModuleLinearTransformer(ModuleBase):
+    parameter_list = {
+        0: {"name": "coef_aa", "width": 16},
+        1: {"name": "coef_ab", "width": 16},
+        2: {"name": "coef_ba", "width": 16},
+        3: {"name": "coef_bb", "width": 16}
+    }
+    alias_list = {
+        "coef_aa": 0, "a_to_a": 0,
+        "coef_ab": 1, "b_to_a": 1,
+        "coef_ba": 2, "a_to_b": 2,
+        "coef_bb": 3, "b_to_b": 3
+    }
+    deduced_parameter_list = {
+        "a00": lambda self: self.a00_func,
+        "a01": lambda self: self.a01_func,
+        "a10": lambda self: self.a10_func,
+        "a11": lambda self: self.a11_func,
+        "matrix": lambda self: self.matrix_func
+    }
+
+    def a00_func(self, data = None):
+        if data != None:
+            # Write, return address-data pairs
+            if data < -1 or data > 1:
+                raise ValueError("Coefficient must be between -1 and 1")
+            coef_int = int(round(data * (2 ** 15 - 1)))
+            if coef_int < 0:
+                coef_int = 2 ** 16 + coef_int
+            return [(0, coef_int)]
+        else:
+            # Read, return address list and formula
+            address_list = [0]
+            def formula(data_list):
+                coef_int = int.from_bytes(data_list[0], "big")
+                if coef_int >= 2 ** 15:
+                    coef_int = coef_int - 2 ** 16
+                return coef_int / (2 ** 15 - 1)
+            return address_list, formula
+        
+    def a01_func(self, data = None):
+        if data != None:
+            # Write, return address-data pairs
+            if data < -1 or data > 1:
+                raise ValueError("Coefficient must be between -1 and 1")
+            coef_int = int(round(data * (2 ** 15 - 1)))
+            if coef_int < 0:
+                coef_int = 2 ** 16 + coef_int
+            return [(1, coef_int)]
+        else:
+            # Read, return address list and formula
+            address_list = [1]
+            def formula(data_list):
+                coef_int = int.from_bytes(data_list[0], "big")
+                if coef_int >= 2 ** 15:
+                    coef_int = coef_int - 2 ** 16
+                return coef_int / (2 ** 15 - 1)
+            return address_list, formula
+        
+    def a10_func(self, data = None):
+        if data != None:
+            # Write, return address-data pairs
+            if data < -1 or data > 1:
+                raise ValueError("Coefficient must be between -1 and 1")
+            coef_int = int(round(data * (2 ** 15 - 1)))
+            if coef_int < 0:
+                coef_int = 2 ** 16 + coef_int
+            return [(2, coef_int)]
+        else:
+            # Read, return address list and formula
+            address_list = [2]
+            def formula(data_list):
+                coef_int = int.from_bytes(data_list[0], "big")
+                if coef_int >= 2 ** 15:
+                    coef_int = coef_int - 2 ** 16
+                return coef_int / (2 ** 15 - 1)
+            return address_list, formula
+        
+    def a11_func(self, data = None):
+        if data != None:
+            # Write, return address-data pairs
+            if data < -1 or data > 1:
+                raise ValueError("Coefficient must be between -1 and 1")
+            coef_int = int(round(data * (2 ** 15 - 1)))
+            if coef_int < 0:
+                coef_int = 2 ** 16 + coef_int
+            return [(3, coef_int)]
+        else:
+            # Read, return address list and formula
+            address_list = [3]
+            def formula(data_list):
+                coef_int = int.from_bytes(data_list[0], "big")
+                if coef_int >= 2 ** 15:
+                    coef_int = coef_int - 2 ** 16
+                return coef_int / (2 ** 15 - 1)
+            return address_list, formula
+
+    def matrix_func(self, data = None):
+        if data != None:
+            # Write, return address-data pairs
+            if type(data) != np.ndarray or data.shape != (2, 2):
+                raise ValueError("Input data must be a 2x2 numpy array")
+            # Normalize to 1 in terms of l1 norm
+            data[0] = data[0] / (np.abs(data[0,0]) + np.abs(data[0,1]))
+            data[1] = data[1] / (np.abs(data[1,0]) + np.abs(data[1,1]))
+            address_data_pairs = []
+            address_data_pairs.append((0, int(round(data[0,0] * (2 ** 15 - 1))) % (2 ** 16)))
+            address_data_pairs.append((1, int(round(data[0,1] * (2 ** 15 - 1))) % (2 ** 16)))
+            address_data_pairs.append((2, int(round(data[1,0] * (2 ** 15 - 1))) % (2 ** 16)))
+            address_data_pairs.append((3, int(round(data[1,1] * (2 ** 15 - 1))) % (2 ** 16)))
+            return address_data_pairs
+        else:
+            # Read, return address list and formula
+            address_list = [0, 1, 2, 3]
+            def formula(data_list):
+                matrix = np.zeros((2, 2))
+                for i in range(2):
+                    for j in range(2):
+                        coef_int = int.from_bytes(data_list[i * 2 + j], "big")
+                        if coef_int >= 2 ** 15:
+                            coef_int = coef_int - 2 ** 16
+                        matrix[i, j] = coef_int / 2 ** 15
+                return matrix
+            return address_list, formula

@@ -21,7 +21,7 @@ package mypak is
 
     constant log_dbus_w :   integer := 5; -- Log2 of the data bus width.
 
-    constant module_count   : integer := 15; -- Number of modules connected to the bus.
+    constant module_count   : integer := 25; -- Number of modules connected to the bus.
     constant BUS_ROUT_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(1, mbus_w)); -- Address of the router module.
     constant BUS_TRIG_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(2, mbus_w)); -- Address of the trigonometric module.
     constant BUS_ACCM_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(3, mbus_w)); -- Address of the accumulator module.
@@ -37,7 +37,16 @@ package mypak is
     constant BUS_FIR2_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(13, mbus_w)); -- Address of the 2nd FIR filter module.
     constant BUS_MIX2_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(14, mbus_w)); -- Address of the 2nd mixer module.
     constant BUS_UNWR_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(15, mbus_w)); -- Address of the unwrapper module.
-
+    constant BUS_TRI2_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(16, mbus_w)); -- Address of the 2nd trigonometric module.
+    constant BUS_ACC2_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(17, mbus_w)); -- Address of the 2nd accumulator module.
+    constant BUS_PID2_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(18, mbus_w)); -- Address of the 2nd PID controller module.
+    constant BUS_LTRN_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(19, mbus_w)); -- Address of the linear transformer module.
+    constant BUS_LTR2_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(20, mbus_w)); -- Address of the 2nd linear transformer module.
+    constant BUS_MIX3_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(21, mbus_w)); -- Address of the 3rd mixer module.
+    constant BUS_MIX4_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(22, mbus_w)); -- Address of the 4th mixer module.
+    constant BUS_FIR3_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(23, mbus_w)); -- Address of the 3rd FIR filter module.
+    constant BUS_FIR4_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(24, mbus_w)); -- Address of the 4th FIR filter module.
+    constant BUS_ATA2_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(25, mbus_w)); -- Address of the 2nd inverse trigonometric module.
     -- Used in wrapper and central_control
     constant SPI_P1C1_ADDR      : integer := 0; -- Address of chip 1 on FMC Port 1.
     constant SPI_P1C2_ADDR      : integer := 1; -- Address of chip 2 on FMC Port 1.

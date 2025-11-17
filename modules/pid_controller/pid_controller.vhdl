@@ -49,6 +49,7 @@ architecture behavioural of pid_controller is
 
     signal integral_buf         :   signed(47 downto 0); -- yy xxxx yyyy yy__
     signal integral_buf_limited :   signed(47 downto 0); -- yy xxxx yyyy yy__
+    signal sum                  :   signed(27 downto 0); -- yy xxxx y___ ____
     signal sum_buf              :   signed(27 downto 0); -- yy xxxx y___ ____
     signal sum_buf_limited      :   signed(27 downto 0); -- yy xxxx y___ ____
     type leak_array_type is array(0 to 31) of std_logic_vector(47 downto 0);
@@ -119,6 +120,7 @@ begin
             product_p <= gain_p * error_from_setpoint;
             product_i <= gain_i * error_from_setpoint;
             product_d <= gain_d * differential;
+            sum <= sum_buf;
             feedback_out_buf <= sum_buf_limited(19 downto 4);
             interleaving_clk <= not interleaving_clk;
         end if;
@@ -139,9 +141,9 @@ begin
                             integral_buf;
 
     sum_buf <= product_p(39 downto 12) + integral(47 downto 20) + product_d(39 downto 12);
-    sum_buf_limited <= limit_sum when sum_buf > limit_sum else
-                    -limit_sum when sum_buf < -limit_sum else
-                    sum_buf;
+    sum_buf_limited <= limit_sum when sum > limit_sum else
+                    -limit_sum when sum < -limit_sum else
+                    sum;
 
     array_gen : for i in 0 to 31 generate
         leak_array(i) <= (7 + i downto 0 => integral(47)) & std_logic_vector(integral(47 downto i + 8)) when leak_digit(i) = '1' else (others => '0');
