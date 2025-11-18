@@ -72,50 +72,19 @@ architecture structural of module_moku_mim_wrapper is
     signal mim_en           :   std_logic;
     signal mim_id           :   std_logic_vector(5 downto 0);
 begin
-    
-    core_entity_0 : entity work.moku_mim_wrapper(id_0) port map(
+    core_entity_12 : entity work.moku_mim_wrapper(id_12) port map(
         clk             =>  clk,
         rst             =>  core_rst,
         core_param_in   =>  core_param,
         -- data flow ports
-        inputa          =>  inputa_buf(0),
-        inputb          =>  inputb_buf(0),
-        inputc          =>  inputc_buf(0),
-        inputd          =>  inputd_buf(0),
-        outputa         =>  outputa_buf(0),
-        outputb         =>  outputb_buf(0),
-        outputc         =>  outputc_buf(0),
-        outputd         =>  outputd_buf(0)
-    );
-
-    core_entity_1 : entity work.moku_mim_wrapper(id_1) port map(
-        clk             =>  clk,
-        rst             =>  core_rst,
-        core_param_in   =>  core_param,
-        -- data flow ports
-        inputa          =>  inputa_buf(1),
-        inputb          =>  inputb_buf(1),
-        inputc          =>  inputc_buf(1),
-        inputd          =>  inputd_buf(1),
-        outputa         =>  outputa_buf(1),
-        outputb         =>  outputb_buf(1),
-        outputc         =>  outputc_buf(1),
-        outputd         =>  outputd_buf(1)
-    );
-
-    core_entity_6 : entity work.moku_mim_wrapper(id_6) port map(
-        clk             =>  clk,
-        rst             =>  core_rst,
-        core_param_in   =>  core_param,
-        -- data flow ports
-        inputa          =>  inputa_buf(6),
-        inputb          =>  inputb_buf(6),
-        inputc          =>  inputc_buf(6),
-        inputd          =>  inputd_buf(6),
-        outputa         =>  outputa_buf(6),
-        outputb         =>  outputb_buf(6),
-        outputc         =>  outputc_buf(6),
-        outputd         =>  outputd_buf(6)
+        inputa          =>  inputa_buf(12),
+        inputb          =>  inputb_buf(12),
+        inputc          =>  inputc_buf(12),
+        inputd          =>  inputd_buf(12),
+        outputa         =>  outputa_buf(12),
+        outputb         =>  outputb_buf(12),
+        outputc         =>  outputc_buf(12),
+        outputd         =>  outputd_buf(12)
     );
 
     parameter_ram : entity work.parameter_ram_2048 generic map(

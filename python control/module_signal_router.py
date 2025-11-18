@@ -195,11 +195,12 @@ class ModuleSignalRouter(module.ModuleBase):
         return "".join([hex(int(self.bits[i * 8: (i + 1) * 8], 2))[2:] for i in range(64)])
     
     def _upload(self):
+        self.implement_routing()
+        self.encode()
         for i in range(31, 0, -1):
             if self.bits[i * 32: (i + 1) * 32] != self.last_bits[i * 32: (i + 1) * 32]:
                 self.write((31 - i), int(self.bits[i * 32: (i + 1) * 32], 2), hold = True)
-        if self.bits[0:32] != self.last_bits[0:32]:
-            self.write(31, int(self.bits[0:32], 2), hold = False)
+        self.write(31, int(self.bits[0:32], 2), hold = False)
         self.last_bits = self.bits
 
     def upload(self):

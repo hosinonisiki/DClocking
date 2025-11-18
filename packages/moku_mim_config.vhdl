@@ -8,9 +8,9 @@ use ieee.numeric_std.all;
 
 package moku_mim_config is
     -- The max id of configurations currently integrated in the design.
-    constant MAX_ID         :   integer := 6;
+    constant MAX_ID         :   integer := 12;
     -- Indicating which ids are actually instantiated in the design.
-    constant VALID_ID       :   std_logic_vector(MAX_ID downto 0) := "1000011";
+    constant VALID_ID       :   std_logic_vector(MAX_ID downto 0) := "1000000000000";
 
     -- Bus commands dedicated to the moku_mim_wrapper.
     -- The additional information contains 32 bits.

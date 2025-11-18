@@ -89,7 +89,22 @@ begin
         inputb          =>  x"0000",
         outputa         =>  outputa,
         outputb         =>  outputb,
-        outputc         =>  open,
-        outputd         =>  open
+        outputc         =>  outputc,
+        outputd         =>  outputd
     );
 end architecture id_6;
+
+architecture id_12 of moku_mim_wrapper is
+begin
+    slot_2 : entity work.mcc_wrapper(pdh) port map(
+        clk             =>  clk,
+        rst             =>  rst,
+        core_param_in   =>  core_param_in(1023 downto 512),
+        inputa          =>  inputa,
+        inputb          =>  x"0000",
+        outputa         =>  outputa,
+        outputb         =>  outputb,
+        outputc         =>  outputc,
+        outputd         =>  outputd
+    );
+end architecture id_12;

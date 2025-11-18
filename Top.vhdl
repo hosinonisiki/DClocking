@@ -627,6 +627,27 @@ begin
         );
     end block module_25_block;
 
+    module_26_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_PDHS_ADDR else '0'; 
+        module_26 : entity work.module_pdh_state_machine port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(26),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(26),
+            rsp_stat_out    =>  rsbus(26),
+            
+            sig_in          =>  sig_bank_out(37), 
+            pid_enable      =>  ctrl_bank_in(2),  
+            mixer_enable    =>  ctrl_bank_in(3),  
+            sawtooth_enable =>  ctrl_bank_in(4)   
+        );
+    end block module_26_block;
+
     -- signal banks provided by the router
     -- Last 8 channels reserved for top adc and dac ports
     
