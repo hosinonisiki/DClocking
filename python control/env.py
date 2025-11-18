@@ -11,7 +11,7 @@ import time
 
 import code
 
-ser = uart.MySerial("COM7", baudrate = 19200, parity = "E", timeout = 0.5)
+ser = uart.MySerial("COM9", baudrate = 19200, parity = "E", timeout = 0.5)
 bus_inst = bus.Bus(ser)
 router = module_signal_router.ModuleSignalRouter(bus_inst)
 tri = module.ModuleBase(bus_inst, "TRIG")
@@ -33,6 +33,7 @@ mixer3 = module.ModuleBase(bus_inst, "MIX3")
 mixer4 = module.ModuleBase(bus_inst, "MIX4")
 fir3 = module.ModuleFIRFilter(bus_inst, "FIR3")
 fir4 = module.ModuleFIRFilter(bus_inst, "FIR4")
+pdhfsm = module.ModulePDHFSM(bus_inst, "PDHS")
 spi_inst = spi.Spi(ser)
 
 def init():
@@ -58,6 +59,7 @@ def init():
         mixer4.reset()
         fir3.reset()
         fir4.reset()
+        pdhfsm.reset()
 
         print("Configure converters")
         init_FL9627(spi_inst, 1)
@@ -89,6 +91,7 @@ def init_no_ref():
         mixer4.reset()
         fir3.reset()
         fir4.reset()
+        pdhfsm.reset()
 
         print("Configure converters")
         init_FL9627(spi_inst, 1)
@@ -143,6 +146,34 @@ def setup_duallock():
     sclr2.write("scale", 0)
     pid.write("p", 65536)
     pid2.write("p", 65536)
+
+def setup_pdh():
+    router.set_routing(TRI_IN, ACC_OUT)
+    router.set_routing(MIXER_IN_A, TRI_SIN)
+    router.set_routing(MIXER_IN_B, INPUT_C)
+    router.set_routing(FIR_IN, MIXER_OUT)
+    router.set_routing(PID_IN, FIR_OUT)
+    router.set_routing(LN_TRANSFORMER_IN_A, PID_OUT)
+    router.set_routing(LN_TRANSFORMER_IN_B, ACC2_OUT)
+    router.set_routing(SCALER_IN, LN_TRANSFORMER_OUT_A)
+    router.set_routing(OUTPUT_B, SCALER_OUT)
+    router.set_routing(OUTPUT_C, TRI_SIN)
+    router.set_routing(FIR2_IN, INPUT_C)
+    router.set_routing(PDHFSM_IN, FIR2_OUT)
+    router.set_routing(PID_RESET, PDHFSM_PID_RESET_CTRL)
+    router.set_routing(ACC2_RESET, PDHFSM_SCAN_RESET_CTRL)
+    router.upload()
+
+    print("Write parameters")
+    sclr.write("scale", 0) # Disable output until limits are set
+    sclr.write("bias", 15000)
+    pid.write("auto_reset", 1)
+    acc2.write("auto_reset", 1)
+    ltrn.write("matrix", np.array([[0.5, 0.5], [1, 0]]))
+    pdhfsm.write("thre_sig_lock", -32768)
+    pdhfsm.write("thre_sig_scan", 32767)
+    pdhfsm.write("time_lock", 2**29)
+    pdhfsm.write("time_scan", 2**29)
 
 def load_fir():
     print("Load FIR coefficients")

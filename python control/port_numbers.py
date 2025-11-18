@@ -76,6 +76,7 @@ FIR3_IN = 33
 FIR4_IN = 34
 ATAN2_IN_SIN = 35
 ATAN2_IN_COS = 36
+PDHFSM_IN = 37
 
 OUTPUT_A = 56
 OUTPUT_B = 57
@@ -87,8 +88,13 @@ OUTPUT_G = 62
 OUTPUT_H = 63
 
 # Output control from signal router, input to module:
-ACC_RESET = 0
-PID_RESET = 1
-UNWRAPPER_RESET = 2
-ACC2_RESET = 3
-PID2_RESET = 4
+ACC_RESET = 0 + 64
+PID_RESET = 1 + 64
+UNWRAPPER_RESET = 2 + 64 
+ACC2_RESET = 3 + 64
+PID2_RESET = 4 + 64
+
+# Input control to signal router, output from module:
+PDHFSM_PID_RESET_CTRL = 2 + 64
+PDHFSM_MIXER_RESET_CTRL = 3 + 64
+PDHFSM_SCAN_RESET_CTRL = 4 + 64

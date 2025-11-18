@@ -528,7 +528,7 @@ class ModuleLinearTransformer(ModuleBase):
             return address_list, formula
 
     def matrix_func(self, data = None):
-        if data != None:
+        if not data is None:
             # Write, return address-data pairs
             if type(data) != np.ndarray or data.shape != (2, 2):
                 raise ValueError("Input data must be a 2x2 numpy array")
@@ -554,3 +554,19 @@ class ModuleLinearTransformer(ModuleBase):
                         matrix[i, j] = coef_int / 2 ** 15
                 return matrix
             return address_list, formula
+        
+class ModulePDHFSM(ModuleBase):
+    parameter_list = {
+        0: {"name": "pc_cmd", "width": 2},
+        1: {"name": "thre_sig_lock", "width": 16},
+        2: {"name": "thre_sig_scan", "width": 16},
+        3: {"name": "time_scan", "width": 32},
+        4: {"name": "time_lock", "width": 32}
+    }
+    alias_list = {
+        "pc_cmd": 0,
+        "thre_sig_lock": 1, "threshold_signal_lock": 1,
+        "thre_sig_scan": 2, "threshold_signal_scan": 2,
+        "time_scan": 3,
+        "time_lock": 4
+    }

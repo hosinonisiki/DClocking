@@ -17,7 +17,7 @@ entity pdh_state_machine is
         sig_in          : in  std_logic_vector(15 downto 0);  -- Input signal for validity check
         pid_enable      : out std_logic;  -- Enable PID controller
         mixer_enable    : out std_logic;  -- Enable mixer
-        sawtooth_enable : out std_logic;  -- Sawtooth wave for scanning
+        sawtooth_enable : out std_logic  -- Sawtooth wave for scanning
     );
 end entity pdh_state_machine;
 
