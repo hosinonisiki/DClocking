@@ -39,7 +39,7 @@ end entity moku_mim_wrapper;
 
 architecture id_0 of moku_mim_wrapper is
 begin
-    slot_3 : entity work.mcc_wrapper(feedback) port map(
+    slot_3 : entity work.mcc_wrapper(idle) port map(
         clk             =>  clk,
         rst             =>  rst,
         core_param_in   =>  core_param_in(1535 downto 1024),
@@ -51,7 +51,7 @@ begin
         outputd         =>  open
     );
 
-    slot_2 : entity work.mcc_wrapper(turnkey) port map(
+    slot_2 : entity work.mcc_wrapper(idle) port map(
         clk             =>  clk,
         rst             =>  rst,
         core_param_in   =>  core_param_in(1023 downto 512),
@@ -66,7 +66,7 @@ end architecture id_0;
 
 architecture id_1 of moku_mim_wrapper is
 begin
-    slot_2 : entity work.mcc_wrapper(turnkey) port map(
+    slot_2 : entity work.mcc_wrapper(idle) port map(
         clk             =>  clk,
         rst             =>  rst,
         core_param_in   =>  core_param_in(1023 downto 512),
@@ -81,7 +81,7 @@ end architecture id_1;
 
 architecture id_6 of moku_mim_wrapper is
 begin
-    slot_2 : entity work.mcc_wrapper(PID_wrapped) port map(
+    slot_2 : entity work.mcc_wrapper(idle) port map(
         clk             =>  clk,
         rst             =>  rst,
         core_param_in   =>  core_param_in(1023 downto 512),

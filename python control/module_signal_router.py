@@ -1,6 +1,7 @@
 import module
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+from port_numbers import *
 
 class ModuleSignalRouter(module.ModuleBase):
     # The router consists of 8 banks of 10x10 switches,
@@ -193,13 +194,34 @@ class ModuleSignalRouter(module.ModuleBase):
         self.encode()
         return "".join([hex(int(self.bits[i * 8: (i + 1) * 8], 2))[2:] for i in range(64)])
     
+    def _upload(self):
+        for i in range(31, 0, -1):
+            if self.bits[i * 32: (i + 1) * 32] != self.last_bits[i * 32: (i + 1) * 32]:
+                self.write((31 - i), int(self.bits[i * 32: (i + 1) * 32], 2), hold = True)
+        if self.bits[0:32] != self.last_bits[0:32]:
+            self.write(31, int(self.bits[0:32], 2), hold = False)
+        self.last_bits = self.bits
+
     def upload(self):
+        # Safe upload, disable output during reconfiguration
+        temp_config = self.port_config.copy()
+        temp_enable = self.port_enable.copy()
+        self.disable(OUTPUT_A)
+        self.disable(OUTPUT_B)
+        self.disable(OUTPUT_C)
+        self.disable(OUTPUT_D)
+        self.disable(OUTPUT_E)
+        self.disable(OUTPUT_F)
+        self.disable(OUTPUT_G)
+        self.disable(OUTPUT_H)
         self.implement_routing()
         self.encode()
-        for i in range(31, -1, -1):
-            if self.bits[i * 32: (i + 1) * 32] != self.last_bits[i * 32: (i + 1) * 32]:
-                self.write((31 - i), int(self.bits[i * 32: (i + 1) * 32], 2))
-        self.last_bits = self.bits
+        self._upload()
+        self.port_config = temp_config
+        self.port_enable = temp_enable
+        self.implement_routing()
+        self.encode()
+        self._upload()
 
     def plot(self):
         assert not self.full_connection, "Full connection mode does not require routing visualization."
