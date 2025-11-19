@@ -18,6 +18,7 @@ entity accumulator is
         core_param_in   :   in  std_logic_vector(127 downto 0);
         acc_out         :   out std_logic_vector(15 downto 0);
 
+        pause_in        :   in  std_logic;
         auto_reset_in   :   in  std_logic
     );
 end entity accumulator;
@@ -59,7 +60,9 @@ begin
             if internal_rst = '1' then
                 acc <= (others => '0');
             else
-                acc <= acc + delta;
+                if pause_in = '0' then
+                    acc <= acc + delta;
+                end if;
             end if;
         end if;
     end process;

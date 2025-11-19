@@ -96,7 +96,7 @@ end architecture id_6;
 
 architecture id_12 of moku_mim_wrapper is
 begin
-    slot_2 : entity work.mcc_wrapper(pdh) port map(
+    slot_2 : entity work.mcc_wrapper(idle) port map(
         clk             =>  clk,
         rst             =>  rst,
         core_param_in   =>  core_param_in(1023 downto 512),

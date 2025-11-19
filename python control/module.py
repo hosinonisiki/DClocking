@@ -265,7 +265,7 @@ class ModuleAccumulator(ModuleBase):
         "enable_auto_reset": 3, "auto_reset": 3, "auto": 3
     }
     def set_freq(self, freq, sample_rate = 250000000):
-        if freq <= 0 or freq > sample_rate / 2:
+        if freq < 0 or freq > sample_rate / 2:
             raise ValueError("Frequency must be between 0 and Nyquist frequency")
         var = int(round(freq / sample_rate * 2 ** 64))
         self.write(0, var % (2 ** 32), hold = True)
@@ -428,6 +428,8 @@ class ModuleFIRFilter(ModuleBase):
         coef = coef / np.max(np.abs(coef)) * 0.98
         l1_norm = sum(np.abs(coef))
         norm = 32 / l1_norm * 0.98
+        if norm < 1 or norm > 16:
+            raise ValueError("Designed filter normalization factor is out of range (1 to 16). Try increasing the passband frequency.")
         self.load_coef(coef, norm)
 
 class ModuleLinearTransformer(ModuleBase):
@@ -533,8 +535,10 @@ class ModuleLinearTransformer(ModuleBase):
             if type(data) != np.ndarray or data.shape != (2, 2):
                 raise ValueError("Input data must be a 2x2 numpy array")
             # Normalize to 1 in terms of l1 norm
-            data[0] = data[0] / (np.abs(data[0,0]) + np.abs(data[0,1]))
-            data[1] = data[1] / (np.abs(data[1,0]) + np.abs(data[1,1]))
+            if np.abs(data[0,0]) + np.abs(data[0,1]) != 0:
+                data[0] = data[0] / (np.abs(data[0,0]) + np.abs(data[0,1]))
+            if np.abs(data[1,0]) + np.abs(data[1,1]) != 0:
+                data[1] = data[1] / (np.abs(data[1,0]) + np.abs(data[1,1]))
             address_data_pairs = []
             address_data_pairs.append((0, int(round(data[0,0] * (2 ** 15 - 1))) % (2 ** 16)))
             address_data_pairs.append((1, int(round(data[0,1] * (2 ** 15 - 1))) % (2 ** 16)))
