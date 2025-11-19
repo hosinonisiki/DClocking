@@ -168,11 +168,11 @@ def setup_pdh():
     sclr.write("scale", 0) # Disable output until limits are set
     sclr.write("bias", 15000)
     pid.write("auto_reset", 1)
-    acc2.write("auto_reset", 1)
+    acc2.write("auto_reset", 1)# 1 by fsm；0 by hand
     ltrn.write("matrix", np.array([[0.5, 0.5], [1, 0]]))
-    pdhfsm.write("thre_sig_lock", -32768)
+    pdhfsm.write("thre_sig_lock", 7800)
     pdhfsm.write("thre_sig_scan", 32767)
-    pdhfsm.write("time_lock", 2**29)
+    pdhfsm.write("time_lock", 1000000)
     pdhfsm.write("time_scan", 2**29)
 
 def load_fir():
