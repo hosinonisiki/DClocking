@@ -93,6 +93,8 @@ PID_RESET = 1 + 64
 UNWRAPPER_RESET = 2 + 64 
 ACC2_RESET = 3 + 64
 PID2_RESET = 4 + 64
+ACC_PAUSE = 5 + 64
+ACC2_PAUSE = 6 + 64
 
 # Input control to signal router, output from module:
 PDHFSM_PID_RESET_CTRL = 2 + 64

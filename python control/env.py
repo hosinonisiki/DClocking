@@ -161,7 +161,7 @@ def setup_pdh():
     router.set_routing(FIR2_IN, INPUT_C)
     router.set_routing(PDHFSM_IN, FIR2_OUT)
     router.set_routing(PID_RESET, PDHFSM_PID_RESET_CTRL)
-    router.set_routing(ACC2_RESET, PDHFSM_SCAN_RESET_CTRL)
+    router.set_routing(ACC2_PAUSE, PDHFSM_SCAN_RESET_CTRL)
     router.upload()
 
     print("Write parameters")

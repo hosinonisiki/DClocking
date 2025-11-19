@@ -181,6 +181,7 @@ begin
             
             acc_out         =>  sig_bank_in(4),
 
+            pause_in        =>  ctrl_bank_out(5),
             auto_reset_in   =>  ctrl_bank_out(0)
         );
     end block module_3_block;
@@ -462,6 +463,7 @@ begin
             
             acc_out         =>  sig_bank_in(26),
 
+            pause_in        =>  ctrl_bank_out(6),
             auto_reset_in   =>  ctrl_bank_out(3)
         );
     end block module_17_block;
