@@ -69,12 +69,12 @@ begin
     state_transition: process(clk)
     begin
         if rising_edge(clk) then
-            if rst = '1' then
+            if rst = '1'  then
                 current_state <= IDLE;
                 time_able <= (others => '0');
-                pid_enable <= '0';
-                mixer_enable <= '0';
-                sawtooth_enable <= '0';
+                pid_enable <= '1';
+                mixer_enable <= '1';
+                sawtooth_enable <= '1';
                 pc_cmd_prev <= "00";
             else
                 pc_cmd_prev <= pc_cmd;
@@ -82,18 +82,18 @@ begin
                 -- State transition logic
                 case current_state is
                     when IDLE =>
-                        pid_enable <= '0';
-                        mixer_enable <= '0';
-                        sawtooth_enable <= '0';
+                        pid_enable <= '1';
+                        mixer_enable <= '1';
+                        sawtooth_enable <= '1';
                         if pc_cmd = "01" and pc_cmd_prev = "00" then  -- Start command edge detection
                             current_state <= SCANNING;
                             time_able <= (others => '0');
                         end if;
 
                     when SCANNING =>
-                        mixer_enable <= '1';
-                        pid_enable <= '0';
-                        sawtooth_enable <= '1';
+                        mixer_enable <= '0';
+                        pid_enable <= '1';
+                        sawtooth_enable <= '0';
                         if sig_in_buf < threshold_signal_scanning then
                             if time_able < time_duration_scanning then
                                 time_able <= time_able + 1;
@@ -110,9 +110,9 @@ begin
                         end if;
 
                     when LOCKING =>
-                        mixer_enable    <= '1';
-                        pid_enable      <= '1';
-                        sawtooth_enable <= '0';
+                        mixer_enable    <= '0';
+                        pid_enable      <= '0';
+                        sawtooth_enable <= '1';
                         -- Stop command forces return to IDLE
                         if pc_cmd = "00" and pc_cmd_prev = "01" then
                             current_state <= IDLE;
