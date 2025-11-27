@@ -112,43 +112,6 @@ architecture structural of main_control is
             txrdyn : OUT STD_LOGIC 
         );
     END COMPONENT;
-
-    COMPONENT uart_custom_axi_master_0
-        PORT (
-            rst : IN STD_LOGIC;
-            rst_busy : OUT STD_LOGIC;
-            rxd_out : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
-            rxen_in : IN STD_LOGIC;
-            rxemp_out : OUT STD_LOGIC;
-            txd_in : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
-            txen_in : IN STD_LOGIC;
-            txful_out : OUT STD_LOGIC;
-            irpt : IN STD_LOGIC;
-            err : OUT STD_LOGIC;
-            m00_axi_aclk : IN STD_LOGIC;
-            m00_axi_aresetn : IN STD_LOGIC;
-            m00_axi_awaddr : OUT STD_LOGIC_VECTOR(31 DOWNTO 0);
-            m00_axi_awprot : OUT STD_LOGIC_VECTOR(2 DOWNTO 0);
-            m00_axi_awvalid : OUT STD_LOGIC;
-            m00_axi_awready : IN STD_LOGIC;
-            m00_axi_wdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0);
-            m00_axi_wstrb : OUT STD_LOGIC_VECTOR(3 DOWNTO 0);
-            m00_axi_wvalid : OUT STD_LOGIC;
-            m00_axi_wready : IN STD_LOGIC;
-            m00_axi_bresp : IN STD_LOGIC_VECTOR(1 DOWNTO 0);
-            m00_axi_bvalid : IN STD_LOGIC;
-            m00_axi_bready : OUT STD_LOGIC;
-            m00_axi_araddr : OUT STD_LOGIC_VECTOR(31 DOWNTO 0);
-            m00_axi_arprot : OUT STD_LOGIC_VECTOR(2 DOWNTO 0);
-            m00_axi_arvalid : OUT STD_LOGIC;
-            m00_axi_arready : IN STD_LOGIC;
-            m00_axi_rdata : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
-            m00_axi_rresp : IN STD_LOGIC_VECTOR(1 DOWNTO 0);
-            m00_axi_rvalid : IN STD_LOGIC;
-            m00_axi_rready : OUT STD_LOGIC 
-        );
-    END COMPONENT;
-
 begin
     axi_aresetn <= not rst;
 
@@ -190,7 +153,7 @@ begin
         txrdyn => open
     );
 
-    uart_axi_master : uart_custom_axi_master_0 PORT MAP (
+    uart_axi_master : entity work.uart_axi_master port map(
         rst => rst,
         rst_busy => open,
         rxd_out => rx_char,
