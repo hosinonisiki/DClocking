@@ -11,7 +11,7 @@ class MySerial(Serial):
         if repeated:
             response = self.read_until(b"!")
             while True:
-                if response[-6] == 46 and response[-11] == 46:
+                if len(response) >= 11 and response[-6] == 46 and response[-11] == 46:
                     break
                 response += self.read_until(b"!")
             if verbose:

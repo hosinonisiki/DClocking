@@ -116,6 +116,8 @@ class ModulePID(ModuleBase):
         if data != None:
             # Write, return address-data pairs
             target_gain_p = int(round(2 ** 16 * 10 ** (data / 20)))
+            if target_gain_p >= 2 ** 23 or target_gain_p < -2 ** 23:
+                raise ValueError("Resulting gain_p is out of range")
             current_gain_p = int.from_bytes(self.read("gain_p"), "big")
             current_gain_i = int.from_bytes(self.read("gain_i"), "big")
             current_gain_d = int.from_bytes(self.read("gain_d"), "big")
