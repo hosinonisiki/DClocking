@@ -6,12 +6,13 @@ import spi
 from boards import *
 from chips import *
 from port_numbers import *
+import qtuart
 import numpy as np
 import time
 
 import code
 
-ser = uart.MySerial("COM9", baudrate = 19200, parity = "E", timeout = 0.5)
+ser = qtuart.QtSerial("COM7", baudrate = 115200, parity = "E", timeout = 1)
 bus_inst = bus.Bus(ser)
 router = module_signal_router.ModuleSignalRouter(bus_inst)
 tri = module.ModuleBase(bus_inst, "TRIG")
