@@ -1,7 +1,7 @@
 # Simply recording the corresponding port numbers of different modules as a temporary solution.
 
 # Output from module, input to signal router:
-TRI_SIN = 0
+TRI_SIN = 2
 TRI_COS = 1
 ACC_OUT = 4
 SCALER_OUT = 5

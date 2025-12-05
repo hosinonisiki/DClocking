@@ -160,7 +160,7 @@ begin
             rsp_stat_out    =>  rsbus(2),
             
             phase_in        =>  sig_bank_out(4),
-            sin_out         =>  sig_bank_in(0),
+            sin_out         =>  sig_bank_in(2),
             cos_out         =>  sig_bank_in(1)
         );
     end block module_2_block;
