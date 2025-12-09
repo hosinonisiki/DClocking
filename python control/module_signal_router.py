@@ -33,7 +33,7 @@ class ModuleSignalRouter(module.ModuleBase):
         super().__init__(bus, "ROUT")
         self.full_connection = full_connection
         if full_connection:
-            self.port_config = list(range(64)) + list(range(64))
+            self.port_config = [0] * (64 + 64)
             self.port_enable = [1] * (64 + 64)
             self.encode()
             self.last_bits = self.bits

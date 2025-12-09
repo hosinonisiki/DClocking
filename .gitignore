@@ -11,5 +11,3 @@ modules/moku_mim_wrapper/mcc\ srcs
 testbenches/
 
 **.pyc
-
-**.md
