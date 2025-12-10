@@ -266,12 +266,30 @@ class ModuleAccumulator(ModuleBase):
         "high": 1,
         "enable_auto_reset": 3, "auto_reset": 3, "auto": 3
     }
-    def set_freq(self, freq, sample_rate = 250000000):
-        if freq < 0 or freq > sample_rate / 2:
-            raise ValueError("Frequency must be between 0 and Nyquist frequency")
-        var = int(round(freq / sample_rate * 2 ** 64))
-        self.write(0, var % (2 ** 32), hold = True)
-        self.write(1, var // (2 ** 32))
+    deduced_parameter_list = {
+        "freq": lambda self: self.freq_func
+    }
+
+    def freq_func(self, data = None):
+        if data is not None:
+            # Write, return address-data pairs
+            if data < 0:
+                raise ValueError("Frequency cannot be negative")
+            if data > 250000000 / 2:
+                raise ValueError("Frequency exceeds Nyquist limit")
+            target_var = int(round(data * 2 ** 64 / 250000000))
+            low = target_var & 0xFFFFFFFF
+            high = (target_var >> 32) & 0xFFFFFFFF
+            return [(0, low), (1, high)]
+        else:
+            # Read, return address list and formula
+            address_list = [0, 1]
+            def formula(data_list):
+                low = int.from_bytes(data_list[0], "big")
+                high = int.from_bytes(data_list[1], "big")
+                var = (high << 32) | low
+                return var * 250000000 / 2 ** 64
+            return address_list, formula
 
 class ModuleFIRFilter(ModuleBase):
     parameter_list = {
