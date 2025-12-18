@@ -11,7 +11,7 @@ class MySerial(Serial):
         if repeated:
             response = self.read_until(b"!")
             while True:
-                if response[-6] == 46 and response[-11] == 46:
+                if len(response) >= 11 and response[-6] == 46 and response[-11] == 46:
                     break
                 response += self.read_until(b"!")
             if verbose:
@@ -20,7 +20,7 @@ class MySerial(Serial):
                 raise Exception("Error in transmission. Sent: " + message.decode() + ", Received: " + response.decode())
         response = self.read_until(b"!")
         while True:
-            if response[-6] == 46 or response[-6] == 58:
+            if len(response) >= 6 and (response[-6] == 46 or response[-6] == 58):
                 break
             response += self.read_until(b"!")
         if verbose:
