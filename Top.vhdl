@@ -646,7 +646,8 @@ begin
             sig_in          =>  sig_bank_out(37), 
             pid_enable      =>  ctrl_bank_in(2),  
             mixer_enable    =>  ctrl_bank_in(3),  
-            sawtooth_enable =>  ctrl_bank_in(4)   
+            sawtooth_enable =>  ctrl_bank_in(4),
+            saw_input       =>  sig_bank_out(38)
         );
     end block module_26_block;
 

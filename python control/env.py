@@ -168,12 +168,12 @@ def setup_pdh():
     sclr.write("scale", 0) # Disable output until limits are set
     sclr.write("bias", 15000)
     pid.write("auto_reset", 1)
-    acc2.write("auto_reset", 1)# 1 by fsm；0 by hand
+    acc2.write("auto_reset", 0)# 1 by fsm；0 by hand
     ltrn.write("matrix", np.array([[0.5, 0.5], [1, 0]]))
-    pdhfsm.write("thre_sig_lock", 7800)
-    pdhfsm.write("thre_sig_scan", 32767)
-    pdhfsm.write("time_lock", 1000000)
-    pdhfsm.write("time_scan", 2**29)
+    pdhfsm.write("thre_sig_lock", 32767)
+    pdhfsm.write("thre_sig_scan", 9300)
+    pdhfsm.write("time_lock", 2**31)
+    pdhfsm.write("time_scan", 1500000)
 
 def load_fir():
     print("Load FIR coefficients")
