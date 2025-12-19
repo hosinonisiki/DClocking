@@ -88,7 +88,7 @@ OUTPUT_G = 62
 OUTPUT_H = 63
 
 # Output control from signal router, input to module:
-ACC_RESET = 0 + 64
+ACC_RESET = 7 + 64
 PID_RESET = 1 + 64
 UNWRAPPER_RESET = 2 + 64 
 ACC2_RESET = 3 + 64
