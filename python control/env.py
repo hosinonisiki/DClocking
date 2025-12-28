@@ -11,7 +11,7 @@ import time
 
 import code
 
-ser = uart.MySerial("COM7", baudrate = 115200, parity = "E", timeout = 0.5)
+ser = uart.MySerial("COM9", baudrate = 115200, parity = "E", timeout = 0.5)
 bus_inst = bus.Bus(ser)
 router = module_signal_router.ModuleSignalRouter(bus_inst)
 tri = module.ModuleBase(bus_inst, "TRIG")
@@ -153,13 +153,14 @@ def setup_pdh():
     router.set_routing(MIXER_IN_B, INPUT_C)
     router.set_routing(FIR_IN, MIXER_OUT)
     router.set_routing(PID_IN, FIR_OUT)
-    router.set_routing(LN_TRANSFORMER_IN_A, PID_OUT)
+    router.set_routing(LN_TRANSFORMER_IN_A, PID_OUT)    
     router.set_routing(LN_TRANSFORMER_IN_B, ACC2_OUT)
     router.set_routing(SCALER_IN, LN_TRANSFORMER_OUT_A)
     router.set_routing(OUTPUT_B, SCALER_OUT)
     router.set_routing(OUTPUT_C, TRI_SIN)
     router.set_routing(FIR2_IN, INPUT_C)
-    router.set_routing(PDHFSM_IN, FIR2_OUT)
+    router.set_routing(PDHFSM_IN_POWER, FIR2_OUT)
+    router.set_routing(PDHFSM_IN_SCAN, ACC2_OUT)
     router.set_routing(PID_RESET, PDHFSM_PID_RESET_CTRL)
     router.set_routing(ACC2_PAUSE, PDHFSM_SCAN_RESET_CTRL)
     router.upload()
@@ -167,13 +168,15 @@ def setup_pdh():
     print("Write parameters")
     sclr.write("scale", 0) # Disable output until limits are set
     sclr.write("bias", 15000)
+    acc2.write("freq", 20)
     pid.write("auto_reset", 1)
     acc2.write("auto_reset", 0)# 1 by fsm；0 by hand
     ltrn.write("matrix", np.array([[0.5, 0.5], [1, 0]]))
+    pdhfsm.write("pc_cmd",0)
     pdhfsm.write("thre_sig_lock", 32767)
-    pdhfsm.write("thre_sig_scan", 9300)
+    pdhfsm.write("thre_sig_scan", 0)
     pdhfsm.write("time_lock", 2**31)
-    pdhfsm.write("time_scan", 1500000)
+    pdhfsm.write("time_scan", 2**31)
 
 def load_fir():
     print("Load FIR coefficients")

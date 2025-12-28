@@ -585,7 +585,9 @@ class ModulePDHFSM(ModuleBase):
         1: {"name": "thre_sig_lock", "width": 16},
         2: {"name": "thre_sig_scan", "width": 16},
         3: {"name": "time_scan", "width": 32},
-        4: {"name": "time_lock", "width": 32}
+        4: {"name": "time_lock", "width": 32},
+        5: {"name": "coef_scan", "width": 16},
+        6: {"name": "coef_lock", "width": 16}
     }
     alias_list = {
         "pc_cmd": 0,

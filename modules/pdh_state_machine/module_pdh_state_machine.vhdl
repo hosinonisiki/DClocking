@@ -67,8 +67,8 @@ begin
     -- Instantiate the parameter RAM to store the core's configuration
     parameter_ram : entity work.parameter_ram_256 generic map(
         -- Default values can be set here if needed
-        ram_default     =>  x"00000000000000000000000000000000" &
-                            x"00000000000000000000000000000000"
+        ram_default     =>  x"00000000000075300000400020000000" &
+                            x"20000000000000000000800000000000"
     ) port map(
         clk             =>  clk,
         rst             =>  ram_rst,

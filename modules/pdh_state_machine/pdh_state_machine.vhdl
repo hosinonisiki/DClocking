@@ -31,15 +31,20 @@ architecture behavioral of pdh_state_machine is
     signal time_duration_locking    : unsigned(31 downto 0);
     signal auto_threshold_signal_scanning : signed(15 downto 0);
     signal auto_threshold_signal_locking  : signed(15 downto 0);
+    signal auto_threshold_signal_scanning_buf : signed(15 downto 0);
+    signal auto_threshold_signal_locking_buf : signed(15 downto 0);
     signal auto_time_duration_scanning      : unsigned(31 downto 0);
     signal auto_time_duration_locking      : unsigned(31 downto 0);
-    signal max_sig_in                : signed(15 downto 0) := (others => '0');
-    signal min_sig_in                : signed(15 downto 0) := (others => '0');
+    signal max_sig_in                : signed(15 downto 0) := (15 => '1', others => '0');
+    signal min_sig_in                : signed(15 downto 0) := (15 => '0', others => '1');
     signal diff_sig_in               : signed(16 downto 0); 
-    signal scaled_lock_sig_in             : signed(25 downto 0);
-    signal scaled_scan_sig_in             : signed(25 downto 0);
-    signal coef_scan                  : unsigned(15 downto 0); 
-    signal coef_lock                  : unsigned(15 downto 0);
+    signal diff_sig_in_buf           : signed(16 downto 0);
+    signal scaled_lock_sig_in             : signed(32 downto 0);
+    signal scaled_scan_sig_in             : signed(32 downto 0);
+    signal scaled_lock_sig_in_buf    : signed(32 downto 0);
+    signal scaled_scan_sig_in_buf    : signed(32 downto 0);
+    signal coef_scan                  : signed(15 downto 0); 
+    signal coef_lock                  : signed(15 downto 0);
     constant min_AUTO_TIME            : unsigned(15 downto 0) := to_unsigned(500, 16);
 
     -- State machine signals
@@ -68,9 +73,9 @@ begin
 
     time_duration_scanning      <= unsigned(core_param_in(127 downto 96)); -- address 0x03
     time_duration_locking       <= unsigned(core_param_in(159 downto 128)); -- address 0x04
-    -- 8 bit coef when coef=128 ratio is 0.5
-    coef_scan                   <= unsigned(core_param_in(175 downto 160)); -- address 0x05
-    coef_lock                   <= unsigned(core_param_in(207 downto 192)); -- address 0x06
+
+    coef_scan                   <= signed(core_param_in(175 downto 160)); -- address 0x05(-32768 to 32767) Q1.15
+    coef_lock                   <= signed(core_param_in(207 downto 192)); -- address 0x06
 
     saw_input_signed          <= signed(saw_input); 
 
@@ -92,12 +97,35 @@ begin
         sig_in_buf <= (others => '0') when rst = '1' else signed(sig_in);
     end generate;
 
-    diff_sig_in <= resize(max_sig_in, 17) - resize(min_sig_in, 17);
-    scaled_scan_sig_in <= resize(diff_sig_in * signed('0' & coef_scan), 26);
-    scaled_lock_sig_in <= resize(diff_sig_in * signed('0' & coef_lock), 26);
-    auto_threshold_signal_scanning <= min_sig_in + resize(scaled_scan_sig_in(24 downto 8), 16);
-    auto_threshold_signal_locking  <= min_sig_in + resize(scaled_lock_sig_in(24 downto 8), 16);
+    diff_sig_in_buf <= resize(max_sig_in, 17) - resize(min_sig_in, 17); -- Q17.0
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            diff_sig_in <= diff_sig_in_buf;
+        end if;
+    end process;
 
+    scaled_scan_sig_in_buf <= diff_sig_in * coef_scan ;-- Q18.15
+    scaled_lock_sig_in_buf <= diff_sig_in * coef_lock;-- Q18.15
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            scaled_scan_sig_in <= scaled_scan_sig_in_buf;
+            scaled_lock_sig_in <= scaled_lock_sig_in_buf;
+        end if;
+    end process;
+
+    auto_threshold_signal_scanning_buf <= min_sig_in + scaled_scan_sig_in(30 downto 15); -- Q16.0
+    auto_threshold_signal_locking_buf <= min_sig_in + scaled_lock_sig_in(30 downto 15);
+
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            auto_threshold_signal_scanning <= auto_threshold_signal_scanning_buf;
+            auto_threshold_signal_locking <= auto_threshold_signal_locking_buf;
+        end if;
+    end process;
+    
     -- Main state machine process
     state_transition: process(clk)
     begin
@@ -116,8 +144,8 @@ begin
                 pid_enable <= '1';
                 mixer_enable <= '1';
                 sawtooth_enable <= '1';
-                min_sig_in <= (others => '0');
-                max_sig_in <= (others => '0');
+                min_sig_in <= (15 => '0', others => '1');
+                max_sig_in <= (15 => '1', others => '0');
                 measurement_done <= '0';
                 auto_time_duration_scanning <= (others => '0');
                 auto_time_duration_locking <= (others => '0');
@@ -141,7 +169,7 @@ begin
                     when AUTO_WAIT =>
                         pid_enable <= '1';
                         mixer_enable <= '1';
-                        sawtooth_enable <= '1';
+                        sawtooth_enable <= '0';
                         if pc_cmd = "00"  then 
                             current_state <= IDLE;
                         elsif sawtooth_jump = '1' then
@@ -182,8 +210,8 @@ begin
                             else
                                 if time_able > min_AUTO_TIME then
                                     measurement_done <= '1'; 
-                                    auto_time_duration_scanning <= time_able;
-                                    auto_time_duration_locking <= time_able(30 downto 0) & '0';
+                                    auto_time_duration_scanning <= '0' & time_able(31 downto 1);--*0.5
+                                    auto_time_duration_locking <= time_able(29 downto 0) & "00"; --*4
                                     time_able <= (others => '0');
                                 else 
                                     time_able <= (others => '0');
@@ -193,7 +221,7 @@ begin
 
                         if pc_cmd = "00" then
                             current_state <= IDLE;
-                        elsif sawtooth_jump = '1' then
+                        elsif sawtooth_jump = '1' and auto_time_duration_scanning > 0 then
                             current_state <= AUTO_SCANNING;
                             time_able <= (others => '0');
                         end if;
@@ -226,7 +254,7 @@ begin
                         elsif sig_in_buf > auto_threshold_signal_locking then
                             if time_able < auto_time_duration_locking then
                                 time_able <= time_able + 1;
-                            else
+                            elsif pc_cmd = "11" then
                                 current_state <= IDLE;
                                 time_able <= (others => '0');
                             end if;

@@ -11,3 +11,4 @@ set_max_delay -datapath_only -from [get_pins -filter {NAME =~ *C} -of_objects [g
 
 
 
+
