@@ -30,6 +30,8 @@ entity module_accumulator is
         rsp_stat_out    :   out std_logic_vector(rsbus_w - 1 downto 0);
         -- data flow ports
         acc_out         :   out std_logic_vector(15 downto 0);
+        fast_out        :   out std_logic_vector(15 downto 0);
+        feedback_in     :   in  std_logic_vector(15 downto 0);
         -- control ports
         pause_in        :   in  std_logic;
         auto_reset_in   :   in  std_logic
@@ -64,6 +66,8 @@ begin
         core_param_in   =>  core_param,
         -- data flow ports
         acc_out         =>  acc_out,
+        fast_out        =>  fast_out,
+        feedback_in     =>  feedback_in,
         -- control ports
         pause_in        =>  pause_in,
         auto_reset_in   =>  auto_reset_in
