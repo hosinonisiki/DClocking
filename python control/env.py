@@ -176,6 +176,17 @@ def setup_pdh():
     pdhfsm.write("time_lock", 1000000)
     pdhfsm.write("time_scan", 2**29)
 
+def setup_dpll():
+    router.set_routing(MIXER_IN_A, INPUT_F)
+    router.set_routing(FIR_IN, MIXER_OUT)
+    router.set_routing(PID_IN, FIR_OUT)
+    router.set_routing(ACC_IN, PID_OUT)
+    router.set_routing(TRI_IN, ACC_OUT)
+    router.set_routing(OUTPUT_A, TRI_SIN)
+    router.set_routing(TRI2_IN, ACC_FAST_OUT)
+    router.set_routing(MIXER_IN_B, TRI2_SIN)
+    router.upload()
+
 def load_fir():
     print("Load FIR coefficients")
     filename = "fir_coef.txt"
