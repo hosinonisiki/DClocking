@@ -236,8 +236,7 @@ begin
                     sig_out <= (others => (others => '0'));
                     ctrl_out <= (others => '0');
                 else
-                    sig_out(63 downto 1) <= sig_out_buf(63 downto 1);
-                    sig_out(0) <= x"0000";
+                    sig_out <= sig_out_buf;
                     ctrl_out <= ctrl_out_buf;
                 end if;
             end if;
@@ -245,8 +244,7 @@ begin
     end generate;
 
     no_output_buffer : if io_buf = buf_i_only or io_buf = buf_none generate
-        sig_out(63 downto 1) <= (others => (others => '0')) when rst = '1' else sig_out_buf;
-        sig_out(0) <= x"0000";
+        sig_out <= (others => (others => '0')) when rst = '1' else sig_out_buf;
         ctrl_out <= (others => '0') when rst = '1' else ctrl_out_buf;
     end generate;
 

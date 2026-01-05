@@ -260,13 +260,19 @@ class ModuleAccumulator(ModuleBase):
         0: {"name": "low", "width": 32},
         1: {"name": "high", "width": 32},
         2: {"name": "divisor", "width": 16},
-        3: {"name": "enable_auto_reset", "width": 1}
+        4: {"name": "lf_kp", "width": 24},
+        5: {"name": "lf_ki", "width": 32},
+        6: {"name": "bypass_lf", "width": 1},
+        7: {"name": "enable_auto_reset", "width": 1}
     }
     alias_list = {
         "low": 0,
         "high": 1,
         "divisor": 2,
-        "enable_auto_reset": 3, "auto_reset": 3, "auto": 3
+        "lf_kp": 4, "kp": 4, "k_p": 4, "p": 4,
+        "lf_ki": 5, "ki": 5, "k_i": 5, "i": 5,
+        "bypass_lf": 6, "bypass": 6,
+        "enable_auto_reset": 7, "auto_reset": 7, "auto": 7
     }
     deduced_parameter_list = {
         "freq": lambda self: self.freq_func,

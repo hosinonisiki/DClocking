@@ -1,5 +1,8 @@
 # Simply recording the corresponding port numbers of different modules as a temporary solution.
 
+VOID = 0 # Signals to port 0 are ignored. Signals from port 0 are always zero.
+VOID_BOOL = 0 + 64
+
 # Output from module, input to signal router:
 TRI_SIN = 2
 TRI_COS = 1
@@ -91,6 +94,10 @@ OUTPUT_E = 60
 OUTPUT_F = 61
 OUTPUT_G = 62
 OUTPUT_H = 63
+
+# LOW is constant 0, HIGH is constant 1
+LOW = 62 + 64
+HIGH = 63 + 64
 
 # Output control from signal router, input to module:
 ACC_RESET = 7 + 64
