@@ -259,15 +259,24 @@ class ModuleAccumulator(ModuleBase):
     parameter_list = {
         0: {"name": "low", "width": 32},
         1: {"name": "high", "width": 32},
-        3: {"name": "enable_auto_reset", "width": 1}
+        2: {"name": "divisor", "width": 16},
+        4: {"name": "lf_kp", "width": 24},
+        5: {"name": "lf_ki", "width": 32},
+        6: {"name": "bypass_lf", "width": 1},
+        7: {"name": "enable_auto_reset", "width": 1}
     }
     alias_list = {
         "low": 0,
         "high": 1,
-        "enable_auto_reset": 3, "auto_reset": 3, "auto": 3
+        "divisor": 2,
+        "lf_kp": 4, "kp": 4, "k_p": 4, "p": 4,
+        "lf_ki": 5, "ki": 5, "k_i": 5, "i": 5,
+        "bypass_lf": 6, "bypass": 6,
+        "enable_auto_reset": 7, "auto_reset": 7, "auto": 7
     }
     deduced_parameter_list = {
-        "freq": lambda self: self.freq_func
+        "freq": lambda self: self.freq_func,
+        "ratio": lambda self: self.ratio_func
     }
 
     def freq_func(self, data = None):
@@ -289,6 +298,22 @@ class ModuleAccumulator(ModuleBase):
                 high = int.from_bytes(data_list[1], "big")
                 var = (high << 32) | low
                 return var * 250000000 / 2 ** 64
+            return address_list, formula
+        
+    def ratio_func(self, data = None):
+        if data is not None:
+            # Write, return address-data pairs
+            if not data in [2 ** n for n in range(16)]:
+                raise ValueError("Ratio must be a power of 2 between 1 and 32768")
+            return [(2, data)]
+        else:
+            # Read, return address list and formula
+            address_list = [2]
+            def formula(data_list):
+                ratio = int.from_bytes(data_list[0], "big")
+                if ratio == 0:
+                    return 1
+                return 2 ** (int(np.log2(ratio)))
             return address_list, formula
 
 class ModuleFIRFilter(ModuleBase):

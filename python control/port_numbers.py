@@ -1,5 +1,8 @@
 # Simply recording the corresponding port numbers of different modules as a temporary solution.
 
+VOID = 0 # Signals to port 0 are ignored. Signals from port 0 are always zero.
+VOID_BOOL = 0 + 64
+
 # Output from module, input to signal router:
 TRI_SIN = 2
 TRI_COS = 1
@@ -32,6 +35,8 @@ MIXER4_OUT = 33
 FIR3_OUT = 34
 FIR4_OUT = 35
 ATAN2_OUT = 36
+ACC_FAST_OUT = 37
+ACC2_FAST_OUT = 38
 
 INPUT_A = 56
 INPUT_B = 57
@@ -78,6 +83,8 @@ ATAN2_IN_SIN = 35
 ATAN2_IN_COS = 36
 PDHFSM_IN_POWER = 37
 PDHFSM_IN_SCAN = 38
+ACC_IN = 39
+ACC2_IN = 40
 
 OUTPUT_A = 56
 OUTPUT_B = 57
@@ -87,6 +94,10 @@ OUTPUT_E = 60
 OUTPUT_F = 61
 OUTPUT_G = 62
 OUTPUT_H = 63
+
+# LOW is constant 0, HIGH is constant 1
+LOW = 62 + 64
+HIGH = 63 + 64
 
 # Output control from signal router, input to module:
 ACC_RESET = 7 + 64

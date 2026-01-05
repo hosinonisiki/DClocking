@@ -144,6 +144,10 @@ begin
             ctrl_out        =>  ctrl_bank_out
         );
     end block module_1_block;
+    sig_bank_in(0) <= (others => '0'); -- VOID
+    ctrl_bank_in(0) <= '0'; -- VOID_BOOL
+    ctrl_bank_in(62) <= '0'; -- LOW constant
+    ctrl_bank_in(63) <= '1'; -- HIGH constant
 
     module_2_block : block
         signal bus_en       :   std_logic;
@@ -180,6 +184,8 @@ begin
             rsp_stat_out    =>  rsbus(3),
             
             acc_out         =>  sig_bank_in(4),
+            fast_out        =>  sig_bank_in(37),
+            error_in     =>  sig_bank_out(39),
 
             pause_in        =>  ctrl_bank_out(5),
             auto_reset_in   =>  ctrl_bank_out(7)
@@ -462,6 +468,8 @@ begin
             rsp_stat_out    =>  rsbus(17),
             
             acc_out         =>  sig_bank_in(26),
+            fast_out        =>  sig_bank_in(38),
+            error_in        =>  sig_bank_out(40),
 
             pause_in        =>  ctrl_bank_out(6),
             auto_reset_in   =>  ctrl_bank_out(3)
