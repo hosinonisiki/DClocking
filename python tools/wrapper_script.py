@@ -8,7 +8,7 @@ for i in range(3):
     configurations[i].fmc_id = fmc_id[i]
     configurations[i].make()
 
-filename = "wrapper.vhdl"
+filename = "python tools\\wrapper.vhdl"
 with open(filename, 'r') as file:
     # Locate script generation indicators
     pin_declaration_beg_token = "-- PIN DECLARATION GENERATION START"

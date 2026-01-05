@@ -180,9 +180,11 @@ begin
             rsp_stat_out    =>  rsbus(3),
             
             acc_out         =>  sig_bank_in(4),
+            fast_out        =>  sig_bank_in(37),
+            feedback_in     =>  sig_bank_out(39),
 
             pause_in        =>  ctrl_bank_out(5),
-            auto_reset_in   =>  ctrl_bank_out(0)
+            auto_reset_in   =>  ctrl_bank_out(7)
         );
     end block module_3_block;
 
@@ -462,6 +464,8 @@ begin
             rsp_stat_out    =>  rsbus(17),
             
             acc_out         =>  sig_bank_in(26),
+            fast_out        =>  sig_bank_in(38),
+            feedback_in     =>  sig_bank_out(40),
 
             pause_in        =>  ctrl_bank_out(6),
             auto_reset_in   =>  ctrl_bank_out(3)
