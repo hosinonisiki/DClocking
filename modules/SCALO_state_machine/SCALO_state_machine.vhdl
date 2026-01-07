@@ -30,7 +30,7 @@ entity scalo_state_machine is
         phase_in        :   in  std_logic_vector(15 downto 0);
         phase_out       :   out std_logic_vector(15 downto 0);
         -- control ports
-        pid_reset_out   :   out std_logic;
+        pid_reset_out   :   out std_logic
     );
 end entity scalo_state_machine;
 

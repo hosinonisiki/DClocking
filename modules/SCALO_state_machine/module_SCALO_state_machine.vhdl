@@ -55,7 +55,7 @@ architecture structural of module_SCALO_state_machine is
     signal ren              :   std_logic; -- Read enable signal
 begin
     
-    core_entity : entity work.core_SCALO_state_machine port map(
+    core_entity : entity work.SCALO_state_machine port map(
         clk             =>  clk,
         rst             =>  core_rst,
         core_param_in   =>  core_param,

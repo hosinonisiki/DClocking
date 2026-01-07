@@ -118,11 +118,11 @@ class ModulePID(ModuleBase):
             target_gain_p = int(round(2 ** 16 * 10 ** (data / 20)))
             if target_gain_p >= 2 ** 23 or target_gain_p < -2 ** 23:
                 raise ValueError("Resulting gain_p is out of range")
-            current_gain_p = int.from_bytes(self.read("gain_p"), "big")
-            current_gain_i = int.from_bytes(self.read("gain_i"), "big")
-            current_gain_d = int.from_bytes(self.read("gain_d"), "big")
+            current_gain_p = int.from_bytes(self.read("gain_p"), "big", signed = True)
+            current_gain_i = int.from_bytes(self.read("gain_i"), "big", signed = True)
+            current_gain_d = int.from_bytes(self.read("gain_d"), "big", signed = True)
             if current_gain_p != 0:
-                scale_factor = target_gain_p / current_gain_p
+                scale_factor = np.abs(target_gain_p / current_gain_p)
                 target_gain_i = int(round(current_gain_i * scale_factor))
                 target_gain_d = int(round(current_gain_d * scale_factor))
                 if target_gain_i >= 2 ** 31 or target_gain_i < -2 ** 31 or target_gain_d >= 2 ** 23 or target_gain_d < -2 ** 23:
@@ -134,16 +134,16 @@ class ModulePID(ModuleBase):
             # Read, return address list and formula
             address_list = [0]
             def formula(data_list):
-                gain_p = int.from_bytes(data_list[0], "big")
+                gain_p = int.from_bytes(data_list[0], "big", signed = True)
                 if gain_p == 0:
                     return -np.inf
-                return 20 * np.log10(gain_p / 2 ** 16)
+                return 20 * np.log10(np.abs(gain_p) / 2 ** 16)
             return address_list, formula
         
     def pi_corner_func(self, data = None):
         if data != None:
             # Write, return address-data pairs
-            current_gain_p = int.from_bytes(self.read("gain_p"), "big")
+            current_gain_p = int.from_bytes(self.read("gain_p"), "big", signed = True)
             target_gain_i = int(round(current_gain_p * data * 2 * np.pi / 125000000 * 2 ** 16))
             if target_gain_i >= 2 ** 31 or target_gain_i < -2 ** 31:
                 raise ValueError("Resulting gain_i is out of range")
@@ -152,18 +152,18 @@ class ModulePID(ModuleBase):
             # Read, return address list and formula
             address_list = [0, 1]
             def formula(data_list):
-                gain_p = int.from_bytes(data_list[0], "big")
-                gain_i = int.from_bytes(data_list[1], "big")
+                gain_p = int.from_bytes(data_list[0], "big", signed = True)
+                gain_i = int.from_bytes(data_list[1], "big", signed = True)
                 if gain_p == 0:
                     return np.inf
-                return (gain_i / gain_p) * 125000000 / (2 * np.pi * 2 ** 16)
+                return np.abs(gain_i / gain_p) * 125000000 / (2 * np.pi * 2 ** 16)
             return address_list, formula
 
     def pd_corner_func(self, data = None):
         if data != None:
             # Write, return address-data pairs
             if data != 0:
-                current_gain_p = int.from_bytes(self.read("gain_p"), "big")
+                current_gain_p = int.from_bytes(self.read("gain_p"), "big", signed = True)
                 target_gain_d = int(round(current_gain_p * 250000000 / (data * 2 * np.pi)))
                 if target_gain_d >= 2 ** 23 or target_gain_d < -2 ** 23:
                     raise ValueError("Resulting gain_d is out of range")
@@ -174,19 +174,19 @@ class ModulePID(ModuleBase):
             # Read, return address list and formula
             address_list = [0, 1]
             def formula(data_list):
-                gain_p = int.from_bytes(data_list[0], "big")
-                gain_d = int.from_bytes(data_list[1], "big")
+                gain_p = int.from_bytes(data_list[0], "big", signed = True)
+                gain_d = int.from_bytes(data_list[1], "big", signed = True)
                 if gain_d == 0:
                     return np.inf
-                return (gain_p / gain_d) * 250000000 / (2 * np.pi)
+                return np.abs(gain_p / gain_d) * 250000000 / (2 * np.pi)
             return address_list, formula
 
     def saturation_gain_func(self, data = None):
         if data != None:
             # Write, return address-data pairs
-            current_gain_i = int.from_bytes(self.read("gain_i"), "big")
+            current_gain_i = int.from_bytes(self.read("gain_i"), "big", signed = True)
             if current_gain_i != 0:
-                log_target_leak_digit = int(round(np.log2((10 ** (data / 20)) * (2 ** 32) / (current_gain_i * 256))))
+                log_target_leak_digit = int(round(np.log2((10 ** (data / 20)) * (2 ** 32) / (np.abs(current_gain_i) * 256))))
                 if log_target_leak_digit <= -1:
                     target_leak_digit = 1
                     print("Warning: saturation gain too low, setting to maximum leak")
@@ -195,7 +195,7 @@ class ModulePID(ModuleBase):
                     print("Warning: saturation gain too high, setting to no leak")
                 else:
                     target_leak_digit = 2 ** log_target_leak_digit
-                    print(f"Implemented saturation gain: {20 * np.log10(current_gain_i * target_leak_digit * 256 / (2 ** 32))} dB, requested: {data} dB")
+                    print(f"Implemented saturation gain: {20 * np.log10(np.abs(current_gain_i) * target_leak_digit * 256 / (2 ** 32))} dB, requested: {data} dB")
                 return [(6, target_leak_digit)]
             else:
                 raise ValueError("gain_i is zero, cannot set saturation gain")
@@ -203,13 +203,13 @@ class ModulePID(ModuleBase):
             # Read, return address list and formula
             address_list = [1, 6]
             def formula(data_list):
-                gain_i = int.from_bytes(data_list[0], "big")
+                gain_i = int.from_bytes(data_list[0], "big", signed = True)
                 if gain_i == 0:
                     raise ValueError("gain_i is zero, cannot read saturation gain")
-                leak_digit = int.from_bytes(data_list[1], "big")
+                leak_digit = int.from_bytes(data_list[1], "big", signed = True)
                 if leak_digit == 0:
                     return np.inf
-                return 20 * np.log10(gain_i * leak_digit * 256 / (2 ** 32))
+                return 20 * np.log10(np.abs(gain_i) * leak_digit * 256 / (2 ** 32))
             return address_list, formula
 
     def saturation_turning_frequency_func(self, data = None):
@@ -254,6 +254,25 @@ class ModuleScaler(ModuleBase):
         "lower": 3, "lower_limit": 3,
         "enable_wrapping": 4, "wrap": 4, "wrapping": 4
     }
+    deduced_parameter_list = {
+        "gain": lambda self: self.gain_func
+    }
+
+    def gain_func(self, data = None):
+        if data is not None:
+            # Write, return address-data pairs
+            current_scale = int.from_bytes(self.read("scale"), "big", signed = True)
+            target_scale = np.sign(current_scale) * int(round(2 ** 16 * 10 ** (data / 20)))
+            if target_scale >= 2 ** 23 or target_scale < -2 ** 23:
+                raise ValueError("Resulting scale is out of range")
+            return [(0, target_scale)]
+        else:
+            # Read, return address list and formula
+            address_list = [0]
+            def formula(data_list):
+                scale = int.from_bytes(data_list[0], "big", signed = True)
+                return 20 * np.log10(np.abs(scale) / 2 ** 16)
+            return address_list, formula
 
 class ModuleAccumulator(ModuleBase):
     parameter_list = {
@@ -294,8 +313,8 @@ class ModuleAccumulator(ModuleBase):
             # Read, return address list and formula
             address_list = [0, 1]
             def formula(data_list):
-                low = int.from_bytes(data_list[0], "big")
-                high = int.from_bytes(data_list[1], "big")
+                low = int.from_bytes(data_list[0], "big", signed = False)
+                high = int.from_bytes(data_list[1], "big", signed = False)
                 var = (high << 32) | low
                 return var * 250000000 / 2 ** 64
             return address_list, formula
@@ -310,7 +329,7 @@ class ModuleAccumulator(ModuleBase):
             # Read, return address list and formula
             address_list = [2]
             def formula(data_list):
-                ratio = int.from_bytes(data_list[0], "big")
+                ratio = int.from_bytes(data_list[0], "big", signed = False)
                 if ratio == 0:
                     return 1
                 return 2 ** (int(np.log2(ratio)))
@@ -511,7 +530,7 @@ class ModuleLinearTransformer(ModuleBase):
             # Read, return address list and formula
             address_list = [0]
             def formula(data_list):
-                coef_int = int.from_bytes(data_list[0], "big")
+                coef_int = int.from_bytes(data_list[0], "big", signed = True)
                 if coef_int >= 2 ** 15:
                     coef_int = coef_int - 2 ** 16
                 return coef_int / (2 ** 15 - 1)
@@ -530,7 +549,7 @@ class ModuleLinearTransformer(ModuleBase):
             # Read, return address list and formula
             address_list = [1]
             def formula(data_list):
-                coef_int = int.from_bytes(data_list[0], "big")
+                coef_int = int.from_bytes(data_list[0], "big", signed = True)
                 if coef_int >= 2 ** 15:
                     coef_int = coef_int - 2 ** 16
                 return coef_int / (2 ** 15 - 1)
@@ -549,7 +568,7 @@ class ModuleLinearTransformer(ModuleBase):
             # Read, return address list and formula
             address_list = [2]
             def formula(data_list):
-                coef_int = int.from_bytes(data_list[0], "big")
+                coef_int = int.from_bytes(data_list[0], "big", signed = True)
                 if coef_int >= 2 ** 15:
                     coef_int = coef_int - 2 ** 16
                 return coef_int / (2 ** 15 - 1)
@@ -568,7 +587,7 @@ class ModuleLinearTransformer(ModuleBase):
             # Read, return address list and formula
             address_list = [3]
             def formula(data_list):
-                coef_int = int.from_bytes(data_list[0], "big")
+                coef_int = int.from_bytes(data_list[0], "big", signed = True)
                 if coef_int >= 2 ** 15:
                     coef_int = coef_int - 2 ** 16
                 return coef_int / (2 ** 15 - 1)
