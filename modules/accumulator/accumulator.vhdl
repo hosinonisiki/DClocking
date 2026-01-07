@@ -34,6 +34,11 @@ architecture behavioral of accumulator is
     signal divisor      :   std_logic_vector(15 downto 0); -- the divisor N
     signal divisor_digit    :   integer; -- log of the divisor
 
+    type error_shifted_buf_type is array (0 to 15) of std_logic_vector(63 downto 0);
+    signal error_shifted_buf :   error_shifted_buf_type;
+    type lf_sum_shifted_buf_type is array (0 to 15) of signed(63 downto 0);
+    signal lf_sum_shifted_buf  :   lf_sum_shifted_buf_type;
+
     -- The phase of acc_out is the first 16 bits of acc.
     -- To make fast_out N times faster, use the logN ~ 15+logN th bits of acc as its phase.
     -- The feedback is aligned with fast phase in order to get better precision while preserving range.
@@ -155,14 +160,20 @@ begin
             lf_sum <= (lf_product_p(39) & lf_product_p & x"00") + lf_integral_limited;
         end if;
     end process;
-    lf_integral_limited <= "0_01111111_11111111_11111111_11111111_11111111_11111111" when lf_integral(48 downto 47) = "01" else
-                           "1_10000000_00000000_00000000_00000000_00000000_00000000" when lf_integral(48 downto 47) = "10" else
+    lf_integral_limited <= b"0_01111111_11111111_11111111_11111111_11111111_11111111" when lf_integral(48 downto 47) = "01" else
+                           b"1_10000000_00000000_00000000_00000000_00000000_00000000" when lf_integral(48 downto 47) = "10" else
                            lf_integral;
-    error_shifted <= error_in_buf & (47 downto 0 => '0') when divisor_digit = 0 else
-                        (divisor_digit - 1 downto 0 => error_in_buf(15)) & error_in_buf & (47 - divisor_digit downto 0 => '0');
-    lf_sum_shifted <= lf_sum & (14 downto 0 => '0') when divisor_digit = 0 else
-                        (14 downto 0 => lf_sum(48)) & lf_sum when divisor_digit = 15 else
-                        (divisor_digit - 1 downto 0 => lf_sum(48)) & lf_sum & (14 - divisor_digit downto 0 => '0');
+
+    error_shifted_buf(0) <= error_in_buf & (47 downto 0 => '0');
+    lf_sum_shifted_buf(0) <= lf_sum & (14 downto 0 => '0');
+    gen_shifted_buf : for i in 1 to 14 generate
+        error_shifted_buf(i) <= (i - 1 downto 0 => error_in_buf(15)) & error_in_buf & (47 - i downto 0 => '0');
+        lf_sum_shifted_buf(i) <= (i - 1 downto 0 => lf_sum(48)) & lf_sum & (14 - i downto 0 => '0');
+    end generate;
+    error_shifted_buf(15) <= (14 downto 0 => error_in_buf(15)) & error_in_buf & (32 downto 0 => '0');
+    lf_sum_shifted_buf(15) <= (14 downto 0 => lf_sum(48)) & lf_sum;
+    error_shifted <= error_shifted_buf(divisor_digit);
+    lf_sum_shifted <= lf_sum_shifted_buf(divisor_digit);
 
     acc_out_buf <= acc(63 downto 48);
     fast_out_buf <= acc(63 - divisor_digit downto 48 - divisor_digit);
