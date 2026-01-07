@@ -229,14 +229,14 @@ pid.read("saturation_gain") # 10
 - 锯齿波扫描输入（16bit物理信号）
 
 输出：
-- PID使能信号（1bit布尔值）
-- 混频器使能信号（1bit布尔值）
-- 扫描信号使能（1bit布尔值）
+- PID复位信号（1bit布尔值）
+- 混频器复位信号（1bit布尔值）
+- 扫描复位信号（1bit布尔值）
 
 端口名：
-|标识符|透射光强信号输入|扫描锯齿波输入|PID使能信号|混频器使能信号|扫描信号使能|
+|标识符|透射光强信号输入|锯齿波扫描输入|PID复位信号|混频器复位信号|扫描复位信号|
 |----|----|----|----|----|----|
-|PDH|SIG_IN|SAW_IN|PID_ENABLE|MIXER_ENABLE|SAW_ENABLE|
+|PDH|PDHFSM_IN_POWER|PDHFSM_IN_SCAN|PDHFSM_PID_RESET_CTRL|PDH_FSM_MIXER_RESET_CTRL|PDHFSM_SCAN_RESET_CTRL|
 
 ### 直接参数
 
@@ -257,11 +257,9 @@ pid.read("saturation_gain") # 10
 ### 可视化
 
 在手动模式下，允许用户调整所有直接参数。
-- 借助示波器输出锯齿波扫描波形
-- 借助示波器直接输出PD输出波形
-- 输出正弦波调制波形
-- 输出滤波后的信号波形
-- 显示当前状态机的状态（IDLE, SCANNING, LOCKING 等）。
+- 手动模式下，绘制各阈值物理含义的示意图。（详细沟通，可能需同步到示波器）
+- 自动模式下，绘制设定比例系数的示意图。（详细沟通）
+- 显示当前状态机的状态，如IDLE, SCANNING, LOCKING等。（架构上不可能，待将来更新）
 
 # 封装后模块
 
