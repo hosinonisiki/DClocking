@@ -18,7 +18,7 @@ use ieee.numeric_std.all;
 
 use work.mypak.all;
 
-entity module_accumulator is
+entity module_SCALO_state_machine is
     port(
         clk             :   in  std_logic;
         rst             :   in  std_logic;
@@ -29,17 +29,15 @@ entity module_accumulator is
         rsp_data_out    :   out std_logic_vector(rdbus_w - 1 downto 0);
         rsp_stat_out    :   out std_logic_vector(rsbus_w - 1 downto 0);
         -- data flow ports
-        acc_out         :   out std_logic_vector(15 downto 0);
-        fast_out        :   out std_logic_vector(15 downto 0);
-        error_in     :   in  std_logic_vector(15 downto 0);
+        phase_in        :   in  std_logic_vector(15 downto 0);
+        phase_out       :   out std_logic_vector(15 downto 0);
         -- control ports
-        pause_in        :   in  std_logic;
-        auto_reset_in   :   in  std_logic
+        pid_reset_out   :   out std_logic
     );
-end entity module_accumulator;
+end entity module_SCALO_state_machine;
 
-architecture structural of module_accumulator is
-    signal core_param       :   std_logic_vector(255 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
+architecture structural of module_SCALO_state_machine is
+    signal core_param       :   std_logic_vector(63 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
     signal core_rst         :   std_logic := '1';
 
     signal ram_rst          :   std_logic := '1';
@@ -57,27 +55,19 @@ architecture structural of module_accumulator is
     signal ren              :   std_logic; -- Read enable signal
 begin
     
-    core_entity : entity work.accumulator generic map(
-        -- Removed buffer options for high bandwidth testing previously
-        -- Added back due to upgraded functionality causing timing issues
-        -- Plus 4 ns won't hurt here
-        io_buf => buf_for_io   
-    )port map(
+    core_entity : entity work.core_SCALO_state_machine port map(
         clk             =>  clk,
         rst             =>  core_rst,
         core_param_in   =>  core_param,
         -- data flow ports
-        acc_out         =>  acc_out,
-        fast_out        =>  fast_out,
-        error_in     =>  error_in,
+        phase_in        =>  phase_in,
+        phase_out       =>  phase_out,
         -- control ports
-        pause_in        =>  pause_in,
-        auto_reset_in   =>  auto_reset_in
+        pid_reset_out   =>  pid_reset_out
     );
 
-    parameter_ram : entity work.parameter_ram_256 generic map(
-        ram_default     =>  x"00000000_00000001_00000000_00000000" &
-                            x"00000000_00000001_00000000_00000000"
+    parameter_ram : entity work.parameter_ram_64 generic map(
+        ram_default     =>  x"0000000000000000"
     )port map(
         clk             =>  clk,
         rst             =>  ram_rst,

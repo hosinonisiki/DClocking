@@ -124,6 +124,7 @@ begin
     -- 2.Register the address of the module in mypak
     -- 3.Register the name of the module in uart_protocol
     -- 4.Add corresponding lines in central_control
+    -- 5.Record port numbers in port_numbers.py
     module_1_block : block
         signal bus_en       :   std_logic;
     begin
@@ -658,6 +659,26 @@ begin
             saw_input       =>  sig_bank_out(38)
         );
     end block module_26_block;
+
+    module_27_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_SCLO_ADDR else '0';
+        module_27 : entity work.module_SCALO_state_machine port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(27),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(27),
+            rsp_stat_out    =>  rsbus(27),
+            
+            phase_in        =>  sig_bank_out(41),
+            phase_out       =>  sig_bank_in(39),
+            pid_reset_out   =>  ctrl_bank_in(5)
+        );
+    end block module_27_block;
 
     -- signal banks provided by the router
     -- Last 8 channels reserved for top adc and dac ports
