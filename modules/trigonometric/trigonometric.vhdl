@@ -6,6 +6,14 @@
 -- with x7586a5 representing 1.0. Note that internal
 -- signals are of 24 bits while io ports are 16 bits.
 
+-- In previous pipelining structures, during each cycle,
+-- z is first calculated according to d from the last cycle,
+-- from which the new d is determined and then used to
+-- calculate c and s. This results both c and s being
+-- gated by the calculation of z. To improve pipelining,
+-- z should be calculated 1 cycle in advance so that
+-- c and s won't be blocked.
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -55,10 +63,12 @@ architecture behavioral of trigonometric is
         x"00000a"
     ); -- angle values of arctan(2^(-i))
     signal c, s, z          :   signed_array(0 to 18); -- cos, sin and angle residue
+    signal s_pre, z_pre     :   signed(23 downto 0); -- for pipelining
     signal c_buf, s_buf, z_buf  :   signed_array(0 to 17); -- buffers inserted to pipeline
 
     type sign_array is array(natural range <>) of std_logic;
     signal d, x             :   sign_array(0 to 18); -- d stores the sign of residue. x stores quandrant information of the input
+    signal x_pre            :   std_logic; -- for pipelining
     signal d_buf, x_buf     :   sign_array(0 to 17); -- buffers inserted to pipeline
 begin
     use_input_buffer : if io_buf = buf_for_io or io_buf = buf_i_only generate
@@ -99,32 +109,59 @@ begin
     end generate;
 
     -- rotate input angle to the first or fourth quadrant
-    z(0) <= phase_in_buf(14) & phase_in_buf(14 downto 0) & x"00";
-    x(0) <= phase_in_buf(15) xor phase_in_buf(14);
-    d(0) <= z(0)(23);
+    -- z(0) <= phase_in_buf(14) & phase_in_buf(14 downto 0) & x"00";
+    z_pre <= phase_in_buf(14) & phase_in_buf(14 downto 0) & x"00";
+    -- x(0) <= phase_in_buf(15) xor phase_in_buf(14);
+    x_pre <= phase_in_buf(15) xor phase_in_buf(14);
+    d(0) <= z_pre(23);
     c(0) <= x"475e34"; -- x"475e34" = 0.607253 * x"7586a5", where 0.607253 is the product of cos(arctan(2^(-i))) for i = 0 to 18
-    s(0) <= x"475e34" when d(0) = '0' else x"b8a1cc"; -- x"b8a1cc" = -0.607253 * x"7586a5"
+    -- s(0) <= x"475e34" when d(0) = '0' else x"b8a1cc"; -- x"b8a1cc" = -0.607253 * x"7586a5"
+    s_pre <= x"475e34" when d(0) = '0' else x"b8a1cc"; -- x"b8a1cc" = -0.607253 * x"7586a5"
+
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            if d(0) = '0' then
+                z(0) <= z_pre - a(0);
+            else
+                z(0) <= z_pre + a(0);
+            end if;
+            s(0) <= s_pre;
+            x(0) <= x_pre;
+        end if;
+    end process;
 
     iterations : for i in 0 to 17 generate
         c_buf(i) <= c(i) - shift_right(s(i), i + 1) when d_buf(i) = '0' else
                             c(i) + shift_right(s(i), i + 1);
         s_buf(i) <= s(i) + shift_right(c(i), i + 1) when d_buf(i) = '0' else
                             s(i) - shift_right(c(i), i + 1);
-        d_buf(i) <= z_buf(i)(23);
+        d_buf(i) <= z(i)(23);
         x_buf(i) <= x(i);
-        z_buf(i) <= z(i) - a(i) when d(i) = '0' else
-                            z(i) + a(i);
+        z_buf(i) <= z(i) - a(i + 1) when d_buf(i) = '0' else
+                            z(i) + a(i + 1);
+    end generate iterations;
+
+    no_buf_even : for i in 0 to 8 generate
+        c(i * 2 + 1) <= c_buf(i * 2);
+        s(i * 2 + 1) <= s_buf(i * 2);
+        d(i * 2 + 1) <= d_buf(i * 2);
+        x(i * 2 + 1) <= x_buf(i * 2);
+        z(i * 2 + 1) <= z_buf(i * 2);
+    end generate no_buf_even;
+
+    buf_odd : for i in 0 to 8 generate
         process(clk)
         begin
             if rising_edge(clk) then
-                c(i + 1) <= c_buf(i);
-                s(i + 1) <= s_buf(i);
-                d(i + 1) <= d_buf(i);
-                x(i + 1) <= x_buf(i);
-                z(i + 1) <= z_buf(i);
+                c(i * 2 + 2) <= c_buf(i * 2 + 1);
+                s(i * 2 + 2) <= s_buf(i * 2 + 1);
+                d(i * 2 + 2) <= d_buf(i * 2 + 1);
+                x(i * 2 + 2) <= x_buf(i * 2 + 1);
+                z(i * 2 + 2) <= z_buf(i * 2 + 1);
             end if;
         end process;
-    end generate iterations;
+    end generate buf_odd;
 
     -- rotate back to the original quadrant with rounding
     cos_out_buf <= c(18)(23 downto 8) xor x"FFFF" when c(18)(7) = '1' and x(18) = '1' else

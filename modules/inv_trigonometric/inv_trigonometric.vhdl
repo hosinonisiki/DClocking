@@ -4,6 +4,8 @@
 -- an angle. Phase is normalized with x8000 representing
 -- exactly +/- pi.
 
+-- Reworked pipelining structure similar to trigonometric.vhdl.
+
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -55,10 +57,12 @@ architecture behavioural of inv_trigonometric is
         x"00000a"
     ); -- angle values of arctan(2^(-i))
     signal c, s, z          :   signed_array(0 to 18); -- cos, sin and angle residue
+    signal c_pre, s_pre, z_pre  :   signed(23 downto 0); -- for pipelining
     signal c_buf, s_buf, z_buf  :   signed_array(0 to 17); -- buffers inserted to pipeline
 
     type sign_array is array(natural range <>) of std_logic;
     signal d, x             :   sign_array(0 to 18); -- d stores the sign of residue. x stores quandrant information of the input
+    signal x_pre            :   std_logic; -- for pipelining
     signal d_buf, x_buf     :   sign_array(0 to 17); -- buffers inserted to pipeline
 
     signal sin_in_scaled    :   signed(31 downto 0);
@@ -110,36 +114,67 @@ begin
         end if;
     end process;
 
-    x(0) <= cos_in_scaled(31);
-    s(0) <= (sin_in_scaled(31 downto 8) xor x"FFFFFF") + x"000001" when x(0) = '1' else
+    -- x(0) <= cos_in_scaled(31);
+    x_pre <= cos_in_scaled(31);
+    -- s(0) <= (sin_in_scaled(31 downto 8) xor x"FFFFFF") + x"000001" when x(0) = '1' else
+    --         sin_in_scaled(31 downto 8);
+    s_pre <= (sin_in_scaled(31 downto 8) xor x"FFFFFF") + x"000001" when x_pre = '1' else
             sin_in_scaled(31 downto 8);
-    c(0) <= x"36F612" when cos_in_buf = x"0000" and sin_in_buf = x"0000" else
-            (cos_in_scaled(31 downto 8) xor x"FFFFFF") + x"000001" when x(0) = '1' else
+    -- c(0) <= x"36F612" when cos_in_buf = x"0000" and sin_in_buf = x"0000" else
+    --         (cos_in_scaled(31 downto 8) xor x"FFFFFF") + x"000001" when x(0) = '1' else
+    --         cos_in_scaled(31 downto 8);
+    c_pre <= x"36F612" when cos_in_buf = x"0000" and sin_in_buf = x"0000" else
+            (cos_in_scaled(31 downto 8) xor x"FFFFFF") + x"000001" when x_pre = '1' else
             cos_in_scaled(31 downto 8);
-    d(0) <= s(0)(23);
-    z(0) <= - a(0) when d(0) = '1' else
+    d(0) <= s_pre(23);
+    -- z(0) <= - a(0) when d(0) = '1' else
+    --         a(0);
+    z_pre <= - a(0) when d(0) = '1' else
             a(0);
 
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            c(0) <= c_pre - shift_right(s_pre, 0) when d(0) = '1' else
+                            c_pre + shift_right(s_pre, 0);
+            s(0) <= s_pre + shift_right(c_pre, 0) when d(0) = '1' else
+                            s_pre - shift_right(c_pre, 0);
+            x(0) <= x_pre;
+            z(0) <= z_pre;
+        end if;
+    end process;
+
     iterations : for i in 0 to 17 generate
-        c_buf(i) <= c(i) - shift_right(s(i), i) when d(i) = '1' else
-                            c(i) + shift_right(s(i), i);
-        s_buf(i) <= s(i) + shift_right(c(i), i) when d(i) = '1' else
-                            s(i) - shift_right(c(i), i);
-        d_buf(i) <= s_buf(i)(23);
+        c_buf(i) <= c(i) - shift_right(s(i), i + 1) when d_buf(i) = '1' else
+                            c(i) + shift_right(s(i), i + 1);
+        s_buf(i) <= s(i) + shift_right(c(i), i + 1) when d_buf(i) = '1' else
+                            s(i) - shift_right(c(i), i + 1);
+        d_buf(i) <= s(i)(23);
         x_buf(i) <= x(i);
         z_buf(i) <= z(i) - a(i + 1) when d_buf(i) = '1' else
                             z(i) + a(i + 1);
+    end generate iterations;
+
+    no_buf_even : for i in 0 to 8 generate
+        c(i * 2 + 1) <= c_buf(i * 2);
+        s(i * 2 + 1) <= s_buf(i * 2);
+        d(i * 2 + 1) <= d_buf(i * 2);
+        x(i * 2 + 1) <= x_buf(i * 2);
+        z(i * 2 + 1) <= z_buf(i * 2);
+    end generate no_buf_even;
+
+    buf_odd : for i in 0 to 8 generate
         process(clk)
         begin
             if rising_edge(clk) then
-                c(i + 1) <= c_buf(i);
-                s(i + 1) <= s_buf(i);
-                d(i + 1) <= d_buf(i);
-                x(i + 1) <= x_buf(i);
-                z(i + 1) <= z_buf(i);
+                c(i * 2 + 2) <= c_buf(i * 2 + 1);
+                s(i * 2 + 2) <= s_buf(i * 2 + 1);
+                d(i * 2 + 2) <= d_buf(i * 2 + 1);
+                x(i * 2 + 2) <= x_buf(i * 2 + 1);
+                z(i * 2 + 2) <= z_buf(i * 2 + 1);
             end if;
         end process;
-    end generate iterations;
+    end generate buf_odd;
 
     phase_out_buf <= z(18)(23 downto 8) + x"8001" when z(18)(7) = '1' and x(18) = '1' else
                         z(18)(23 downto 8) + x"0001" when z(18)(7) = '1' and x(18) = '0' else
