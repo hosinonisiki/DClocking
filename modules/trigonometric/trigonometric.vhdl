@@ -68,7 +68,7 @@ architecture behavioral of trigonometric is
 
     type sign_array is array(natural range <>) of std_logic;
     signal d, x             :   sign_array(0 to 18); -- d stores the sign of residue. x stores quandrant information of the input
-    signal x_pre     :   std_logic; -- for pipelining
+    signal x_pre            :   std_logic; -- for pipelining
     signal d_buf, x_buf     :   sign_array(0 to 17); -- buffers inserted to pipeline
 begin
     use_input_buffer : if io_buf = buf_for_io or io_buf = buf_i_only generate
