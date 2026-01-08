@@ -31,9 +31,11 @@ entity module_accumulator is
         -- data flow ports
         acc_out         :   out std_logic_vector(15 downto 0);
         fast_out        :   out std_logic_vector(15 downto 0);
-        error_in     :   in  std_logic_vector(15 downto 0);
+        error_in        :   in  std_logic_vector(15 downto 0);
+        bias_in         :   in  std_logic_vector(15 downto 0);
         -- control ports
         pause_in        :   in  std_logic;
+        lf_reset_in     :   in  std_logic;
         auto_reset_in   :   in  std_logic
     );
 end entity module_accumulator;
@@ -69,9 +71,11 @@ begin
         -- data flow ports
         acc_out         =>  acc_out,
         fast_out        =>  fast_out,
-        error_in     =>  error_in,
+        error_in        =>  error_in,
+        bias_in         =>  bias_in,
         -- control ports
         pause_in        =>  pause_in,
+        lf_reset_in     =>  lf_reset_in,
         auto_reset_in   =>  auto_reset_in
     );
 

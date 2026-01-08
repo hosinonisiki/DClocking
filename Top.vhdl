@@ -186,9 +186,11 @@ begin
             
             acc_out         =>  sig_bank_in(4),
             fast_out        =>  sig_bank_in(37),
-            error_in     =>  sig_bank_out(39),
+            error_in        =>  sig_bank_out(39),
+            bias_in         =>  sig_bank_out(42),
 
             pause_in        =>  ctrl_bank_out(5),
+            lf_reset_in     =>  ctrl_bank_out(7),
             auto_reset_in   =>  ctrl_bank_out(7)
         );
     end block module_3_block;
@@ -471,8 +473,10 @@ begin
             acc_out         =>  sig_bank_in(26),
             fast_out        =>  sig_bank_in(38),
             error_in        =>  sig_bank_out(40),
+            bias_in         =>  sig_bank_out(43),
 
             pause_in        =>  ctrl_bank_out(6),
+            lf_reset_in     =>  ctrl_bank_out(8),
             auto_reset_in   =>  ctrl_bank_out(3)
         );
     end block module_17_block;

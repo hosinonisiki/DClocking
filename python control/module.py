@@ -305,7 +305,6 @@ class ModuleAccumulator(ModuleBase):
         2: {"name": "divisor", "width": 16},
         4: {"name": "lf_kp", "width": 24},
         5: {"name": "lf_ki", "width": 32},
-        6: {"name": "bypass_lf", "width": 1},
         7: {"name": "enable_auto_reset", "width": 1}
     }
     alias_list = {
@@ -314,7 +313,6 @@ class ModuleAccumulator(ModuleBase):
         "divisor": 2,
         "lf_kp": 4, "kp": 4, "k_p": 4, "p": 4,
         "lf_ki": 5, "ki": 5, "k_i": 5, "i": 5,
-        "bypass_lf": 6, "bypass": 6,
         "enable_auto_reset": 7, "auto_reset": 7, "auto": 7
     }
     deduced_parameter_list = {
