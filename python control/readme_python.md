@@ -23,6 +23,16 @@ pid.read("saturation_gain") # 10
 
 部分间接参数在读取时可能返回无穷大np.inf。
 
+部分位宽为1的参数，仅在上升沿或下降沿有效，对应格式：
+<模块变量名>.flip_on(<地址/参数名>)
+<模块变量名>.flip_off(<地址/参数名>)
+
+```python
+sclofsm = module.ModuleSCLOFSM(bus_inst, "SCLO")
+sclofsm.flip_on("lock") # 在lock参数产生一个上升沿
+sclofsm.flip_off("lock") # 在lock参数产生一个下降沿
+```
+
 ## PID控制器
 
 ### 基本信息
@@ -486,12 +496,49 @@ fir.design_lowpass(1e6, 10e6, 250e6) # 设计一个通带截止频率为1MHz，�
 
 ## LO自动校准状态机
 
+### 基本信息
+
+数量：1
+
+类名：ModuleSCLOFSM
+
+### 端口
+
+输入：
+- 剩余相位输入（16bit物理信号）
+
+输出：
+- 相位校准值输出（16bit物理信号）
+- PID复位信号（1bit布尔值）
+
+端口名：
+|标识符|剩余相位输入|相位校准值输出|PID复位信号|
+|----|----|----|----|
+|SCLO|SCLOFSM_PHASE_IN|SCLOFSM_BIAS_OUT|SCLOFSM_PID_RESET_CTRL|
+
+### 直接参数
+
+|地址|参数名|位宽|范围|含义|备注|
+|----|----|----|----|----|----|
+|0|lock|1|0 / 1|锁定指令|上升沿时，更新校准值，打开PID。下降沿时，关闭PID，但校准值维持|
+|1|clear|1|0 / 1|清除指令|上升沿时，清除校准值为0|
+
+### 间接参数
+
+无
+
+### 可视化
+
+无
+
 # 封装后模块
 
 由一个或多个基础模块封装而成。
 
 端口连接格式：
-router.set_routing(目标端口名, 源端口名)
+
+router.set_routing(<目标端口名>, <源端口名>)
+
 router.upload()
 
 ```python

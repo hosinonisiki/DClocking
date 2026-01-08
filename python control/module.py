@@ -64,6 +64,30 @@ class ModuleBase():
             address_list, formula = func()
             data_list = [self.bus.read(self.name, addr) for addr in address_list]
             return formula(data_list)
+        
+    def flip_on(self, designator):
+        ret = self.process_designator(designator)
+        if type(ret) != int:
+            raise ValueError("Invalid address or parameter name for flipping, should be a direct parameter")
+        address = ret
+        if self.parameter_list[address]["width"] != 1:
+            raise ValueError("Invalid address or parameter name for flipping, should be a boolean parameter")
+        current_value = int.from_bytes(self.bus.read(self.name, address), "big", signed = False)
+        if current_value != 0:
+            self.bus.write(self.name, address, 0)
+        self.bus.write(self.name, address, 1)
+
+    def flip_off(self, designator):
+        ret = self.process_designator(designator)
+        if type(ret) != int:
+            raise ValueError("Invalid address or parameter name for flipping, should be a direct parameter")
+        address = ret
+        if self.parameter_list[address]["width"] != 1:
+            raise ValueError("Invalid address or parameter name for flipping, should be a boolean parameter")
+        current_value = int.from_bytes(self.bus.read(self.name, address), "big", signed = False)
+        if current_value != 1:
+            self.bus.write(self.name, address, 1)
+        self.bus.write(self.name, address, 0)
 
     def process_designator(self, designator):
         if type(designator) == str:
@@ -639,4 +663,14 @@ class ModulePDHFSM(ModuleBase):
         "thre_sig_scan": 2, "threshold_signal_scan": 2,
         "time_scan": 3,
         "time_lock": 4
+    }
+
+class ModuleSCLOFSM(ModuleBase):
+    parameter_list = {
+        0: {"name": "lock", "width": 1},
+        1: {"name": "clear", "width": 1}
+    }
+    alias_list = {
+        "lock": 0,
+        "clear": 1
     }

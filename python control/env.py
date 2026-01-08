@@ -34,6 +34,7 @@ mixer4 = module.ModuleBase(bus_inst, "MIX4")
 fir3 = module.ModuleFIRFilter(bus_inst, "FIR3")
 fir4 = module.ModuleFIRFilter(bus_inst, "FIR4")
 pdhfsm = module.ModulePDHFSM(bus_inst, "PDHS")
+sclofsm = module.ModuleSCLOFSM(bus_inst, "SCLO")
 spi_inst = spi.Spi(ser)
 
 def init():
@@ -181,13 +182,31 @@ def setup_pdh():
 def setup_dpll():
     router.set_routing(MIXER_IN_A, INPUT_F)
     router.set_routing(FIR_IN, MIXER_OUT)
-    router.set_routing(PID_IN, FIR_OUT)
-    router.set_routing(ACC_IN, PID_OUT)
+    router.set_routing(ACC_IN, FIR_OUT)
     router.set_routing(TRI_IN, ACC_OUT)
     router.set_routing(OUTPUT_A, TRI_SIN)
     router.set_routing(TRI2_IN, ACC_FAST_OUT)
     router.set_routing(MIXER_IN_B, TRI2_SIN)
     router.upload()
+    acc.write("bypass_lf", 0)
+
+def setup_sclo():
+    router.set_routing(MIXER_IN_A, INPUT_F)
+    router.set_routing(MIXER_IN_B, TRI_SIN)
+    router.set_routing(MIXER2_IN_A, INPUT_F)
+    router.set_routing(MIXER2_IN_B, TRI_COS)
+    router.set_routing(FIR_IN, MIXER_OUT)
+    router.set_routing(FIR2_IN, MIXER2_OUT)
+    router.set_routing(ATAN_IN_SIN, FIR_OUT)
+    router.set_routing(ATAN_IN_COS, FIR2_OUT)
+    router.set_routing(SCLOFSM_PHASE_IN, ATAN_OUT)
+    router.set_routing(ACC_IN, SCLOFSM_BIAS_OUT)
+    router.set_routing(TRI_IN, ACC_OUT)
+    router.set_routing(PID_IN, FIR_OUT)
+    router.set_routing(SCALER_IN, PID_OUT)
+    router.set_routing(OUTPUT_A, SCALER_OUT)
+    router.upload()
+    sclofsm.flip_on("clear")
 
 def load_fir():
     print("Load FIR coefficients")
