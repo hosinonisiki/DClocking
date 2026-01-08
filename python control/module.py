@@ -433,7 +433,10 @@ class ModuleFIRFilter(ModuleBase):
         61: {"name": "coef_61", "width": 24},
         62: {"name": "coef_62", "width": 24},
         63: {"name": "coef_63", "width": 24},
-        64: {"name": "norm", "width": 18}
+        64: {"name": "norm_64", "width": 18},
+        65: {"name": "norm_32", "width": 18},
+        66: {"name": "norm_16", "width": 18},
+        67: {"name": "taps", "width": 6}
     }
     alias_list = {
         "coef_0": 0, "c0": 0, "coef0": 0,
@@ -500,33 +503,44 @@ class ModuleFIRFilter(ModuleBase):
         "coef_61": 61, "c61": 61, "coef61": 61,
         "coef_62": 62, "c62": 62, "coef62": 62,
         "coef_63": 63, "c63": 63, "coef63": 63,
-        "norm": 64
+        "norm_64": 64,
+        "norm_32": 65,
+        "norm_16": 66,
+        "taps": 67
     }
-    def load_coef(self, coef_list, norm):
-        if len(coef_list) != 64:
-            raise ValueError("Coefficient list must have exactly 64 elements")
+    def load_coef(self, coef_list, norm, taps = 64):
+        if len(coef_list) != taps:
+            raise ValueError(f"Coefficient list must have exactly {taps} elements for {taps}-tap filter")
         coef_list = np.array(coef_list)
         if max(abs(coef_list)) > 1:
             raise ValueError("Coefficient values must be normalized between -1 and 1")
         coef_int = np.round(coef_list * (2 ** 23 - 1))
-        for i in range(64):
+        for i in range(taps):
             if coef_int[i] < 0:
                 coef_int[i] = 2 ** 24 + coef_int[i]
             self.write(i, int(coef_int[i]), hold = True)
-        if norm < 1 or norm > 16:
-            raise ValueError("Normalization factor must be between 1 and 16")
-        self.write(64, int(norm * (2 ** 13 - 1)))
+        if norm < 1 or norm > 1024 / taps:
+            raise ValueError(f"Normalization factor must be between 1 and {1024 / taps} for {taps}-tap filter")
+        if taps == 64:
+            self.write(64, int(norm * (2 ** 13 - 1)))
+        elif taps == 32:
+            self.write(65, int(norm * (2 ** 13 - 1)))
+        elif taps == 16:
+            self.write(66, int(norm * (2 ** 13 - 1)))
+        self.write(67, taps - 1)
         return
     
-    def design_lowpass(self, freq_pass, freq_stop, freq_sample, weight = 1):
-        coef = signal.remez(64, [0, freq_pass, freq_stop, freq_sample / 2], [1, 0], fs = freq_sample, weight = [1, weight])
+    def design_lowpass(self, freq_pass, freq_stop, freq_sample, weight = 1, taps = 64):
+        if taps not in [16, 32, 64]:
+            raise ValueError("Only 16, 32, or 64 taps are supported")
+        coef = signal.remez(taps, [0, freq_pass, freq_stop, freq_sample / 2], [1, 0], fs = freq_sample, weight = [1, weight])
         coef = np.array(coef)
         coef = coef / np.max(np.abs(coef)) * 0.98
         l1_norm = sum(np.abs(coef))
-        norm = 32 / l1_norm * 0.98
-        if norm < 1 or norm > 16:
-            raise ValueError("Designed filter normalization factor is out of range (1 to 16). Try increasing the passband frequency.")
-        self.load_coef(coef, norm)
+        norm = taps / 2 / l1_norm * 0.98
+        if norm < 1 or norm > 1024 / taps:
+            raise ValueError("Designed filter normalization factor is out of range. Try increasing the passband frequency.")
+        self.load_coef(coef, norm, taps)
 
 class ModuleLinearTransformer(ModuleBase):
     parameter_list = {

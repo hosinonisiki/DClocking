@@ -135,10 +135,13 @@ begin
     process(clk)
     begin
         if rising_edge(clk) then
-            c(0) <= c_pre - shift_right(s_pre, 0) when d(0) = '1' else
-                            c_pre + shift_right(s_pre, 0);
-            s(0) <= s_pre + shift_right(c_pre, 0) when d(0) = '1' else
-                            s_pre - shift_right(c_pre, 0);
+            if d(0) = '1' then
+                c(0) <= c_pre - s_pre;
+                s(0) <= s_pre + c_pre;
+            else
+                c(0) <= c_pre + s_pre;
+                s(0) <= s_pre - c_pre;
+            end if;
             x(0) <= x_pre;
             z(0) <= z_pre;
         end if;

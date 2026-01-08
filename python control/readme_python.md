@@ -345,7 +345,10 @@ router.upload() # 一次同时上传所有连接设定
 |地址|参数名|位宽|范围|含义|备注|
 |----|----|----|----|----|----|
 |0-63|coef_0 ~ coef_63|24|-2^23 ~ 2^23-1|滤波器系数|滤波器的冲激响应，共64个抽头，仅推荐通过专用方法修改|
-|64|norm|18|0 ~ 262143|归一化系数|用于归一化滤波器输出，仅推荐通过专用方法修改|
+|64|norm_64|18|0 ~ 262143|归一化系数|用于归一化滤波器输出，仅推荐通过专用方法修改|
+|65|norm_32|18|0 ~ 262143|归一化系数|用于归一化滤波器输出，仅推荐通过专用方法修改|
+|66|norm_16|18|0 ~ 262143|归一化系数|用于归一化滤波器输出，仅推荐通过专用方法修改|
+|67|taps|6|15 / 31 / 63|滤波器抽头数|15表示16抽头，31表示32抽头，63表示64抽头，仅推荐通过专用方法修改|
 
 ### 间接参数
 
@@ -357,7 +360,7 @@ router.upload() # 一次同时上传所有连接设定
 
 定义：
 ```python
-def design_lowpass(self, freq_pass, freq_stop, freq_sample, weight = 1):
+def design_lowpass(self, freq_pass, freq_stop, freq_sample, weight = 1, taps = 64):
 ```
 
 参数说明：
@@ -365,11 +368,12 @@ def design_lowpass(self, freq_pass, freq_stop, freq_sample, weight = 1):
 - freq_stop：阻带截止频率，单位为Hz
 - freq_sample：采样频率，单位为Hz，默认为250MHz，实际取决于硬件型号
 - weight：阻带权重，默认为1
+- taps：滤波器抽头数，默认为64，仅支持16、32或64抽头
 
 用法：
 ```python
 fir = module.ModuleFIRFilter(bus_inst, "FIRF")
-fir.design_lowpass(1e6, 10e6, 250e6) # 设计一个通带截止频率为1MHz，阻带截止频率为10MHz的低通滤波器
+fir.design_lowpass(1e6, 10e6, 250e6) # 设计一个通带截止频率为1MHz，阻带截止频率为10MHz的64抽头低通滤波器
 ```
 
 ### 可视化
