@@ -329,18 +329,24 @@ class ModuleAccumulator(ModuleBase):
                 raise ValueError("Frequency cannot be negative")
             if data > 250000000 / 2:
                 raise ValueError("Frequency exceeds Nyquist limit")
-            target_var = int(round(data * 2 ** 64 / 250000000))
+            ratio = self.read("ratio")
+            target_var = int(round(data * 2 ** 64 / 250000000 / ratio))
             low = target_var & 0xFFFFFFFF
             high = (target_var >> 32) & 0xFFFFFFFF
             return [(0, low), (1, high)]
         else:
             # Read, return address list and formula
-            address_list = [0, 1]
+            address_list = [0, 1, 2]
             def formula(data_list):
                 low = int.from_bytes(data_list[0], "big", signed = False)
                 high = int.from_bytes(data_list[1], "big", signed = False)
+                ratio = int.from_bytes(data_list[2], "big", signed = False)
+                if ratio == 0:
+                    ratio = 1
+                else:
+                    ratio = 2 ** (int(np.log2(ratio)))
                 var = (high << 32) | low
-                return var * 250000000 / 2 ** 64
+                return var * 250000000 / 2 ** 64 * ratio
             return address_list, formula
         
     def ratio_func(self, data = None):
@@ -348,7 +354,11 @@ class ModuleAccumulator(ModuleBase):
             # Write, return address-data pairs
             if not data in [2 ** n for n in range(16)]:
                 raise ValueError("Ratio must be a power of 2 between 1 and 32768")
-            return [(2, data)]
+            freq = self.read("freq")
+            target_var = int(round(freq * 2 ** 64 / 250000000 / data))
+            low = target_var & 0xFFFFFFFF
+            high = (target_var >> 32) & 0xFFFFFFFF
+            return [(0, low), (1, high), (2, data)]
         else:
             # Read, return address list and formula
             address_list = [2]

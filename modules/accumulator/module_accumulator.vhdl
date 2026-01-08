@@ -76,7 +76,7 @@ begin
     );
 
     parameter_ram : entity work.parameter_ram_256 generic map(
-        ram_default     =>  x"00000000_00000001_00000000_00000000" &
+        ram_default     =>  x"00000000_00000001_00002710_0007A120" &
                             x"00000000_00000001_00000000_00000000"
     )port map(
         clk             =>  clk,
