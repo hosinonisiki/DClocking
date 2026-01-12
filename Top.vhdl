@@ -61,6 +61,11 @@ architecture structural of top is
     signal mbus         :   std_logic_vector(mbus_w - 1 downto 0) := (others => '0'); -- module selection bus, x"00" refers to no module selected
     signal cbus         :   std_logic_vector(cbus_w - 1 downto 0) := (others => '0'); -- control bus
 
+    signal dbus_buf     :   std_logic_vector(dbus_w - 1 downto 0) := (others => '0');
+    signal abus_buf     :   std_logic_vector(abus_w - 1 downto 0) := (others => '0');
+    signal mbus_buf     :   std_logic_vector(mbus_w - 1 downto 0) := (others => '0');
+    signal cbus_buf     :   std_logic_vector(cbus_w - 1 downto 0) := (others => '0');
+
     signal rdbus        :   rdbus_type := (others => (others => '0')); -- response data bus
     signal rsbus        :   rsbus_type := (others => (others => '0')); -- response status bus
 
@@ -76,6 +81,12 @@ architecture structural of top is
     signal sig_bank_out     :   signal_array(63 downto 0) := (others => (others => '0'));
     signal ctrl_bank_in     :   std_logic_vector(63 downto 0) := (others => '0');
     signal ctrl_bank_out    :   std_logic_vector(63 downto 0) := (others => '0');
+
+    attribute max_fanout : integer;
+    attribute max_fanout of dbus : signal is 5;
+    attribute max_fanout of abus : signal is 5;
+    attribute max_fanout of mbus : signal is 5;
+    attribute max_fanout of cbus : signal is 5;
 begin
     assert ADC_channel_count <= 8 and DAC_channel_count <= 8
         report "ADC and DAC channel count must be less than or equal to 8"
@@ -95,16 +106,27 @@ begin
         ss_out          =>  ss,
         io_tri_out      =>  io_tri,
 
-        dbus_out        =>  dbus,
-        abus_out        =>  abus,
-        mbus_out        =>  mbus,
-        cbus_out        =>  cbus,
+        dbus_out        =>  dbus_buf,
+        abus_out        =>  abus_buf,
+        mbus_out        =>  mbus_buf,
+        cbus_out        =>  cbus_buf,
 
         rsp_sel_out     =>  rsp_sel,
         rsp_data_in     =>  rsp_data,
         rsp_stat_in     =>  rsp_stat
     );
     mc_rst <= rst;
+
+    -- Add 1 extra register stage to lower the pressure for bus routing
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            dbus       <= dbus_buf;
+            abus       <= abus_buf;
+            mbus       <= mbus_buf;
+            cbus       <= cbus_buf;
+        end if;
+    end process;
 
     response_mux : entity work.response_mux generic map(
         channel_count   =>  module_count   

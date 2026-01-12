@@ -629,3 +629,45 @@ begin
 end architecture behavioral;
 
 -- ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑64 bit size↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+
+-- ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓placeholder↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+use work.mypak.all;
+
+entity parameter_ram_0 is
+    port(
+        clk             :   in  std_logic;
+        rst             :   in  std_logic;
+        wdata_in        :   in  std_logic_vector(dbus_w - 1 downto 0);
+        waddr_in        :   in  std_logic_vector(abus_w - 1 downto 0);
+        wmask_in        :   in  std_logic_vector(dbus_w - 1 downto 0);
+        wval_in         :   in  std_logic;
+        wen_in          :   in  std_logic;
+        rdata_out       :   out std_logic_vector(dbus_w - 1 downto 0);
+        raddr_in        :   in  std_logic_vector(abus_w - 1 downto 0);
+        rval_out        :   out std_logic;
+        ren_in          :   in  std_logic
+    );
+end entity parameter_ram_0;
+
+architecture behavioral of parameter_ram_0 is
+begin
+    process(clk, rst)
+    begin
+        if rising_edge(clk) then
+            if rst = '1' then
+                rval_out <= '0';
+            else
+                rval_out <= ren_in;
+            end if;
+        end if;
+    end process;
+    
+    rdata_out <= (others => '0');
+end architecture behavioral;
+
+-- ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑placeholder↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑

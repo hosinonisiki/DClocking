@@ -51,9 +51,6 @@ architecture behavioral of accumulator is
     signal bias_shifted  :   std_logic_vector(63 downto 0);
 
     -- Internal loop filter
-    -- When lf is enabled, error is considered to be signed.
-    -- When bypassed, error is directly added to the accumulator and thus considered unsigned.
-    signal bypass_lf    :   std_logic;
     signal lf_kp        :   signed(23 downto 0);
     signal lf_ki        :   signed(31 downto 0);
     signal lf_product_p :   signed(39 downto 0);

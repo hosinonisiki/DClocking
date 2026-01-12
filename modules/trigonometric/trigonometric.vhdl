@@ -27,7 +27,6 @@ entity trigonometric is
     port(
         clk             :   in  std_logic;
         rst             :   in  std_logic;
-        core_param_in   :   in  std_logic_vector(63 downto 0);
         phase_in        :   in  std_logic_vector(15 downto 0);
         sin_out         :   out std_logic_vector(15 downto 0);
         cos_out         :   out std_logic_vector(15 downto 0)
@@ -63,12 +62,12 @@ architecture behavioral of trigonometric is
         x"00000a"
     ); -- angle values of arctan(2^(-i))
     signal c, s, z          :   signed_array(0 to 18); -- cos, sin and angle residue
-    signal s_pre, z_pre     :   signed(23 downto 0); -- for pipelining
+    signal s_pre, z_pre, s_pre_1, z_pre_1     :   signed(23 downto 0); -- for pipelining
     signal c_buf, s_buf, z_buf  :   signed_array(0 to 17); -- buffers inserted to pipeline
 
     type sign_array is array(natural range <>) of std_logic;
     signal d, x             :   sign_array(0 to 18); -- d stores the sign of residue. x stores quandrant information of the input
-    signal x_pre            :   std_logic; -- for pipelining
+    signal d_pre, x_pre, x_pre_1            :   std_logic; -- for pipelining
     signal d_buf, x_buf     :   sign_array(0 to 17); -- buffers inserted to pipeline
 begin
     use_input_buffer : if io_buf = buf_for_io or io_buf = buf_i_only generate
@@ -113,21 +112,26 @@ begin
     z_pre <= phase_in_buf(14) & phase_in_buf(14 downto 0) & x"00";
     -- x(0) <= phase_in_buf(15) xor phase_in_buf(14);
     x_pre <= phase_in_buf(15) xor phase_in_buf(14);
-    d(0) <= z_pre(23);
+    d_pre <= z_pre(23);
     c(0) <= x"475e34"; -- x"475e34" = 0.607253 * x"7586a5", where 0.607253 is the product of cos(arctan(2^(-i))) for i = 0 to 18
     -- s(0) <= x"475e34" when d(0) = '0' else x"b8a1cc"; -- x"b8a1cc" = -0.607253 * x"7586a5"
     s_pre <= x"475e34" when d(0) = '0' else x"b8a1cc"; -- x"b8a1cc" = -0.607253 * x"7586a5"
 
     process(clk)
     begin
+        -- One extra stage for timing closure
+        z_pre_1 <= z_pre;
+        s_pre_1 <= s_pre;
+        x_pre_1 <= x_pre;
+        d(0) <= d_pre;
         if rising_edge(clk) then
             if d(0) = '0' then
-                z(0) <= z_pre - a(0);
+                z(0) <= z_pre_1 - a(0);
             else
-                z(0) <= z_pre + a(0);
+                z(0) <= z_pre_1 + a(0);
             end if;
-            s(0) <= s_pre;
-            x(0) <= x_pre;
+            s(0) <= s_pre_1;
+            x(0) <= x_pre_1;
         end if;
     end process;
 
