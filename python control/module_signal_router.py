@@ -2,6 +2,7 @@ import module
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from port_numbers import *
+import time
 
 class ModuleSignalRouter(module.ModuleBase):
     # The router consists of 8 banks of 10x10 switches,
@@ -198,8 +199,9 @@ class ModuleSignalRouter(module.ModuleBase):
         self.implement_routing()
         self.encode()
         for i in range(31, 0, -1):
-            if self.bits[i * 32: (i + 1) * 32] != self.last_bits[i * 32: (i + 1) * 32]:
-                self.write((31 - i), int(self.bits[i * 32: (i + 1) * 32], 2), hold = True)
+            if True:
+            #if self.bits[i * 32: (i + 1) * 32] != self.last_bits[i * 32: (i + 1) * 32]:
+                self.write((31 - i), int(self.bits[i * 32: (i + 1) * 32], 2), hold = True) # Force update all
         self.write(31, int(self.bits[0:32], 2), hold = False)
         self.last_bits = self.bits
 
@@ -218,6 +220,7 @@ class ModuleSignalRouter(module.ModuleBase):
         self.implement_routing()
         self.encode()
         self._upload()
+        time.sleep(0.05) # Avoid unstable circuit responses
         self.port_config = temp_config
         self.port_enable = temp_enable
         self.implement_routing()
