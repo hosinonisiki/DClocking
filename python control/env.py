@@ -11,7 +11,7 @@ import time
 
 import code
 
-ser = uart.MySerial("COM7", baudrate = 115200, parity = "E", timeout = 0.5)
+ser = uart.MySerial("COM9", baudrate = 115200, parity = "E", timeout = 0.5)
 bus_inst = bus.Bus(ser)
 router = module_signal_router.ModuleSignalRouter(bus_inst)
 tri = module.ModuleBase(bus_inst, "TRIG")
@@ -34,6 +34,7 @@ mixer4 = module.ModuleBase(bus_inst, "MIX4")
 fir3 = module.ModuleFIRFilter(bus_inst, "FIR3")
 fir4 = module.ModuleFIRFilter(bus_inst, "FIR4")
 pdhfsm = module.ModulePDHFSM(bus_inst, "PDHS")
+sclofsm = module.ModuleSCLOFSM(bus_inst, "SCLO")
 spi_inst = spi.Spi(ser)
 
 def init():
@@ -60,6 +61,7 @@ def init():
         fir3.reset()
         fir4.reset()
         pdhfsm.reset()
+        sclofsm.reset()
 
         print("Configure converters")
         init_FL9627(spi_inst, 1)
@@ -92,6 +94,7 @@ def init_no_ref():
         fir3.reset()
         fir4.reset()
         pdhfsm.reset()
+        sclofsm.reset()
 
         print("Configure converters")
         init_FL9627(spi_inst, 1)
@@ -102,7 +105,7 @@ def init_no_ref():
 
 def setup_pll():
     print("Setup PLL")
-    router.set_routing(TRI_IN,ACC_OUT)
+    router.set_routing(TRI_IN,ACC_SLOW_OUT)
     router.set_routing(MIXER_IN_A, INPUT_F)
     router.set_routing(MIXER_IN_B, TRI_SIN)
     router.set_routing(MIXER2_IN_A, INPUT_F)
@@ -125,14 +128,14 @@ def setup_pll():
 
 def setup_duallock():
     print("Setup dual locking")
-    router.set_routing(TRI_IN, ACC_OUT)
+    router.set_routing(TRI_IN, ACC_SLOW_OUT)
     router.set_routing(MIXER_IN_A, INPUT_F)
     router.set_routing(MIXER_IN_B, TRI_SIN)
     router.set_routing(FIR_IN, MIXER_OUT)
     router.set_routing(PID_IN, FIR_OUT)
     router.set_routing(SCALER_IN, PID_OUT)
     router.set_routing(OUTPUT_A, SCALER_OUT)
-    router.set_routing(TRI2_IN, ACC2_OUT)
+    router.set_routing(TRI2_IN, ACC2_SLOW_OUT)
     router.set_routing(MIXER2_IN_A, INPUT_F)
     router.set_routing(MIXER2_IN_B, TRI2_SIN)
     router.set_routing(FIR2_IN, MIXER2_OUT)
@@ -148,18 +151,19 @@ def setup_duallock():
     pid2.write("p", 65536)
 
 def setup_pdh():
-    router.set_routing(TRI_IN, ACC_OUT)
+    router.set_routing(TRI_IN, ACC_SLOW_OUT)
     router.set_routing(MIXER_IN_A, TRI_SIN)
     router.set_routing(MIXER_IN_B, INPUT_C)
     router.set_routing(FIR_IN, MIXER_OUT)
     router.set_routing(PID_IN, FIR_OUT)
-    router.set_routing(LN_TRANSFORMER_IN_A, PID_OUT)
-    router.set_routing(LN_TRANSFORMER_IN_B, ACC2_OUT)
+    router.set_routing(LN_TRANSFORMER_IN_A, PID_OUT)    
+    router.set_routing(LN_TRANSFORMER_IN_B, ACC2_SLOW_OUT)
     router.set_routing(SCALER_IN, LN_TRANSFORMER_OUT_A)
     router.set_routing(OUTPUT_B, SCALER_OUT)
     router.set_routing(OUTPUT_C, TRI_SIN)
     router.set_routing(FIR2_IN, INPUT_C)
-    router.set_routing(PDHFSM_IN, FIR2_OUT)
+    router.set_routing(PDHFSM_IN_POWER, FIR2_OUT)
+    router.set_routing(PDHFSM_IN_SCAN, ACC2_SLOW_OUT)
     router.set_routing(PID_RESET, PDHFSM_PID_RESET_CTRL)
     router.set_routing(ACC2_PAUSE, PDHFSM_SCAN_RESET_CTRL)
     router.upload()
@@ -167,13 +171,63 @@ def setup_pdh():
     print("Write parameters")
     sclr.write("scale", 0) # Disable output until limits are set
     sclr.write("bias", 15000)
+    acc2.write("freq", 20)
     pid.write("auto_reset", 1)
-    acc2.write("auto_reset", 1)# 1 by fsm；0 by hand
+    acc2.write("auto_reset", 0)# 1 by fsm；0 by hand
     ltrn.write("matrix", np.array([[0.5, 0.5], [1, 0]]))
-    pdhfsm.write("thre_sig_lock", 7800)
-    pdhfsm.write("thre_sig_scan", 32767)
-    pdhfsm.write("time_lock", 1000000)
-    pdhfsm.write("time_scan", 2**29)
+    pdhfsm.write("pc_cmd",0)
+    pdhfsm.write("thre_sig_lock", 32767)
+    pdhfsm.write("thre_sig_scan", 0)
+    pdhfsm.write("time_lock", 2**31)
+    pdhfsm.write("time_scan", 2**31)
+
+def setup_dpll():
+    router.set_routing(MIXER_IN_A, INPUT_F)
+    router.set_routing(FIR_IN, MIXER_OUT)
+    router.set_routing(ACC_ERROR_IN, FIR_OUT)
+    router.set_routing(TRI_IN, ACC_SLOW_OUT)
+    router.set_routing(OUTPUT_A, TRI_SIN)
+    router.set_routing(TRI2_IN, ACC_FAST_OUT)
+    router.set_routing(MIXER_IN_B, TRI2_SIN)
+    router.upload()    
+
+def setup_sclo():
+    router.set_routing(MIXER_IN_A, INPUT_F)
+    router.set_routing(MIXER_IN_B, TRI_SIN)
+    router.set_routing(MIXER2_IN_A, INPUT_F)
+    router.set_routing(MIXER2_IN_B, TRI_COS)
+    router.set_routing(FIR_IN, MIXER_OUT)
+    router.set_routing(FIR2_IN, MIXER2_OUT)
+    router.set_routing(ATAN_IN_SIN, FIR_OUT)
+    router.set_routing(ATAN_IN_COS, FIR2_OUT)
+    router.set_routing(SCLOFSM_PHASE_IN, ATAN_OUT)
+    router.set_routing(ACC_BIAS_IN, SCLOFSM_BIAS_OUT)
+    router.set_routing(TRI_IN, ACC_FAST_OUT)
+    router.set_routing(PID_IN, FIR_OUT)
+    router.set_routing(PID_RESET, SCLOFSM_PID_RESET_CTRL)
+    router.set_routing(SCALER_IN, PID_OUT)
+    router.set_routing(OUTPUT_A, SCALER_OUT)
+    router.upload()
+    sclofsm.flip_on("clear")
+
+def setup_sclodpll():
+    router.set_routing(MIXER_IN_A, INPUT_F)
+    router.set_routing(MIXER_IN_B, TRI_SIN)
+    router.set_routing(MIXER2_IN_A, INPUT_F)
+    router.set_routing(MIXER2_IN_B, TRI_COS)
+    router.set_routing(FIR_IN, MIXER_OUT)
+    router.set_routing(FIR2_IN, MIXER2_OUT)
+    router.set_routing(ATAN_IN_SIN, FIR_OUT)
+    router.set_routing(ATAN_IN_COS, FIR2_OUT)
+    router.set_routing(SCLOFSM_PHASE_IN, ATAN_OUT)
+    router.set_routing(ACC_BIAS_IN, SCLOFSM_BIAS_OUT)
+    router.set_routing(TRI_IN, ACC_FAST_OUT)
+    router.set_routing(TRI2_IN, ACC_SLOW_OUT)
+    router.set_routing(ACC_ERROR_IN, FIR_OUT)
+    router.set_routing(ACC_LF_RESET, SCLOFSM_PID_RESET_CTRL)
+    router.set_routing(OUTPUT_A, TRI2_SIN)
+    router.upload()
+    sclofsm.flip_on("clear")
 
 def load_fir():
     print("Load FIR coefficients")

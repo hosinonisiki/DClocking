@@ -1,9 +1,12 @@
 # Simply recording the corresponding port numbers of different modules as a temporary solution.
 
+VOID = 0 # Signals to port 0 are ignored. Signals from port 0 are always zero.
+VOID_BOOL = 0 + 64
+
 # Output from module, input to signal router:
 TRI_SIN = 2
 TRI_COS = 1
-ACC_OUT = 4
+ACC_SLOW_OUT = 4
 SCALER_OUT = 5
 MIM_OUT_A = 10
 MIM_OUT_B = 11
@@ -21,7 +24,7 @@ MIXER2_OUT = 22
 UNWRAPPER_OUT = 23
 TRI2_SIN = 24
 TRI2_COS = 25
-ACC2_OUT = 26
+ACC2_SLOW_OUT = 26
 PID2_OUT = 27
 LN_TRANSFORMER_OUT_A = 28
 LN_TRANSFORMER_OUT_B = 29
@@ -32,6 +35,9 @@ MIXER4_OUT = 33
 FIR3_OUT = 34
 FIR4_OUT = 35
 ATAN2_OUT = 36
+ACC_FAST_OUT = 37
+ACC2_FAST_OUT = 38
+SCLOFSM_BIAS_OUT = 39
 
 INPUT_A = 56
 INPUT_B = 57
@@ -76,7 +82,13 @@ FIR3_IN = 33
 FIR4_IN = 34
 ATAN2_IN_SIN = 35
 ATAN2_IN_COS = 36
-PDHFSM_IN = 37
+PDHFSM_IN_POWER = 37
+PDHFSM_IN_SCAN = 38
+ACC_ERROR_IN = 39
+ACC2_ERROR_IN = 40
+SCLOFSM_PHASE_IN = 41
+ACC_BIAS_IN = 42
+ACC2_BIAS_IN = 43
 
 OUTPUT_A = 56
 OUTPUT_B = 57
@@ -87,6 +99,10 @@ OUTPUT_F = 61
 OUTPUT_G = 62
 OUTPUT_H = 63
 
+# LOW is constant 0, HIGH is constant 1
+LOW = 62 + 64
+HIGH = 63 + 64
+
 # Output control from signal router, input to module:
 ACC_RESET = 7 + 64
 PID_RESET = 1 + 64
@@ -95,8 +111,11 @@ ACC2_RESET = 3 + 64
 PID2_RESET = 4 + 64
 ACC_PAUSE = 5 + 64
 ACC2_PAUSE = 6 + 64
+ACC_LF_RESET = 7 + 64
+ACC2_LF_RESET = 8 + 64
 
 # Input control to signal router, output from module:
 PDHFSM_PID_RESET_CTRL = 2 + 64
 PDHFSM_MIXER_RESET_CTRL = 3 + 64
 PDHFSM_SCAN_RESET_CTRL = 4 + 64
+SCLOFSM_PID_RESET_CTRL = 5 + 64

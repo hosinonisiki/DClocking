@@ -16,7 +16,6 @@ entity mixer is
     port(
         clk             :   in  std_logic;
         rst             :   in  std_logic;
-        core_param_in   :   in  std_logic_vector(63 downto 0);
         -- data flow ports
         sig_a_in        :   in  std_logic_vector(15 downto 0);
         sig_b_in        :   in  std_logic_vector(15 downto 0);

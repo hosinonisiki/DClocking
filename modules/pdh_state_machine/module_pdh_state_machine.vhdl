@@ -25,7 +25,8 @@ entity module_pdh_state_machine is
         sig_in          :   in  std_logic_vector(15 downto 0);
         pid_enable      : out std_logic;  -- Enable PID controller
         mixer_enable    : out std_logic;  -- Enable mixer
-        sawtooth_enable : out std_logic  -- Sawtooth wave for scanning
+        sawtooth_enable : out std_logic;  -- Sawtooth wave for scanning
+        saw_input       : in  std_logic_vector(15 downto 0)
     );
 end entity module_pdh_state_machine;
 
@@ -59,14 +60,15 @@ begin
         sig_in          =>  sig_in,
         pid_enable      =>  pid_enable,
         mixer_enable    =>  mixer_enable,
-        sawtooth_enable =>  sawtooth_enable
+        sawtooth_enable =>  sawtooth_enable,
+        saw_input       =>  saw_input
     );
 
     -- Instantiate the parameter RAM to store the core's configuration
     parameter_ram : entity work.parameter_ram_256 generic map(
         -- Default values can be set here if needed
-        ram_default     =>  x"00000000000000000000000000000000" &
-                            x"00000000000000000000000000000000"
+        ram_default     =>  x"00000000000075300000400020000000" &
+                            x"20000000000000000000800000000000"
     ) port map(
         clk             =>  clk,
         rst             =>  ram_rst,

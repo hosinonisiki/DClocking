@@ -18,7 +18,7 @@ use ieee.numeric_std.all;
 
 use work.mypak.all;
 
-entity module_trigonometric is
+entity module_SCALO_state_machine is
     port(
         clk             :   in  std_logic;
         rst             :   in  std_logic;
@@ -29,13 +29,15 @@ entity module_trigonometric is
         rsp_data_out    :   out std_logic_vector(rdbus_w - 1 downto 0);
         rsp_stat_out    :   out std_logic_vector(rsbus_w - 1 downto 0);
         -- data flow ports
-        phase_in : in std_logic_vector(15 downto 0);
-        sin_out : out std_logic_vector(15 downto 0);
-        cos_out : out std_logic_vector(15 downto 0)
+        phase_in        :   in  std_logic_vector(15 downto 0);
+        phase_out       :   out std_logic_vector(15 downto 0);
+        -- control ports
+        pid_reset_out   :   out std_logic
     );
-end entity module_trigonometric;
+end entity module_SCALO_state_machine;
 
-architecture structural of module_trigonometric is
+architecture structural of module_SCALO_state_machine is
+    signal core_param       :   std_logic_vector(63 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
     signal core_rst         :   std_logic := '1';
 
     signal ram_rst          :   std_logic := '1';
@@ -53,16 +55,20 @@ architecture structural of module_trigonometric is
     signal ren              :   std_logic; -- Read enable signal
 begin
     
-    core_entity : entity work.trigonometric port map(
+    core_entity : entity work.SCALO_state_machine port map(
         clk             =>  clk,
         rst             =>  core_rst,
+        core_param_in   =>  core_param,
         -- data flow ports
-        phase_in => phase_in,
-        sin_out => sin_out,
-        cos_out => cos_out
+        phase_in        =>  phase_in,
+        phase_out       =>  phase_out,
+        -- control ports
+        pid_reset_out   =>  pid_reset_out
     );
 
-    parameter_ram : entity work.parameter_ram_0 port map(
+    parameter_ram : entity work.parameter_ram_64 generic map(
+        ram_default     =>  x"0000000000000000"
+    )port map(
         clk             =>  clk,
         rst             =>  ram_rst,
         wdata_in        =>  wdata,
@@ -73,7 +79,8 @@ begin
         rdata_out       =>  rdata,
         raddr_in        =>  raddr,
         rval_out        =>  rval,
-        ren_in          =>  ren
+        ren_in          =>  ren,
+        ram_data_out    =>  core_param
     );
 
     bus_handler : entity work.bus_handler port map(
