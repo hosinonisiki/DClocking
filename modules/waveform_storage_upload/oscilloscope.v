@@ -291,19 +291,21 @@ module oscilloscope(
                 .adv_data_num       (adv_data_num )           
                
             );  
-    generate
-        if (adv_trigger_mode) begin : ADV_TRIG_ENABLE         
-            assign mem_write_data  = adv_trigger_data;
-            assign mem_write_valid = adv_trigger_valid && capture_en;
-            assign sample_len = adv_data_num;
-        end else   begin : NORMAL_MODE
-            // 普通模式直接使用预处理数据
-            assign mem_write_data  = preprocessed_data;
-            assign mem_write_valid = preprocessed_valid && capture_en;
-             assign sample_len = capture_counter;
-        end
-    endgenerate 
-  
+//    generate
+//        if (adv_trigger_mode) begin : ADV_TRIG_ENABLE         
+//            assign mem_write_data  = adv_trigger_data;
+//            assign mem_write_valid = adv_trigger_valid && capture_en;
+//            assign sample_len = adv_data_num;
+//        end else   begin : NORMAL_MODE
+//            // 普通模式直接使用预处理数据
+//            assign mem_write_data  = preprocessed_data;
+//            assign mem_write_valid = preprocessed_valid && capture_en;
+//             assign sample_len = capture_counter;
+//        end
+//    endgenerate 
+     assign mem_write_data  = adv_trigger_mode ? adv_trigger_data : preprocessed_data;
+     assign mem_write_valid = adv_trigger_mode ? adv_trigger_valid && capture_en : preprocessed_valid && capture_en;
+     assign sample_len = adv_trigger_mode ? adv_data_num : capture_counter;
 //    // ============================================
 //    // 调试与状态输出
 //    // ============================================
