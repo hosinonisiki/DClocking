@@ -25,13 +25,12 @@ module oscilloscope(
     input  wire        clk,           // adc数据时钟
     input  wire        rst,         // 系统复位
     //寄存器
-    input  wire [128:0] core_param_in,    
+    input  wire [511:0] core_param_in,    
     // 数据输入接口
     input  wire [15:0]  sig_a_buf,        // ADC输入数据
     input  wire [15:0]  sig_b_buf,        
     input  wire [15:0]  sig_c_buf,
     input  wire [15:0]  sig_d_buf,  
-    input  wire         adc_data_valid_i,  // ADC数据有效标志 
    
   // ================= 触发接口 =================
     input  wire         ext_trigger_i,   // 外部触发输入
@@ -112,18 +111,30 @@ module oscilloscope(
 
 
    
+   // 0x00
    assign start_cmd = core_param_in[0];// [50] 开始指令
-   assign reg_operation_mode = core_param_in[1];// 0-单次模式,1-持续模式 
-   assign reg_trigger_mode = core_param_in[4:2];// 000-立即模式,001-一般触发,010-高级触发
-   assign reg_trigger_type = core_param_in[8:5];// 触发类型
-   assign trigger_channel = core_param_in[10:9];     // 00=CH1,01=CH2,10=CH3,11=adc_clk   
-   assign upload_channels = core_param_in[14:11];     // 上传通道选择 (位图) bit0=CH1,bit1=CH2,bit2=CH3,bit3=CH4     
-   assign reg_downsample_ratio = core_param_in[31:15];// 降采样倍数
-   assign reg_trigger_value = core_param_in[47:32];// 触发阈值（16位）
-   assign reg_sustain_count = core_param_in[63:48];// 持续计数
-   assign reg_capture_len = core_param_in[79:64];// 捕获长度（0-15，实际长度=2^N）
-   assign BUFFER0_BASE = core_param_in[95:80];
-   assign BUFFER1_BASE = core_param_in[111:96];      
+   // 0x01
+   assign reg_operation_mode = core_param_in[32];// 0-单次模式,1-持续模式 
+   // 0x02
+   assign reg_trigger_mode = core_param_in[66:64];// 000-立即模式,001-一般触发,010-高级触发
+   // 0x03
+   assign reg_trigger_type = core_param_in[99:96];// 触发类型
+   // 0x04
+   assign trigger_channel = core_param_in[129:128];     // 00=CH1,01=CH2,10=CH3,11=adc_clk   
+   // 0x05
+   assign upload_channels = core_param_in[163:160];     // 上传通道选择 (位图) bit0=CH1,bit1=CH2,bit2=CH3,bit3=CH4   
+   // 0x06  
+   assign reg_downsample_ratio = core_param_in[208:192];// 降采样倍数
+   // 0x07
+   assign reg_trigger_value = core_param_in[239:224];// 触发阈值（16位）
+   // 0x08
+   assign reg_sustain_count = core_param_in[271:256];// 持续计数
+   // 0x09
+   assign reg_capture_len = core_param_in[303:288];// 捕获长度（0-15，实际长度=2^N）
+   // 0x0A
+   assign BUFFER0_BASE = core_param_in[335:320];
+   // 0x0B
+   assign BUFFER1_BASE = core_param_in[367:352];      
   
  
    
@@ -185,8 +196,7 @@ module oscilloscope(
         .sig_a_buf          (sig_a_buf),
         .sig_b_buf          (sig_b_buf),        
         .sig_c_buf          (sig_c_buf),
-        .sig_d_buf          (sig_d_buf),          
-        .data_valid_i       (adc_data_valid_i),       
+        .sig_d_buf          (sig_d_buf),            
         // 配置
         .reg_downsample_ratio(reg_downsample_ratio),  // 降采样倍数 
         .upload_channels    (upload_channels),      

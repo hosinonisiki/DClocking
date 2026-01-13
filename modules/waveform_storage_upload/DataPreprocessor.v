@@ -16,28 +16,27 @@
 // Revision:
 // Revision 0.01 - File Created
 // Additional Comments:
-// ½µ²ÉÑùÓëÊý¾ÝÔ¤´¦ÀíÄ£¿é
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¤ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½
 //////////////////////////////////////////////////////////////////////////////////
 
 
 module DataPreprocessor (
     input  wire        clk,
     input  wire        rst_n,
-    input  wire [15:0] sig_a_buf,        // ADCÊäÈëÊý¾Ý
+    input  wire [15:0] sig_a_buf,        // ADCï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     input  wire [15:0] sig_b_buf,        
     input  wire [15:0] sig_c_buf,
     input  wire [15:0] sig_d_buf,  
-    input  wire        data_valid_i,
     input  wire [15:0] reg_downsample_ratio,
-    input  wire [3:0]  upload_channels,  // ÉÏ´«Í¨µÀÑ¡Ôñ
-    // Êä³ö
-    output reg  [63:0] preprocessed_data,      // ´ò°üºóµÄÊý¾Ý (4¡Á16Î»)
-    output reg         preprocessed_valid     // ´ò°üÊý¾ÝÓÐÐ§   
+    input  wire [3:0]  upload_channels,  // ï¿½Ï´ï¿½Í¨ï¿½ï¿½Ñ¡ï¿½ï¿½
+    // ï¿½ï¿½ï¿½
+    output reg  [63:0] preprocessed_data,      // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (4ï¿½ï¿½16Î»)
+    output reg         preprocessed_valid     // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§   
 );
     
     reg [15:0] counter;
     reg [15:0] data_buffer[0:3];
-    reg [3:0]  channel_valid;      // Í¨µÀÓÐÐ§±êÖ¾
+    reg [3:0]  channel_valid;      // Í¨ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½Ö¾
     
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -48,12 +47,12 @@ module DataPreprocessor (
             data_buffer[1] <= 16'h0;
             data_buffer[2] <= 16'h0;
             data_buffer[3] <= 16'h0;  
-        end else if (data_valid_i) begin
+        end else begin
  
             if (reg_downsample_ratio == 16'h1) begin
                 preprocessed_valid <= 1'b1;
                 channel_valid <= 4'b1111;
-                // ´æ´¢µ±Ç°Êý¾Ý
+                // ï¿½æ´¢ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½
                 data_buffer[0] <= sig_a_buf;
                 data_buffer[1] <= sig_b_buf;
                 data_buffer[2] <= sig_c_buf;
@@ -61,24 +60,22 @@ module DataPreprocessor (
             end else begin
                 counter <= counter + 1'b1;
                 if (counter == reg_downsample_ratio - 1) begin
-                // ´æ´¢µ±Ç°Êý¾Ý
+                // ï¿½æ´¢ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½
                     data_buffer[0] <= sig_a_buf;
                     data_buffer[1] <= sig_b_buf;
                     data_buffer[2] <= sig_c_buf;
                     data_buffer[3] <= sig_d_buf;                  
                     preprocessed_valid <= 1'b1;
                     counter <= 16'h0;
-                    channel_valid <= upload_channels;  // Ö»±ê¼ÇÑ¡ÖÐµÄÍ¨µÀ
+                    channel_valid <= upload_channels;  // Ö»ï¿½ï¿½ï¿½Ñ¡ï¿½Ðµï¿½Í¨ï¿½ï¿½
                 end else begin
                     preprocessed_valid <= 1'b0;
                 end
             end
-        end else begin
-            preprocessed_valid <= 1'b0;
         end
     end
     
-// Êý¾Ý´ò°ü (64Î» = 4¡Á16Î»)
+// ï¿½ï¿½ï¿½Ý´ï¿½ï¿½ (64Î» = 4ï¿½ï¿½16Î»)
     always @(*) begin
         if (upload_channels[0]) 
             preprocessed_data[15:0]   = data_buffer[0];
