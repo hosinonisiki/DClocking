@@ -147,7 +147,7 @@ begin
                 sum <= (others => '0');
             else
                 phase_in_buf_1 <= phase_in_buf;
-                phase_diff <= phase_in_buf - phase_in_buf_1;
+                phase_diff <= phase_in_buf_1 - phase_in_buf; -- positive diff indicates LO freq larger than sig so requires a negative bias
                 phase_diff_buf(0) <= phase_diff;
                 sum <= sum - ((7 downto 0 => phase_diff_buf(255)(15)) & phase_diff_buf(255)) + ((7 downto 0 => phase_diff_buf(0)(15)) & phase_diff_buf(0));
             end if;

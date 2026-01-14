@@ -201,7 +201,7 @@ router.upload() # 一次同时上传所有连接设定
 
 ### 基本信息
 
-数量：2
+数量：4
 
 类名：ModuleBase（无专用类）
 
@@ -219,6 +219,8 @@ router.upload() # 一次同时上传所有连接设定
 |----|----|----|----|
 |TRIG|TRI_IN|TRI_SIN|TRI_COS|
 |TRI2|TRI2_IN|TRI2_SIN|TRI2_COS|
+|TRI3|TRI3_IN|TRI3_SIN|TRI3_COS|
+|TRI4|TRI4_IN|TRI4_SIN|TRI4_COS|
 
 ### 直接参数
 
