@@ -49,7 +49,7 @@ class ModuleSignalRouter(module.ModuleBase):
     def reset(self):
         super().reset()
         if self.full_connection:
-            self.port_config = list(range(64)) + list(range(64))
+            self.port_config = [0] * (64 + 64)
             self.port_enable = [1] * (64 + 64)
             self.encode()
             self.last_bits = self.bits

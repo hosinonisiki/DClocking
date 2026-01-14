@@ -746,6 +746,26 @@ begin
         );
     end block module_29_block;
 
+    module_30_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_SLO2_ADDR else '0';
+        module_30 : entity work.module_SCALO_state_machine port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(30),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(30),
+            rsp_stat_out    =>  rsbus(30),
+            
+            phase_in        =>  sig_bank_out(46),
+            phase_out       =>  sig_bank_in(44),
+            pid_reset_out   =>  ctrl_bank_in(6)
+        );
+    end block module_30_block;
+
     -- signal banks provided by the router
     -- Last 8 channels reserved for top adc and dac ports
     

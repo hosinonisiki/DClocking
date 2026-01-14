@@ -556,7 +556,7 @@ fir.design_lowpass(1e6, 10e6, 250e6) # 设计一个通带截止频率为1MHz，�
 
 ### 基本信息
 
-数量：1
+数量：2
 
 类名：ModuleSCLOFSM
 

@@ -38,8 +38,12 @@ architecture behavioural of scalo_state_machine is
     signal phase_in_buf     :   signed(15 downto 0);
     signal phase_out_buf    :   signed(15 downto 0);
 
-    type state_type is (s_IDLE, s_LOCKING);
+    type state_type is (s_IDLE, s_CALIBRATING, s_LOCKING);
     signal state            :   state_type := s_IDLE;
+
+    signal calibrating_counter : unsigned(7 downto 0) := x"00";
+    constant calibrating_time   : unsigned(7 downto 0) := x"80"; -- Enough time for calibrated freq to propagate
+    signal calibration_complete :   std_logic := '0';
 
     signal phase_in_buf_1   :   signed(15 downto 0);
     signal phase_diff       :   signed(15 downto 0);
@@ -103,6 +107,10 @@ begin
                 case state is
                     when s_IDLE =>
                         if lock_rising = '1' then
+                            state <= s_CALIBRATING;
+                        end if;
+                    when s_CALIBRATING =>
+                        if calibration_complete = '1' then
                             state <= s_LOCKING;
                         end if;
                     when s_LOCKING =>
@@ -113,6 +121,22 @@ begin
             end if;
         end if;
     end process;
+
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            if rst = '1' then
+                calibrating_counter <= (others => '0');
+            else
+                if state = s_CALIBRATING then
+                    calibrating_counter <= calibrating_counter + x"01";
+                else
+                    calibrating_counter <= (others => '0');
+                end if;
+            end if;
+        end if;
+    end process;
+    calibration_complete <= '1' when calibrating_counter = calibrating_time else '0';
 
     process(clk)
     begin
@@ -170,7 +194,7 @@ begin
     end process;
 
     phase_out_buf <= bias;
-    pid_reset_out <= '1' when state = s_IDLE else '0';
+    pid_reset_out <= '0' when state = s_LOCKING else '1';
 end architecture behavioural;
 
 

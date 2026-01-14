@@ -386,6 +386,9 @@ begin
                                 when u_DEVICE_TRI4 =>
                                     bus_mod_buf <= BUS_TRI4_ADDR;
                                     state <= s_bus_parse_head;
+                                when u_DEVICE_SLO2 =>
+                                    bus_mod_buf <= BUS_SLO2_ADDR;
+                                    state <= s_bus_parse_head;
                                 when others =>
                                     response_err_buf <= x"44564345"; -- "DVCE" for device error
                                     state <= s_respond_exception;
