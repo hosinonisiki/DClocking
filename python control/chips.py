@@ -342,5 +342,5 @@ def init_AD9627(spi, port, chip):
     chip.write("000018") # Set
     chip.write("000503") # Enable
     chip.write("001441") # Output Mode 2's comp
-    chip.write("001701") # Output Delay
+    chip.write("001705") # Output Delay
     chip.write("00FF01") # Transfer

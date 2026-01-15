@@ -61,6 +61,11 @@ architecture structural of top is
     signal mbus         :   std_logic_vector(mbus_w - 1 downto 0) := (others => '0'); -- module selection bus, x"00" refers to no module selected
     signal cbus         :   std_logic_vector(cbus_w - 1 downto 0) := (others => '0'); -- control bus
 
+    signal dbus_buf     :   std_logic_vector(dbus_w - 1 downto 0) := (others => '0');
+    signal abus_buf     :   std_logic_vector(abus_w - 1 downto 0) := (others => '0');
+    signal mbus_buf     :   std_logic_vector(mbus_w - 1 downto 0) := (others => '0');
+    signal cbus_buf     :   std_logic_vector(cbus_w - 1 downto 0) := (others => '0');
+
     signal rdbus        :   rdbus_type := (others => (others => '0')); -- response data bus
     signal rsbus        :   rsbus_type := (others => (others => '0')); -- response status bus
 
@@ -76,6 +81,12 @@ architecture structural of top is
     signal sig_bank_out     :   signal_array(63 downto 0) := (others => (others => '0'));
     signal ctrl_bank_in     :   std_logic_vector(63 downto 0) := (others => '0');
     signal ctrl_bank_out    :   std_logic_vector(63 downto 0) := (others => '0');
+
+    attribute max_fanout : integer;
+    attribute max_fanout of dbus : signal is 5;
+    attribute max_fanout of abus : signal is 5;
+    attribute max_fanout of mbus : signal is 5;
+    attribute max_fanout of cbus : signal is 5;
 begin
     assert ADC_channel_count <= 8 and DAC_channel_count <= 8
         report "ADC and DAC channel count must be less than or equal to 8"
@@ -95,16 +106,27 @@ begin
         ss_out          =>  ss,
         io_tri_out      =>  io_tri,
 
-        dbus_out        =>  dbus,
-        abus_out        =>  abus,
-        mbus_out        =>  mbus,
-        cbus_out        =>  cbus,
+        dbus_out        =>  dbus_buf,
+        abus_out        =>  abus_buf,
+        mbus_out        =>  mbus_buf,
+        cbus_out        =>  cbus_buf,
 
         rsp_sel_out     =>  rsp_sel,
         rsp_data_in     =>  rsp_data,
         rsp_stat_in     =>  rsp_stat
     );
     mc_rst <= rst;
+
+    -- Add 1 extra register stage to lower the pressure for bus routing
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            dbus       <= dbus_buf;
+            abus       <= abus_buf;
+            mbus       <= mbus_buf;
+            cbus       <= cbus_buf;
+        end if;
+    end process;
 
     response_mux : entity work.response_mux generic map(
         channel_count   =>  module_count   
@@ -124,6 +146,7 @@ begin
     -- 2.Register the address of the module in mypak
     -- 3.Register the name of the module in uart_protocol
     -- 4.Add corresponding lines in central_control
+    -- 5.Record port numbers in port_numbers.py
     module_1_block : block
         signal bus_en       :   std_logic;
     begin
@@ -185,9 +208,11 @@ begin
             
             acc_out         =>  sig_bank_in(4),
             fast_out        =>  sig_bank_in(37),
-            error_in     =>  sig_bank_out(39),
+            error_in        =>  sig_bank_out(39),
+            bias_in         =>  sig_bank_out(42),
 
             pause_in        =>  ctrl_bank_out(5),
+            lf_reset_in     =>  ctrl_bank_out(7),
             auto_reset_in   =>  ctrl_bank_out(7)
         );
     end block module_3_block;
@@ -470,8 +495,10 @@ begin
             acc_out         =>  sig_bank_in(26),
             fast_out        =>  sig_bank_in(38),
             error_in        =>  sig_bank_out(40),
+            bias_in         =>  sig_bank_out(43),
 
             pause_in        =>  ctrl_bank_out(6),
+            lf_reset_in     =>  ctrl_bank_out(8),
             auto_reset_in   =>  ctrl_bank_out(3)
         );
     end block module_17_block;
@@ -654,9 +681,90 @@ begin
             sig_in          =>  sig_bank_out(37), 
             pid_enable      =>  ctrl_bank_in(2),  
             mixer_enable    =>  ctrl_bank_in(3),  
-            sawtooth_enable =>  ctrl_bank_in(4)   
+            sawtooth_enable =>  ctrl_bank_in(4),
+            saw_input       =>  sig_bank_out(38)
         );
     end block module_26_block;
+
+    module_27_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_SCLO_ADDR else '0';
+        module_27 : entity work.module_SCALO_state_machine port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(27),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(27),
+            rsp_stat_out    =>  rsbus(27),
+            
+            phase_in        =>  sig_bank_out(41),
+            phase_out       =>  sig_bank_in(39),
+            pid_reset_out   =>  ctrl_bank_in(5)
+        );
+    end block module_27_block;
+
+    module_28_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_TRI3_ADDR else '0';
+        module_28 : entity work.module_trigonometric port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(28),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(28),
+            rsp_stat_out    =>  rsbus(28),
+            
+            phase_in        =>  sig_bank_out(44),
+            sin_out         =>  sig_bank_in(40),
+            cos_out         =>  sig_bank_in(41)
+        );
+    end block module_28_block;
+
+    module_29_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_TRI4_ADDR else '0';
+        module_29 : entity work.module_trigonometric port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(29),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(29),
+            rsp_stat_out    =>  rsbus(29),
+            
+            phase_in        =>  sig_bank_out(45),
+            sin_out         =>  sig_bank_in(42),
+            cos_out         =>  sig_bank_in(43)
+        );
+    end block module_29_block;
+
+    module_30_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_SLO2_ADDR else '0';
+        module_30 : entity work.module_SCALO_state_machine port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(30),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(30),
+            rsp_stat_out    =>  rsbus(30),
+            
+            phase_in        =>  sig_bank_out(46),
+            phase_out       =>  sig_bank_in(44),
+            pid_reset_out   =>  ctrl_bank_in(6)
+        );
+    end block module_30_block;
 
     -- signal banks provided by the router
     -- Last 8 channels reserved for top adc and dac ports

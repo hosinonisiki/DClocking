@@ -3,47 +3,72 @@ import time
 from PySide6.QtCore import QCoreApplication, QIODevice
 from PySide6.QtSerialPort import QSerialPort
 
-# QSerialPort requires a QCoreApplication instance to function correctly,
-# even if we don't run the event loop with exec_().
-if not QCoreApplication.instance():
-    app = QCoreApplication(sys.argv)
-
-class QtSerial:
-    def __init__(self, port, baudrate=115200, parity="N", stopbits=1, bytesize=8, timeout=1):
-        self.serial = QSerialPort()
-        self.serial.setPortName(port)
-        self.serial.setBaudRate(baudrate)
-
-        # Parity Mapping
-        parity_map = {
-            "N": QSerialPort.NoParity,
-            "E": QSerialPort.EvenParity,
-            "O": QSerialPort.OddParity,
-            "M": QSerialPort.MarkParity,
-            "S": QSerialPort.SpaceParity
-        }
-        self.serial.setParity(parity_map.get(parity, QSerialPort.NoParity))
-
-        # Stopbits Mapping
-        if stopbits == 1:
-            self.serial.setStopBits(QSerialPort.OneStop)
-        elif stopbits == 2:
-            self.serial.setStopBits(QSerialPort.TwoStop)
+class QtSerial: 
+    def __init__(self, port=None, baudrate=115200, parity="N", stopbits=1, bytesize=8, timeout=1, serial_instance=None):
+        """
+        初始化串口
         
-        # Data Bits Mapping
-        if bytesize == 8:
-            self.serial.setDataBits(QSerialPort.Data8)
-        elif bytesize == 7:
-            self.serial.setDataBits(QSerialPort.Data7)
-
+        Args: 
+            port: 串口名称（如果 serial_instance 为 None）
+            baudrate: 波特率
+            parity:  校验位
+            stopbits: 停止位
+            bytesize: 数据位
+            timeout: 超时时间
+            serial_instance: 已打开的 QSerialPort 实例（优先使用）
+        """
         self.timeout = timeout
         self._buffer = bytearray()
+        self._own_serial = False  # 标记是否需要自己管理串口
+        
+        if serial_instance is not None:
+            # 使用外部传入的已打开串口
+            if not isinstance(serial_instance, QSerialPort):
+                raise TypeError("serial_instance must be a QSerialPort object")
+            if not serial_instance.isOpen():
+                raise Exception("Provided serial_instance is not open")
+            self. serial = serial_instance
+            self._own_serial = False
+        else:
+            # 自己创建并打开串口
+            if port is None:
+                raise ValueError("Either 'port' or 'serial_instance' must be provided")
+            
+            self.serial = QSerialPort()
+            self.serial.setPortName(port)
+            self.serial.setBaudRate(baudrate)
 
-        if not self.serial.open(QIODevice.ReadWrite):
-            raise Exception(f"Failed to open port {port}: {self.serial.error()}")
+            # Parity Mapping
+            parity_map = {
+                "N": QSerialPort.NoParity,
+                "E":  QSerialPort.EvenParity,
+                "O": QSerialPort.OddParity,
+                "M": QSerialPort.MarkParity,
+                "S": QSerialPort.SpaceParity
+            }
+            self.serial.setParity(parity_map.get(parity, QSerialPort.NoParity))
+
+            # Stopbits Mapping
+            if stopbits == 1:
+                self.serial.setStopBits(QSerialPort. OneStop)
+            elif stopbits == 2:
+                self.serial.setStopBits(QSerialPort.TwoStop)
+            
+            # Data Bits Mapping
+            if bytesize == 8:
+                self.serial.setDataBits(QSerialPort.Data8)
+            elif bytesize == 7:
+                self.serial.setDataBits(QSerialPort.Data7)
+
+            if not self.serial.open(QIODevice.ReadWrite):
+                raise Exception(f"Failed to open port {port}: {self.serial.error()}")
+            
+            self._own_serial = True
 
     def close(self):
-        self.serial.close()
+        """只在自己打开的情况下才关闭串口"""
+        if self._own_serial and self.serial.isOpen():
+            self.serial.close()
 
     def write(self, data):
         if isinstance(data, str):
@@ -64,7 +89,7 @@ class QtSerial:
             # Check if terminator is already in the buffer
             if terminator in self._buffer:
                 split_index = self._buffer.find(terminator) + len(terminator)
-                result = self._buffer[:split_index]
+                result = self._buffer[: split_index]
                 self._buffer = self._buffer[split_index:]
                 return bytes(result)
 
@@ -104,12 +129,12 @@ class QtSerial:
                 except:
                     msg_str = str(message)
                     resp_str = str(response)
-                raise Exception(f"Error in transmission. Sent: {msg_str}, Received: {resp_str}")
+                raise Exception(f"Error in transmission.  Sent: {msg_str}, Received: {resp_str}")
         
-        response = self.read_until(b"!")
+        response = self. read_until(b"!")
         while True:
             if len(response) >= 6:
-                if response[-6] == 46 or response[-6] == 58: # 46='.', 58=':'
+                if response[-6] == 46 or response[-6] == 58: # 46='. ', 58=':'
                     break
             
             new_data = self.read_until(b"!")
@@ -120,11 +145,10 @@ class QtSerial:
         if verbose:
             print(response)
         
-        if not response.startswith(b":ACKN"):
+        if not response.startswith(b": ACKN"):
             try:
-                resp_str = response.decode()
+                resp_str = response. decode()
             except:
                 resp_str = str(response)
             raise Exception(f"Error in transmission. Received: {resp_str}")
         return response
-

@@ -36,7 +36,6 @@ entity module_mixer is
 end entity module_mixer;
 
 architecture structural of module_mixer is
-    signal core_param       :   std_logic_vector(63 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
     signal core_rst         :   std_logic := '1';
 
     signal ram_rst          :   std_logic := '1';
@@ -57,16 +56,13 @@ begin
     core_entity : entity work.mixer port map(
         clk             =>  clk,
         rst             =>  core_rst,
-        core_param_in   =>  core_param,
         -- data flow ports
         sig_a_in        =>  sig_a_in,
         sig_b_in        =>  sig_b_in,
         sig_out         =>  sig_out
     );
 
-    parameter_ram : entity work.parameter_ram_64 generic map(
-        ram_default     =>  x"0000000000000000"
-    )port map(
+    parameter_ram : entity work.parameter_ram_0 port map(
         clk             =>  clk,
         rst             =>  ram_rst,
         wdata_in        =>  wdata,
@@ -77,8 +73,7 @@ begin
         rdata_out       =>  rdata,
         raddr_in        =>  raddr,
         rval_out        =>  rval,
-        ren_in          =>  ren,
-        ram_data_out    =>  core_param
+        ren_in          =>  ren
     );
 
     bus_handler : entity work.bus_handler port map(

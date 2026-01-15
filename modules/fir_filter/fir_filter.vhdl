@@ -29,7 +29,11 @@ architecture behavioural of fir_filter is
 
     type coef_type is array (0 to 63) of signed(23 downto 0); -- Normalized to Q1.23, -1 to 1
     signal coef         :   coef_type := (others => (others => '0'));
-    signal norm         :   signed(17 downto 0); -- Q5.13, -16 to 16
+    signal norm_64      :   signed(17 downto 0); -- Q5.13, -16 to 16
+    signal norm_32      :   signed(17 downto 0); -- Q6.12, -32 to 32
+    signal norm_16      :   signed(17 downto 0); -- Q7.11, -64 to 64
+    -- less taps requires larger scaling factor to keep the same L1 norm of impulse response
+    signal taps         :   unsigned(5 downto 0);
 
     type data_type is array(0 to 63) of signed(15 downto 0); -- Treat as Q1.15, -1 to 1
     signal data         :   data_type := (others => (others => '0'));
@@ -47,9 +51,13 @@ architecture behavioural of fir_filter is
     type sum_1_type is array(0 to 3) of signed(26 downto 0); -- Q6.21
     signal sum_1        :   sum_1_type := (others => (others => '0'));
 
-    signal sum_2        :   signed(26 downto 0); -- Q6.21, -32 to 32, but can be within -2 to 2 most of the time
+    signal sum_1_5      :   signed(26 downto 0); -- Q6.21
 
-    signal scaled       :   signed(44 downto 0); -- Q11.34, -1024 to 1,024 but expected range is -32 to 32 (Use norm to scale the L1 norm of impulse response to 32)
+    signal sum_2        :   signed(26 downto 0); -- Q6.21, -32 to 32, but can be within -2 to 2 most of the time. Even smaller for taps less than 64.
+
+    signal scaled_64    :   signed(44 downto 0); -- Q11.34, -1024 to 1,024 but expected range is -32 to 32 (Use norm_64 to scale the L1 norm of impulse response to 32)
+    signal scaled_32    :   signed(44 downto 0); -- Q12.33, -2048 to 2,048 but expected range is -32 to 32 (use norm_32 to scale the L1 norm of impulse response to 32)
+    signal scaled_16    :   signed(44 downto 0); -- Q13.32, -4096 to 4,096 but expected range is -32 to 32 (use norm_16 to scale the L1 norm of impulse response to 32)
     -- Truncate to Q6.10, 16bit output, -32 to 32 but treated as -1 to 1
 begin
     use_input_buffer : if io_buf = buf_for_io or io_buf = buf_i_only generate
@@ -89,7 +97,10 @@ begin
     gen_coef : for i in 0 to 63 generate
         coef(i) <= signed(core_param_in(i * 32 + 23 downto i * 32)); -- address 0x00 to 0x3F
     end generate;
-    norm <= signed(core_param_in(2065 downto 2048)); -- address 0x40
+    norm_64 <= signed(core_param_in(2065 downto 2048)); -- address 0x40
+    norm_32 <= signed(core_param_in(2097 downto 2080)); -- address 0x41
+    norm_16 <= signed(core_param_in(2129 downto 2112)); -- address 0x42
+    taps <= unsigned(core_param_in(2149 downto 2144)); -- address 0x43
 
     gen_data : for i in 1 to 63 generate
         process(clk)
@@ -179,8 +190,10 @@ begin
         if rising_edge(clk) then
             if rst = '1' then
                 sum_2 <= (others => '0'); -- Q6.21
+                sum_1_5 <= (others => '0');
             else
                 sum_2 <= sum_1(0) + sum_1(1) + sum_1(2) + sum_1(3);
+                sum_1_5 <= sum_1(0) + sum_1(1);
             end if;
         end if;
     end process;
@@ -190,14 +203,21 @@ begin
     begin
         if rising_edge(clk) then
             if rst = '1' then
-                scaled <= (others => '0'); -- Q11.34, Truncate to Q6.10 for output
+                scaled_64 <= (others => '0'); -- Q11.34, Truncate to Q6.10 for output
+                scaled_32 <= (others => '0'); -- Q12.33, Truncate to Q6.10 for output
+                scaled_16 <= (others => '0'); -- Q13.32, Truncate to Q6.10 for output
             else
-                scaled <= sum_2 * norm;
+                scaled_64 <= sum_2 * norm_64;
+                scaled_32 <= sum_1_5 * norm_32;
+                scaled_16 <= sum_1(0) * norm_16;
             end if;
         end if;
     end process;
 
-    sig_out_buf <= scaled(39 downto 24);
+    -- sig_out_buf <= scaled_64(39 downto 24);
+    sig_out_buf <= scaled_16(37 downto 22) when taps <= "001111" else
+                   scaled_32(38 downto 23) when taps <= "011111" else
+                   scaled_64(39 downto 24);
 
 end architecture behavioural;
 

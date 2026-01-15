@@ -31,9 +31,11 @@ entity module_accumulator is
         -- data flow ports
         acc_out         :   out std_logic_vector(15 downto 0);
         fast_out        :   out std_logic_vector(15 downto 0);
-        error_in     :   in  std_logic_vector(15 downto 0);
+        error_in        :   in  std_logic_vector(15 downto 0);
+        bias_in         :   in  std_logic_vector(15 downto 0);
         -- control ports
         pause_in        :   in  std_logic;
+        lf_reset_in     :   in  std_logic;
         auto_reset_in   :   in  std_logic
     );
 end entity module_accumulator;
@@ -58,8 +60,10 @@ architecture structural of module_accumulator is
 begin
     
     core_entity : entity work.accumulator generic map(
-        -- Removed buffer options for high bandwidth testing
-        io_buf => buf_none   
+        -- Removed buffer options for high bandwidth testing previously
+        -- Added back due to upgraded functionality causing timing issues
+        -- Plus 4 ns won't hurt here
+        io_buf => buf_for_io   
     )port map(
         clk             =>  clk,
         rst             =>  core_rst,
@@ -67,14 +71,16 @@ begin
         -- data flow ports
         acc_out         =>  acc_out,
         fast_out        =>  fast_out,
-        error_in     =>  error_in,
+        error_in        =>  error_in,
+        bias_in         =>  bias_in,
         -- control ports
         pause_in        =>  pause_in,
+        lf_reset_in     =>  lf_reset_in,
         auto_reset_in   =>  auto_reset_in
     );
 
     parameter_ram : entity work.parameter_ram_256 generic map(
-        ram_default     =>  x"00000000_00000001_00000000_00000000" &
+        ram_default     =>  x"00000000_00000001_000186A0_0007A120" &
                             x"00000000_00000001_00000000_00000000"
     )port map(
         clk             =>  clk,
