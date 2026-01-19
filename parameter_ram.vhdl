@@ -42,6 +42,13 @@ architecture behavioral of parameter_ram_4096 is
     signal ram_data         :   std_logic_vector(4095 downto 0) := ram_default;
     signal ram_buf          :   std_logic_vector(4095 downto 0) := ram_default;
     signal ram_data_1       :   std_logic_vector(4095 downto 0) := ram_default;
+
+    signal wen              :   std_logic;
+    signal wval             :   std_logic;
+
+    attribute max_fanout    :   integer;
+    attribute max_fanout of wen : signal is 64;
+    attribute max_fanout of wval : signal is 64;
 begin
     
     process(clk, rst)
@@ -52,14 +59,16 @@ begin
                 ram_data <= ram_default;
                 ram_buf <= ram_default;
             else
-                if wen_in = '1' then
+                if wen = '1' then
                     waddr := to_integer(unsigned(waddr_in(abus_w_val - 1 downto 0)));
                     ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w) <= (wmask_in and wdata_in) or ((not wmask_in) and ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w));
                 end if;
-                if wval_in = '1' then
+                if wval = '1' then
                     ram_data <= ram_buf;
                 end if;
             end if;
+            wen <= wen_in;
+            wval <= wval_in;
         end if;
     end process;
 
@@ -131,6 +140,13 @@ architecture behavioral of parameter_ram_2048 is
     signal ram_data         :   std_logic_vector(2047 downto 0) := ram_default;
     signal ram_buf          :   std_logic_vector(2047 downto 0) := ram_default;
     signal ram_data_1       :   std_logic_vector(2047 downto 0) := ram_default;
+
+    signal wen              :   std_logic;
+    signal wval             :   std_logic;
+
+    attribute max_fanout    :   integer;
+    attribute max_fanout of wen : signal is 64;
+    attribute max_fanout of wval : signal is 64;
 begin
     
     process(clk, rst)
@@ -141,14 +157,16 @@ begin
                 ram_data <= ram_default;
                 ram_buf <= ram_default;
             else
-                if wen_in = '1' then
+                if wen = '1' then
                     waddr := to_integer(unsigned(waddr_in(abus_w_val - 1 downto 0)));
                     ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w) <= (wmask_in and wdata_in) or ((not wmask_in) and ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w));
                 end if;
-                if wval_in = '1' then
+                if wval = '1' then
                     ram_data <= ram_buf;
                 end if;
             end if;
+            wen <= wen_in;
+            wval <= wval_in;
         end if;
     end process;
 
@@ -220,6 +238,13 @@ architecture behavioral of parameter_ram_1024 is
     signal ram_data         :   std_logic_vector(1023 downto 0) := ram_default;
     signal ram_buf          :   std_logic_vector(1023 downto 0) := ram_default;
     signal ram_data_1       :   std_logic_vector(1023 downto 0) := ram_default;
+
+    signal wen              :   std_logic;
+    signal wval             :   std_logic;
+
+    attribute max_fanout    :   integer;
+    attribute max_fanout of wen : signal is 64;
+    attribute max_fanout of wval : signal is 64;
 begin
     
     process(clk, rst)
@@ -230,14 +255,16 @@ begin
                 ram_data <= ram_default;
                 ram_buf <= ram_default;
             else
-                if wen_in = '1' then
+                if wen = '1' then
                     waddr := to_integer(unsigned(waddr_in(abus_w_val - 1 downto 0)));
                     ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w) <= (wmask_in and wdata_in) or ((not wmask_in) and ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w));
                 end if;
-                if wval_in = '1' then
+                if wval = '1' then
                     ram_data <= ram_buf;
                 end if;
             end if;
+            wen <= wen_in;
+            wval <= wval_in;
         end if;
     end process;
 
@@ -309,6 +336,13 @@ architecture behavioral of parameter_ram_512 is
     signal ram_data     :   std_logic_vector(511 downto 0) := ram_default;
     signal ram_buf      :   std_logic_vector(511 downto 0) := ram_default;
     signal ram_data_1   :   std_logic_vector(511 downto 0) := ram_default;
+
+    signal wen              :   std_logic;
+    signal wval             :   std_logic;
+
+    attribute max_fanout    :   integer;
+    attribute max_fanout of wen : signal is 64;
+    attribute max_fanout of wval : signal is 64;
 begin
     
     process(clk, rst)
@@ -319,14 +353,16 @@ begin
                 ram_data <= ram_default;
                 ram_buf <= ram_default;
             else
-                if wen_in = '1' then
+                if wen = '1' then
                     waddr := to_integer(unsigned(waddr_in(abus_w_val - 1 downto 0)));
                     ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w) <= (wmask_in and wdata_in) or ((not wmask_in) and ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w));
                 end if;
-                if wval_in = '1' then
+                if wval = '1' then
                     ram_data <= ram_buf;
                 end if;
             end if;
+            wen <= wen_in;
+            wval <= wval_in;
         end if;
     end process;
 
@@ -398,6 +434,13 @@ architecture behavioral of parameter_ram_256 is
     signal ram_data     :   std_logic_vector(255 downto 0) := ram_default;
     signal ram_buf      :   std_logic_vector(255 downto 0) := ram_default;
     signal ram_data_1   :   std_logic_vector(255 downto 0) := ram_default;
+
+    signal wen              :   std_logic;
+    signal wval             :   std_logic;
+
+    attribute max_fanout    :   integer;
+    attribute max_fanout of wen : signal is 64;
+    attribute max_fanout of wval : signal is 64;
 begin
     
     process(clk, rst)
@@ -408,14 +451,16 @@ begin
                 ram_data <= ram_default;
                 ram_buf <= ram_default;
             else
-                if wen_in = '1' then
+                if wen = '1' then
                     waddr := to_integer(unsigned(waddr_in(abus_w_val - 1 downto 0)));
                     ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w) <= (wmask_in and wdata_in) or ((not wmask_in) and ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w));
                 end if;
-                if wval_in = '1' then
+                if wval = '1' then
                     ram_data <= ram_buf;
                 end if;
             end if;
+            wen <= wen_in;
+            wval <= wval_in;
         end if;
     end process;
 
@@ -487,6 +532,13 @@ architecture behavioral of parameter_ram_128 is
     signal ram_data     :   std_logic_vector(127 downto 0) := ram_default;
     signal ram_buf      :   std_logic_vector(127 downto 0) := ram_default;
     signal ram_data_1   :   std_logic_vector(127 downto 0) := ram_default;
+
+    signal wen              :   std_logic;
+    signal wval             :   std_logic;
+
+    attribute max_fanout    :   integer;
+    attribute max_fanout of wen : signal is 64;
+    attribute max_fanout of wval : signal is 64;
 begin
     
     process(clk, rst)
@@ -497,14 +549,16 @@ begin
                 ram_data <= ram_default;
                 ram_buf <= ram_default;
             else
-                if wen_in = '1' then
+                if wen = '1' then
                     waddr := to_integer(unsigned(waddr_in(abus_w_val - 1 downto 0)));
                     ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w) <= (wmask_in and wdata_in) or ((not wmask_in) and ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w));
                 end if;
-                if wval_in = '1' then
+                if wval = '1' then
                     ram_data <= ram_buf;
                 end if;
             end if;
+            wen <= wen_in;
+            wval <= wval_in;
         end if;
     end process;
 
@@ -576,6 +630,13 @@ architecture behavioral of parameter_ram_64 is
     signal ram_data     :   std_logic_vector(63 downto 0) := ram_default;
     signal ram_buf      :   std_logic_vector(63 downto 0) := ram_default;
     signal ram_data_1   :   std_logic_vector(63 downto 0) := ram_default;
+
+    signal wen              :   std_logic;
+    signal wval             :   std_logic;
+
+    attribute max_fanout    :   integer;
+    attribute max_fanout of wen : signal is 64;
+    attribute max_fanout of wval : signal is 64;
 begin
     
     process(clk, rst)
@@ -586,14 +647,16 @@ begin
                 ram_data <= ram_default;
                 ram_buf <= ram_default;
             else
-                if wen_in = '1' then
+                if wen = '1' then
                     waddr := to_integer(unsigned(waddr_in(abus_w_val - 1 downto 0)));
                     ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w) <= (wmask_in and wdata_in) or ((not wmask_in) and ram_buf(waddr * dbus_w + dbus_w - 1 downto waddr * dbus_w));
                 end if;
-                if wval_in = '1' then
+                if wval = '1' then
                     ram_data <= ram_buf;
                 end if;
             end if;
+            wen <= wen_in;
+            wval <= wval_in;
         end if;
     end process;
 

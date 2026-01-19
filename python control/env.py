@@ -35,6 +35,7 @@ fir3 = module.ModuleFIRFilter(bus_inst, "FIR3")
 fir4 = module.ModuleFIRFilter(bus_inst, "FIR4")
 pdhfsm = module.ModulePDHFSM(bus_inst, "PDHS")
 sclofsm = module.ModuleSCLOFSM(bus_inst, "SCLO")
+sclofsm2 = module.ModuleSCLOFSM(bus_inst, "SLO2")
 spi_inst = spi.Spi(ser)
 
 def init():
@@ -62,6 +63,7 @@ def init():
         fir4.reset()
         pdhfsm.reset()
         sclofsm.reset()
+        sclofsm2.reset()
 
         print("Configure converters")
         init_FL9627(spi_inst, 1)
@@ -95,6 +97,7 @@ def init_no_ref():
         fir4.reset()
         pdhfsm.reset()
         sclofsm.reset()
+        sclofsm2.reset()
 
         print("Configure converters")
         init_FL9627(spi_inst, 1)
@@ -181,15 +184,52 @@ def setup_pdh():
     pdhfsm.write("time_lock", 2**31)
     pdhfsm.write("time_scan", 2**31)
 
-def setup_dpll():
-    router.set_routing(MIXER_IN_A, INPUT_F)
+def setup_sclodpllpid():
+    router.set_routing(SCALER2_IN, INPUT_A)
+    router.set_routing(MIXER_IN_A, SCALER2_OUT)
     router.set_routing(FIR_IN, MIXER_OUT)
     router.set_routing(ACC_ERROR_IN, FIR_OUT)
     router.set_routing(TRI_IN, ACC_SLOW_OUT)
-    router.set_routing(OUTPUT_A, TRI_SIN)
     router.set_routing(TRI2_IN, ACC_FAST_OUT)
     router.set_routing(MIXER_IN_B, TRI2_SIN)
-    router.upload()    
+    router.set_routing(MIXER2_IN_A, SCALER2_OUT)
+    router.set_routing(MIXER2_IN_B, TRI2_COS)
+    router.set_routing(FIR2_IN, MIXER2_OUT)
+    router.set_routing(ATAN_IN_SIN, FIR_OUT)
+    router.set_routing(ATAN_IN_COS, FIR2_OUT)
+    router.set_routing(SCLOFSM_PHASE_IN, ATAN_OUT)
+    router.set_routing(ACC_BIAS_IN, SCLOFSM_BIAS_OUT)
+    router.set_routing(ACC_LF_RESET, SCLOFSM_PID_RESET_CTRL)
+    router.set_routing(TRI3_IN, ACC2_FAST_OUT)
+    router.set_routing(MIXER3_IN_A, TRI_SIN)
+    router.set_routing(MIXER3_IN_B, TRI3_SIN)
+    router.set_routing(FIR3_IN, MIXER3_OUT)
+    router.set_routing(MIXER4_IN_A, TRI_SIN)
+    router.set_routing(MIXER4_IN_B, TRI3_COS)
+    router.set_routing(FIR4_IN, MIXER4_OUT)
+    router.set_routing(ATAN2_IN_SIN, FIR3_OUT)
+    router.set_routing(ATAN2_IN_COS, FIR4_OUT)
+    router.set_routing(SCLOFSM2_PHASE_IN, ATAN2_OUT)
+    router.set_routing(ACC2_BIAS_IN, SCLOFSM2_BIAS_OUT)
+    router.set_routing(PID_RESET, SCLOFSM_PID_RESET_CTRL)
+    router.set_routing(PID_IN, FIR3_OUT)
+    router.set_routing(SCALER_IN, PID_OUT)
+    router.set_routing(OUTPUT_A, SCALER_OUT)
+    router.upload()   
+    fir.design_lowpass(20, 45, 250)
+    fir2.design_lowpass(20, 45, 250)
+    fir3.design_lowpass(1, 10, 250)
+    fir4.design_lowpass(1, 10, 250)
+    sclofsm.flip_on("clear")
+    sclofsm2.flip_on("clear")
+    acc.write("freq", 80000000)
+    acc.write("ratio", 8)
+    acc2.write("freq", 10000000)
+    pid.write("p", 10000)
+    pid.write("i", 1000)
+    pid.write("enable_auto_reset", 1)
+    sclr.write("scale", 20000)
+    sclr2.write("gain", 3)
 
 def setup_sclo():
     router.set_routing(MIXER_IN_A, INPUT_F)
@@ -209,42 +249,6 @@ def setup_sclo():
     router.set_routing(OUTPUT_A, SCALER_OUT)
     router.upload()
     sclofsm.flip_on("clear")
-
-def setup_sclodpll():
-    router.set_routing(MIXER_IN_A, INPUT_F)
-    router.set_routing(MIXER_IN_B, TRI_SIN)
-    router.set_routing(MIXER2_IN_A, INPUT_F)
-    router.set_routing(MIXER2_IN_B, TRI_COS)
-    router.set_routing(FIR_IN, MIXER_OUT)
-    router.set_routing(FIR2_IN, MIXER2_OUT)
-    router.set_routing(ATAN_IN_SIN, FIR_OUT)
-    router.set_routing(ATAN_IN_COS, FIR2_OUT)
-    router.set_routing(SCLOFSM_PHASE_IN, ATAN_OUT)
-    router.set_routing(ACC_BIAS_IN, SCLOFSM_BIAS_OUT)
-    router.set_routing(TRI_IN, ACC_FAST_OUT)
-    router.set_routing(TRI2_IN, ACC_SLOW_OUT)
-    router.set_routing(ACC_ERROR_IN, FIR_OUT)
-    router.set_routing(ACC_LF_RESET, SCLOFSM_PID_RESET_CTRL)
-    router.set_routing(OUTPUT_A, TRI2_SIN)
-    router.upload()
-    sclofsm.flip_on("clear")
-
-def load_fir():
-    print("Load FIR coefficients")
-    filename = "fir_coef.txt"
-    with open(filename, 'r') as f:
-        lines = f.readlines()
-    coef = [float(line.strip()) for line in lines]
-    coef = np.array(coef)
-    coef /= np.max(np.abs(coef)) # Normalize
-    coef *= 0.98
-    print("Normalized coefficients:", coef)
-    l1_norm = sum(np.abs(coef))
-    norm = 32 / l1_norm * 0.98
-    print("L1 norm:", l1_norm)
-    print("Normalization factor:", norm)
-    fir.load_coef(coef, norm)
-    fir2.load_coef(coef, norm)
 
 if __name__ == "__main__":
     code.interact(local=locals())

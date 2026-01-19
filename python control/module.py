@@ -272,7 +272,7 @@ class ModuleScaler(ModuleBase):
         4: {"name": "enable_wrapping", "width": 1}
     }
     alias_list = {
-        "scale": 0, "gain": 0,
+        "scale": 0,
         "bias": 1, "offset": 1,
         "upper": 2, "upper_limit": 2,
         "lower": 3, "lower_limit": 3,
