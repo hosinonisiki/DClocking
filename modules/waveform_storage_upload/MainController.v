@@ -190,7 +190,7 @@ module MainController (
         end 
         else begin   
             // 捕获使能控制
-            if (state == CAPTURING) begin
+            if ((state == CAPTURING) | (state ==ADV_CAPTURING)) begin
                 capture_en_o <= 1'b1;
                 if (preprocessed_valid) begin
                     capture_counter <= capture_counter + 1;

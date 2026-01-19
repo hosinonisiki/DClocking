@@ -55,7 +55,7 @@ module ChannelTriggerDetector(
 
    
     TriggerDetector u_trigger_detector (
-        .clk                (adc_clk),
+        .clk                (clk),
         .rst_n              (rst_n),    
         .data_in            (selected_data),
         .data_valid_i       (data_valid_i),

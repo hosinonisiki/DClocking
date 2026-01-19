@@ -60,6 +60,7 @@ module AdvancedTriggerHandler (
             capturing <= 1'b0;
             data_out_valid <= 1'b0;
             output_counter <= 32'h0;
+            data_out      <= 64'd0;
         end 
         else if (adv_trigger_mode) begin
             if (data_valid_i) begin
