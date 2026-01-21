@@ -211,7 +211,7 @@ def setup_sclodpllpid():
     router.set_routing(ATAN2_IN_COS, FIR4_OUT)
     router.set_routing(SCLOFSM2_PHASE_IN, ATAN2_OUT)
     router.set_routing(ACC2_BIAS_IN, SCLOFSM2_BIAS_OUT)
-    router.set_routing(PID_RESET, SCLOFSM_PID_RESET_CTRL)
+    router.set_routing(PID_RESET, SCLOFSM2_PID_RESET_CTRL)
     router.set_routing(PID_IN, FIR3_OUT)
     router.set_routing(SCALER_IN, PID_OUT)
     router.set_routing(OUTPUT_A, SCALER_OUT)

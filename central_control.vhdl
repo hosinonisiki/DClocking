@@ -601,6 +601,9 @@ begin
                             bsr_o_din(5) <= u_TERM;
                         end if;
                         response_data_attached <= '0';
+                        -- Zero the counters
+                        char_count <= (others => '0');
+                        aux_char_count <= (others => '0');
                         state <= s_send;
                     when s_respond_exception =>
                         -- Load an exception message
@@ -621,11 +624,15 @@ begin
                         else
                             bsr_o_din(5) <= u_TERM;
                         end if;
+                        -- Zero the counters
+                        char_count <= (others => '0');
+                        aux_char_count <= (others => '0');
                         state <= s_send;
                     when s_send =>
                         -- Send the message loaded in the output shift register
                         bsr_o_ren <= '0';
-                        if bsr_o_reg(0) = u_TERM and (bsr_o_sl = '1' or txen_out = '1') then
+                        -- Make sure the length of message is 5 * n + 1
+                        if bsr_o_reg(0) = u_TERM and aux_char_count = "001" and (bsr_o_sl = '1' or txen_out = '1') then
                             txen_out <= '0';
                             bsr_o_sl <= '0';
                             state <= s_idle;
@@ -636,6 +643,12 @@ begin
                         elsif txful_in = '0' then
                             bsr_o_sl <= '1';
                             txen_out <= '1';
+                            char_count <= char_count + x"01";
+                            if aux_char_count = to_unsigned(4, 3) then
+                                aux_char_count <= (others => '0');
+                            else
+                                aux_char_count <= aux_char_count + "001";
+                            end if;
                         end if;
                 end case;
             end if;
