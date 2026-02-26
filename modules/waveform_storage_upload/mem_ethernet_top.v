@@ -127,10 +127,7 @@ module mem_ethernet_top #(
         .DDR4_odt               (DDR4_odt),
         .DDR4_reset_n           (DDR4_reset_n),  
         .ui_clk                 (ui_clk),
-        .ui_rst                 (ui_rst),
-        .buffer_full_o          (buffer_full),
-        .error_o                (mem_error),
-        .buffer_error_i         (buffer_error)
+        .ui_rst                 (ui_rst)
     );
   
   

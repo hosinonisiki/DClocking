@@ -101,8 +101,7 @@ module storage_upload_top (
         .sig_a_buf          (sig_a_buf),
         .sig_b_buf          (sig_b_buf),        
         .sig_c_buf          (sig_c_buf),
-        .sig_d_buf          (sig_d_buf),          
-        .adc_data_valid_i   (adc_data_valid_i),   
+        .sig_d_buf          (sig_d_buf),            
         // 外部触发
         .ext_trigger_i      (ext_trigger_i),           
        //交互

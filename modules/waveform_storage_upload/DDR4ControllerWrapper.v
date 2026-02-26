@@ -120,13 +120,7 @@ module DDR4ControllerWrapper (
        .c0_ddr4_dqs_t          (c0_ddr4_dqs_t),
        .c0_ddr4_ui_clk                (c0_ddr4_ui_clk),
        .c0_ddr4_ui_clk_sync_rst       (c0_ddr4_ui_clk_sync_rst),
-       .addn_ui_clkout1                            (),
-       .addn_ui_clkout2                            (),
-       .addn_ui_clkout3                            (),
-       .addn_ui_clkout4                            (),
        .dbg_clk                                    (),
-       .sl_iport0                                  (37'b0),
-       .sl_oport0                                  (),
 
        .c0_ddr4_aresetn                                (c0_ddr4_aresetn),
        // Slave Interface Write Address Ports

@@ -31,7 +31,7 @@
 module frame_fifo_read
 #(
 	parameter MEM_DATA_BITS          = 32,
-	parameter ADDR_BITS              = 23,
+	parameter ADDR_BITS              = 29,
 	parameter BUSRT_BITS             = 10,
 	parameter FIFO_DEPTH             = 256,
 	parameter BURST_SIZE             = 128
@@ -181,7 +181,7 @@ module frame_fifo_read
     					state <= S_ACK;
     				end
     				//if the FIFO space is a burst read request, goto burst read state
-    				else if(wrusedw < (FIFO_DEPTH - BURST_SIZE - 2))begin
+    				else if(wrusedw < ( BURST_SIZE))begin//(FIFO_DEPTH - BURST_SIZE - 2)
     					state <= S_READ_BURST;
     					rd_burst_len <= BURST_SIZE[BUSRT_BITS - 1:0];
     					rd_burst_req <= 1'b1;

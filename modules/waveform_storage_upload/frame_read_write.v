@@ -32,10 +32,10 @@ module frame_read_write
 #(
 	parameter MEM_DATA_BITS          = 64,
 	parameter READ_DATA_BITS         = 16,
-	parameter WRITE_DATA_BITS        = 16,
-	parameter ADDR_BITS              = 25,
+	parameter WRITE_DATA_BITS        = 64,
+	parameter ADDR_BITS              = 29,
 	parameter BUSRT_BITS             = 10,
-	parameter BURST_SIZE             = 64
+	parameter BURST_SIZE             = 128
 )               
 (
     input  wire                      rst,                  
@@ -106,7 +106,7 @@ module frame_read_write
 	    .dout               (wr_burst_data           ),
 	    .full               (                        ),
 	    .empty              (                        ),
-	    .rd_data_count      (rdusedw                 ),//8
+	    .rd_data_count      (rdusedw         ),//8
 	    .wr_data_count      (                        )//10
     );
 
@@ -135,10 +135,10 @@ module frame_read_write
 //	    .write_addr_index   (write_addr_index         ),    
 	    .write_len          (write_len                ),
 	    .fifo_aclr          (write_fifo_aclr          ),
-	    .rdusedw            (rdusedw                  ) 	
+	    .rdusedw            ({5'd0,rdusedw }          ) 	
     );
-    wire [10:0]  read_usedw1;
-    wire [10:0]  wrusedw;
+    wire [13:0]  read_usedw1;
+    wire [11:0]  wrusedw;
     //instantiate an asynchronous FIFO
 //    fifo_64i_16o read_buf (
 //        .rst                (read_fifo_aclr          ),                     
@@ -154,7 +154,7 @@ module frame_read_write
 //    	.wr_data_count      (wrusedw                 )  
 //    );
 
-    fifo_64i_64o read_buf (
+    fifo_64i_16o read_buf (
         .rst                (read_fifo_aclr          ),                     
     	.wr_clk             (mem_clk                 ),               
     	.rd_clk             (read_clk                ),               
@@ -167,7 +167,7 @@ module frame_read_write
     	.rd_data_count      (read_usedw1              ), 
     	.wr_data_count      (wrusedw                 )  
     );
-    assign read_usedw ={5'b00000,read_usedw1};
+    assign read_usedw ={2'b00,read_usedw1};
     
     frame_fifo_read
     #
@@ -197,7 +197,7 @@ module frame_read_write
 //    	.read_addr_index    (read_addr_index          ),    
     	.read_len           (read_len                 ),
     	.fifo_aclr          (read_fifo_aclr           ),
-    	.wrusedw            (wrusedw                  )
+    	.wrusedw            ({4'd0,wrusedw}       )
     	//.write_finish       (write_finish             )
     );
 

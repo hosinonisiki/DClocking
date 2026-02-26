@@ -66,7 +66,7 @@ module oscilloscope(
     wire        trig_det_data_valid;  
    
     // ¿ØÖÆÐÅºÅ
-    wire        capture_start;
+//    wire        capture_start;
     wire        capture_en;
     wire        upload_start;
     wire        upload_en;

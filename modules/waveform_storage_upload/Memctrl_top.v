@@ -35,7 +35,7 @@ module Memctrl_top(
 //    input  wire        capture_en,   // 捕获使能
 //    input  wire        upload_start,     // 上传开始
 //    input  wire        upload_en,    // 上传使能
- 
+    output             write_en,
     // 数据输入接口（16位采样数据）
     input  wire [63:0] write_data_i,       // 写入数据
     input  wire        write_valid_i,      // 数据有效
@@ -69,7 +69,7 @@ module Memctrl_top(
 
     );
     parameter MEM_DATA_BITS          = 64;             //external memory user interface data width
-    parameter ADDR_BITS              = 25;             //external memory user interface address width
+    parameter ADDR_BITS              = 29;             //external memory user interface address width
     parameter BUSRT_BITS             = 10;             //external memory user interface burst width
     
     
@@ -92,8 +92,8 @@ module Memctrl_top(
     wire                            wr_burst_finish;
     
     // Master Write Address
-    wire [3:0]                      s00_axi_awid;
-    wire [63:0]                     s00_axi_awaddr;
+    wire [0:0]                      s00_axi_awid;
+    wire [31:0]                     s00_axi_awaddr;
     wire [7:0]                      s00_axi_awlen;    // burst length: 0-255
     wire [2:0]                      s00_axi_awsize;   // burst size: fixed 2'b011
     wire [1:0]                      s00_axi_awburst;  // burst type: fixed 2'b01(incremental burst)
@@ -118,8 +118,8 @@ module Memctrl_top(
     wire                            s00_axi_bvalid;
     wire                            s00_axi_bready;
     // master read address
-    wire [3:0]                      s00_axi_arid;
-    wire [63:0]                     s00_axi_araddr;
+    wire [0:0]                      s00_axi_arid;
+    wire [31:0]                     s00_axi_araddr;
     wire [7:0]                      s00_axi_arlen;
     wire [2:0]                      s00_axi_arsize;
     wire [1:0]                      s00_axi_arburst;
@@ -155,7 +155,7 @@ module Memctrl_top(
     //video frame data read-write control
     frame_read_write frame_read_write_m0(
 	    .rst                (rst                      ),
-	    .mem_clk            (ui_clk                   ),
+	    .mem_clk            (sys_clk                   ),
 	    .rd_burst_req       (rd_burst_req             ),
 	    .rd_burst_len       (rd_burst_len             ),
 	    .rd_burst_addr      (rd_burst_addr            ),
@@ -171,7 +171,7 @@ module Memctrl_top(
 //	    .read_addr_2        (24'd4147200              ),
 //	    .read_addr_3        (24'd6220800              ),
 //	    .read_addr_index    (2'd0                     ),
-	    .read_len           (sample_len             ),//frame size 
+	    .read_len           (sample_len               ),//frame size 
 	    .read_en            (read_en                  ),
 	    .read_data          (read_data                ),
         .read_usedw         (read_usedw               ),
@@ -192,14 +192,14 @@ module Memctrl_top(
 //	    .write_addr_3       (24'd6220800              ),
 //	    .write_addr_index   (2'd0                     ),
 	    .write_len          (sample_len             ), //frame size  
-	    .write_en           (write_en                 ),
+	    .write_en           (write_en & write_valid_i ),
 	    .write_data         (write_data               )
     );    
 
 
     aq_axi_master u_aq_axi_master(
-	    .ARESETN            (~ui_rst             ),
-	    .ACLK               (ui_clk              ),
+	    .ARESETN            (~rst             ),
+	    .ACLK               (sys_clk              ),
 	    .M_AXI_AWID         (s00_axi_awid        ),
 	    .M_AXI_AWADDR       (s00_axi_awaddr      ),
 	    .M_AXI_AWLEN        (s00_axi_awlen       ),
@@ -245,7 +245,7 @@ module Memctrl_top(
 	    .MASTER_RST         (1'b0                ),
 	    .WR_START           (wr_burst_req        ),
 	    .WR_ADRS            ({wr_burst_addr,3'd0}),
-	    .WR_LEN             ({wr_burst_len,3'd0} ),
+	    .WR_LEN             ({19'd0,wr_burst_len,3'd0} ),
 	    .WR_READY           (                    ),
 	    .WR_FIFO_RE         (wr_burst_data_req   ),
 	    .WR_FIFO_EMPTY      (1'b0                ),
@@ -254,7 +254,7 @@ module Memctrl_top(
 	    .WR_DONE            (wr_burst_finish     ),
 	    .RD_START           (rd_burst_req        ),
 	    .RD_ADRS            ({rd_burst_addr,3'd0}),
-	    .RD_LEN             ({rd_burst_len,3'd0} ),
+	    .RD_LEN             ({19'd0,rd_burst_len,3'd0} ),
 	    .RD_READY           (                    ),
 	    .RD_FIFO_WE         (rd_burst_data_valid ),
 	    .RD_FIFO_FULL       (1'b0                ),
@@ -264,10 +264,10 @@ module Memctrl_top(
 	    .DEBUG              (                    )
     );
 
-  // ============================================
-    // DDR4控制器包装模块
-    // ============================================
-    // 实际的DDR4控制器实例
+//  // ============================================
+//    // DDR4控制器包装模块
+//    // ============================================
+//    // 实际的DDR4控制器实例
     DDR4ControllerWrapper u_ddr4_controller (
         // 系统接口
         .sys_clk_i          (sys_clk),
@@ -334,5 +334,6 @@ module Memctrl_top(
          .c0_ddr4_ui_clk        (ui_clk),
          .c0_ddr4_ui_clk_sync_rst(ui_rst)
     );
-    
+   
+
 endmodule

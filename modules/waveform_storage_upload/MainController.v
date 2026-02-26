@@ -67,17 +67,12 @@ module MainController (
     
     // ========== ÄÚ²¿ÐÅºÅ ==========
     reg [3:0]  state;
-    wire        single_mode;
-    wire        continuous_mode;
-    
-    wire        immediate_mode;
-    wire        general_trigger_mode;   
-    wire        adv_trigger_mode;
+
     
 //    reg [31:0] capture_counter;
     reg [31:0] capture_length;
     reg        capture_complete;
-    reg        upload_complete;
+
     
                 
     always @(posedge clk or negedge rst_n) begin

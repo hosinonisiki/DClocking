@@ -30,8 +30,7 @@ module adc_sample(
     
     input  wire [31:0] sample_len,
     input  wire        ad_sample_req,
-    output reg         ad_sample_ack,
-                                
+    output reg         ad_sample_ack,                           
     input  wire        write_req_ack,
     output reg         write_req
        );
@@ -56,15 +55,15 @@ module adc_sample(
     
     reg [2:0]            state;
     
-    assign adc_buf_data = adc_data_wide;
+    assign adc_buf_data = adc_data;
       
       
-    always@(posedge clk or posedge rst) begin
-        if(rst == 1'b1)
-            adc_data_wide <= 16'd0;
-        else
-            adc_data_wide <= adc_data;
-    end
+//    always@(posedge clk or posedge rst) begin
+//        if(rst == 1'b1)
+//            adc_data_wide <= 16'd0;
+//        else
+//            adc_data_wide <= adc_data;
+//    end
       
       
     always @(posedge clk or posedge rst)begin
@@ -79,6 +78,7 @@ module adc_sample(
             ad_sample_req_d2 <= ad_sample_req_d1 ;
         end
     end
+     assign   ad_sample_req_pos = ad_sample_req_d1 & (~ad_sample_req_d2);
       
     always@(posedge clk or posedge rst)begin
         if(rst == 1'b1) begin
@@ -87,16 +87,23 @@ module adc_sample(
             sample_cnt <= 32'd0;
             adc_buf_wr <= 1'b0;
             ad_sample_ack <= 1'b0 ;
+            write_req <= 1'b0;
         end
         else begin
             case(state)
                 S_IDLE:begin
-                    if (ad_sample_req_d2)begin
+                    if (ad_sample_req_pos)begin
                         write_req <= 1'b1 ;
                         state <= S_REQ;                      
                     end
-                    else
+                    else begin
                         state <= S_IDLE ;
+                        wait_cnt <= 32'd0;
+                        sample_cnt <= 32'd0;
+                        adc_buf_wr <= 1'b0;
+                        ad_sample_ack <= 1'b0 ;
+                        write_req <= 1'b0;
+                    end
                 end
                 S_REQ :begin
                     if (write_req_ack)begin

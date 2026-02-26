@@ -31,7 +31,7 @@
 module frame_fifo_write
 #(
 	parameter MEM_DATA_BITS          = 32,
-	parameter ADDR_BITS              = 23,
+	parameter ADDR_BITS              = 29,
 	parameter BUSRT_BITS             = 10,
 	parameter BURST_SIZE             = 128
 )               
