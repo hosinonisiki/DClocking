@@ -34,8 +34,8 @@ architecture behavioral of accumulator is
     signal total_incre  :   unsigned(63 downto 0);
     signal total_feedback   :   unsigned(63 downto 0);
 
-    signal divisor      :   std_logic_vector(15 downto 0); -- the divisor N
-    signal divisor_digit    :   integer; -- log of the divisor
+    signal divisor      :   std_logic_vector(15 downto 0) := (others => '0'); -- the divisor N
+    signal divisor_digit    :   unsigned(3 downto 0); -- log of the divisor
 
     type bias_shifted_buf_type is array (0 to 15) of std_logic_vector(63 downto 0);
     signal bias_shifted_buf :   bias_shifted_buf_type;
@@ -115,23 +115,22 @@ begin
     lf_ki <= signed(core_param_in(191 downto 160)); -- Address 0x05
     enable_auto_reset <= core_param_in(224); -- Address 0x07
 
-    divisor_digit <= 15 when divisor(15) = '1' else
-                     14 when divisor(14) = '1' else
-                     13 when divisor(13) = '1' else
-                     12 when divisor(12) = '1' else
-                     11 when divisor(11) = '1' else
-                     10 when divisor(10) = '1' else
-                     9 when divisor(9) = '1' else
-                     8 when divisor(8) = '1' else
-                     7 when divisor(7) = '1' else
-                     6 when divisor(6) = '1' else
-                     5 when divisor(5) = '1' else
-                     4 when divisor(4) = '1' else
-                     3 when divisor(3) = '1' else
-                     2 when divisor(2) = '1' else
-                     1 when divisor(1) = '1' else
-                     0; -- either divisor is x"0001" or x"0000"
-
+    divisor_digit <= x"f" when divisor(15) = '1' else
+                     x"e" when divisor(14) = '1' else
+                     x"d" when divisor(13) = '1' else
+                     x"c" when divisor(12) = '1' else
+                     x"b" when divisor(11) = '1' else
+                     x"a" when divisor(10) = '1' else
+                     x"9" when divisor(9) = '1' else
+                     x"8" when divisor(8) = '1' else
+                     x"7" when divisor(7) = '1' else
+                     x"6" when divisor(6) = '1' else
+                     x"5" when divisor(5) = '1' else
+                     x"4" when divisor(4) = '1' else
+                     x"3" when divisor(3) = '1' else
+                     x"2" when divisor(2) = '1' else
+                     x"1" when divisor(1) = '1' else
+                     x"0"; -- either divisor is x"0001" or x"0000"
     process(clk)
     begin
         if rising_edge(clk) then
@@ -173,9 +172,9 @@ begin
     end generate;
     bias_shifted_buf(15) <= (14 downto 0 => bias_in_buf(15)) & bias_in_buf & (32 downto 0 => '0');
     lf_sum_shifted_buf(15) <= (14 downto 0 => lf_sum(48)) & lf_sum;
-    bias_shifted <= bias_shifted_buf(divisor_digit);
-    lf_sum_shifted <= lf_sum_shifted_buf(divisor_digit);
+    bias_shifted <= bias_shifted_buf(to_integer(divisor_digit));
+    lf_sum_shifted <= lf_sum_shifted_buf(to_integer(divisor_digit));
 
     acc_out_buf <= acc(63 downto 48);
-    fast_out_buf <= acc(63 - divisor_digit downto 48 - divisor_digit);
+    fast_out_buf <= acc(63 - to_integer(divisor_digit) downto 48 - to_integer(divisor_digit));
 end architecture behavioral;
