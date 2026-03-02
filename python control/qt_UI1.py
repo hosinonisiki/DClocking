@@ -2,9 +2,11 @@
 from platform import node
 import sys
 import random
+from collections import deque
+from PySide6.QtCore import QTimer
 # 导入PySide6的QtWidgets模块中的相关组件
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
-                               QHBoxLayout, QListWidget, QGraphicsView, QGraphicsScene,
+                               QHBoxLayout, QListWidget, QListWidgetItem, QGraphicsView, QGraphicsScene,
                                QGraphicsItem, QGraphicsPathItem, QGraphicsTextItem,
                                QSplitter, QGraphicsEllipseItem, QPushButton, QComboBox)
 # 导入PySide6的QtCore模块中的相关类
@@ -14,10 +16,139 @@ from PySide6.QtGui import QDrag, QPainter, QPen, QBrush, QPainterPath, QColor, Q
 from qt_moudle import (PortItem, NodeItem, MoudlePID, MoudleAccumulator, MoudleBase, 
                          MoudleScaler, ModuleFIRFilter, MoudleSCLOFSM, MoudlePDHFSM,
                          MoudleLinerTransformer, CompositeMoudle, SINGenerator, DigitalControlledOscillator,
-                         moudle_factory, moudle_maxm)
+                         moudle_factory, moudle_maxm, set_param_apply_handler)
 from qt_Port import Port
-
 from PySide6.QtSerialPort import QSerialPort
+import module_signal_router
+import port_numbers as pn
+
+
+def _ensure_port_methods():
+    if hasattr(Port, "write_bus"):
+        return
+
+    def is_open(self):
+        return self.serial_port.isOpen()
+
+    def write_bus(self, module, address, data, hold=False):
+        if not self.serial_port or not self.serial_port.isOpen():
+            raise RuntimeError("Serial port is not open")
+        module = module.upper()
+        if isinstance(address, int):
+            address = address.to_bytes(4, "big")
+        elif isinstance(address, str):
+            address = bytes.fromhex(address).rjust(4, b"\x00")
+        if isinstance(data, int):
+            data = data.to_bytes(4, "big")
+        elif isinstance(data, str):
+            data = bytes.fromhex(data).rjust(4, b"\x00")
+        message = b":BUS_." + module.encode() + b".WRTE.ADDR." + address + b".DATA." + data
+        if hold:
+            message += b".HOLD!"
+        else:
+            message += b"!"
+        self.serial_port.write(message)
+
+    Port.is_open = is_open
+    Port.write_bus = write_bus
+
+
+class PortBus:
+    def __init__(self, port_ctrl):
+        self.port_ctrl = port_ctrl
+
+    def write(self, module, address, data, hold=False):
+        self.port_ctrl.write_bus(module, address, data, hold)
+
+
+def _border_port_index(name, prefix):
+    if not name.startswith(prefix):
+        return None
+    try:
+        return int(name[len(prefix):])
+    except ValueError:
+        return None
+
+
+def _resolve_port_number(node_name, port_index, role):
+    border_out_idx = _border_port_index(node_name, "Border_out_")
+    if border_out_idx is not None:
+        inputs = [pn.INPUT_A, pn.INPUT_B, pn.INPUT_C, pn.INPUT_D, pn.INPUT_E, pn.INPUT_F, pn.INPUT_G, pn.INPUT_H]
+        return inputs[border_out_idx] if 0 <= border_out_idx < len(inputs) and role == "out" else None
+
+    border_in_idx = _border_port_index(node_name, "Border_in_")
+    if border_in_idx is not None:
+        outputs = [pn.OUTPUT_A, pn.OUTPUT_B, pn.OUTPUT_C, pn.OUTPUT_D, pn.OUTPUT_E, pn.OUTPUT_F, pn.OUTPUT_G, pn.OUTPUT_H]
+        return outputs[border_in_idx] if 0 <= border_in_idx < len(outputs) and role == "in" else None
+
+    if node_name in ("PIDC", "PID"):
+        inputs = [pn.PID_RESET, pn.PID_IN]
+        outputs = [pn.PID_OUT]
+    elif node_name.startswith("PID"):
+        inputs = [pn.PID2_RESET, pn.PID2_IN]
+        outputs = [pn.PID2_OUT]
+    elif node_name == "ACCM":
+        inputs = {0: pn.ACC_ERROR_IN, 1 : pn.ACC_BIAS_IN, 2: pn.ACC_RESET, 3: pn.ACC_PAUSE, 4 : pn.ACC_LF_RESET}
+        outputs = {0: pn.ACC_SLOW_OUT, 1: pn.ACC_FAST_OUT}
+    elif node_name.startswith("ACC"):
+        inputs = {0: pn.ACC2_ERROR_IN, 1: pn.ACC2_BIAS_IN, 2: pn.ACC2_RESET, 3: pn.ACC2_PAUSE, 4 : pn.ACC2_LF_RESET}
+        outputs = {0: pn.ACC2_SLOW_OUT, 1: pn.ACC2_FAST_OUT}
+    elif node_name == "SCLR":
+        inputs = [pn.SCALER_IN]
+        outputs = [pn.SCALER_OUT]
+    elif node_name.startswith("SCL"):
+        suffix = node_name[3:]
+        base = f"SCALER{suffix}"
+        inputs = [getattr(pn, f"{base}_IN", None)]
+        outputs = [getattr(pn, f"{base}_OUT", None)]
+    elif node_name == "FIRF":
+        inputs = [pn.FIR_IN]
+        outputs = [pn.FIR_OUT]
+    elif node_name.startswith("FIR"):
+        base = node_name
+        inputs = [getattr(pn, f"{base}_IN", None)]
+        outputs = [getattr(pn, f"{base}_OUT", None)]
+    elif node_name == "MIXR":
+        inputs = [pn.MIXER_IN_A, pn.MIXER_IN_B]
+        outputs = [pn.MIXER_OUT]
+    elif node_name.startswith("MIX"):
+        suffix = node_name[3:]
+        base = f"MIXER{suffix}"
+        inputs = [getattr(pn, f"{base}_IN_A", None), getattr(pn, f"{base}_IN_B", None)]
+        outputs = [getattr(pn, f"{base}_OUT", None)]
+    elif node_name == "TRIG":
+        inputs = [pn.TRI_IN, None]
+        outputs = [pn.TRI_COS]
+    elif node_name == "TRI2":
+        inputs = [pn.TRI2_IN, None]
+        outputs = [pn.TRI2_COS]
+    elif node_name == "ATAN":
+        inputs = [pn.ATAN_IN_SIN, pn.ATAN_IN_COS]
+        outputs = [pn.ATAN_OUT]
+    elif node_name == "ATA2":
+        inputs = [pn.ATAN2_IN_SIN, pn.ATAN2_IN_COS]
+        outputs = [pn.ATAN2_OUT]
+    elif node_name == "UNWR":
+        inputs = [pn.UNWRAPPER_IN]
+        outputs = [pn.UNWRAPPER_OUT]
+    elif node_name == "LTRN":
+        inputs = [pn.LN_TRANSFORMER_IN_A, pn.LN_TRANSFORMER_IN_B]
+        outputs = [pn.LN_TRANSFORMER_OUT_A, pn.LN_TRANSFORMER_OUT_B]
+    elif node_name == "LTR2":
+        inputs = [pn.LN_TRANSFORMER2_IN_A, pn.LN_TRANSFORMER2_IN_B]
+        outputs = [pn.LN_TRANSFORMER2_OUT_A, pn.LN_TRANSFORMER2_OUT_B]
+    elif node_name == "PDH":
+        inputs = [pn.PDHFSM_IN_POWER, pn.PDHFSM_IN_SCAN]
+        outputs = [pn.PDHFSM_PID_RESET_CTRL, pn.PDHFSM_MIXER_RESET_CTRL, pn.PDHFSM_SCAN_RESET_CTRL]
+    else:
+        return None
+
+    if isinstance(inputs, dict):
+        return inputs.get(port_index) if role == "in" else outputs.get(port_index)
+    if role == "in":
+        return inputs[port_index] if 0 <= port_index < len(inputs) else None
+    return outputs[port_index] if 0 <= port_index < len(outputs) else None
+
 
 class NodeSignals(QObject):
     """
@@ -35,7 +166,7 @@ class BorderPort(PortItem):
     表示边框上的输入/输出端口的图形项类
     """
     def __init__(self, port_type, index, position):
-        super().__init__(None, port_type, index)
+        super().__init__(None, port_type, index, ["bool", "level", "phase", "differential"])
         self.name = f"Border_{port_type}_{index}"
         self.port_type = port_type
         self.index = index
@@ -86,9 +217,12 @@ class EdgeItem(QGraphicsPathItem):
         self.setZValue(-1)
 
         self.color = start_port.line_color
+        self.base_pen_width = self._base_pen_width()
+        self.hover_pen_width = self.base_pen_width + 1
 
         pen = QPen(QColor(self.color))
-        pen.setWidth(3)
+        pen.setWidth(self.base_pen_width)
+        self._apply_pen_style(pen)
         self.setPen(pen)
 
         self.control_points = []
@@ -102,6 +236,50 @@ class EdgeItem(QGraphicsPathItem):
         self.setAcceptHoverEvents(True)
 
         self.update_path()
+
+    def _signal_set(self, port):
+        signals = port.get_signals()
+        if isinstance(signals, (list, tuple, set)):
+            return {str(s) for s in signals}
+        return {str(signals)}
+
+    def _physical_signal_type(self):
+        matched = self._matched_signals()
+        for sig in ("level", "phase", "differential"):
+            if sig in matched:
+                return sig
+        return None
+
+    def _apply_pen_style(self, pen):
+        sig = self._physical_signal_type()
+        if sig == "phase":
+            pen.setStyle(Qt.CustomDashLine)
+            pen.setDashPattern([10, 4])
+        elif sig == "differential":
+            pen.setStyle(Qt.DashDotLine)
+        else:
+            pen.setStyle(Qt.SolidLine)
+
+    def _matched_signals(self):
+        start_set = self._signal_set(self.start_port)
+        end_set = self._signal_set(self.end_port)
+        matched = start_set & end_set
+        if matched:
+            return matched
+        scene = self.scene()
+        if scene and getattr(scene, "developer_mode", False):
+            physical = {"level", "phase", "differential"}
+            if (start_set & physical) and (end_set & physical):
+                return (start_set & physical) or (end_set & physical)
+        return matched
+
+    def _has_physical_signal(self):
+        matched = self._matched_signals()
+        physical = {"level", "phase", "differential"}
+        return any(sig in physical for sig in matched)
+
+    def _base_pen_width(self):
+        return 4 if self._has_physical_signal() else 2
 
     def _is_reverse_connection(self):
         p1 = self.start_port.scenePos()
@@ -373,13 +551,13 @@ class EdgeItem(QGraphicsPathItem):
                 cp.setVisible(True)
 
         pen = self.pen()
-        pen.setWidth(4)
+        pen.setWidth(self.hover_pen_width)
         self.setPen(pen)
         super().hoverEnterEvent(event)
 
     def hoverLeaveEvent(self, event):
         pen = self.pen()
-        pen.setWidth(3)
+        pen.setWidth(self.base_pen_width)
         self.setPen(pen)
         super().hoverLeaveEvent(event)
 
@@ -415,12 +593,23 @@ class EdgeItem(QGraphicsPathItem):
         if self.scene():
             self.scene().removeItem(self)
 
+    def refresh_style(self):
+        self.color = self.start_port.line_color
+        self.base_pen_width = self._base_pen_width()
+        self.hover_pen_width = self.base_pen_width + 1
+        pen = self.pen()
+        pen.setColor(QColor(self.color))
+        pen.setWidth(self.base_pen_width)
+        self._apply_pen_style(pen)
+        self.setPen(pen)
+
 class DiagramScene(QGraphicsScene):
     def __init__(self, signals):
         super().__init__()
         self.signals = signals
         self.temp_line = None
         self.start_port = None
+        self.developer_mode = False
 
         self.setBackgroundBrush(QBrush(QColor("#1E1E1E")))
         self.setSceneRect(0, 0, 4800, 2700)
@@ -436,6 +625,62 @@ class DiagramScene(QGraphicsScene):
             self.addItem(right_port)
             self.right_ports.append(right_port)
 
+    def set_developer_mode(self, enabled: bool):
+        self.developer_mode = bool(enabled)
+        for item in self.items():
+            if isinstance(item, EdgeItem):
+                item.refresh_style()
+
+    def _signal_set(self, port):
+        signals = port.get_signals()
+        if isinstance(signals, (list, tuple, set)):
+            return {str(s) for s in signals}
+        return {str(signals)}
+
+    def _signal_set_from_signals(self, signals):
+        if isinstance(signals, (list, tuple, set)):
+            return {str(s) for s in signals}
+        return {str(signals)}
+
+    def _preview_style(self, start_port, end_port=None):
+        physical = {"level", "phase", "differential"}
+        start_set = self._signal_set(start_port)
+        if end_port is not None:
+            end_set = self._signal_set(end_port)
+            matched = start_set & end_set
+            if not matched and self.developer_mode:
+                if (start_set & physical) and (end_set & physical):
+                    matched = (start_set & physical) or (end_set & physical)
+        else:
+            matched = start_set
+
+        for sig in ("level", "phase", "differential"):
+            if sig in matched:
+                return sig
+        return None
+
+    def _apply_preview_style(self, pen, start_port, end_port=None):
+        sig = self._preview_style(start_port, end_port)
+        if sig == "phase":
+            pen.setStyle(Qt.CustomDashLine)
+            pen.setDashPattern([10, 4])
+        elif sig == "differential":
+            pen.setStyle(Qt.DashDotLine)
+        else:
+            pen.setStyle(Qt.SolidLine)
+
+    def _preview_width(self, start_port, end_port=None):
+        physical = {"level", "phase", "differential"}
+        start_set = self._signal_set(start_port)
+        if end_port is not None:
+            end_set = self._signal_set(end_port)
+            matched = start_set & end_set
+            if not matched and self.developer_mode:
+                if (start_set & physical) and (end_set & physical):
+                    matched = (start_set & physical) or (end_set & physical)
+            return 3 if any(sig in physical for sig in matched) else 2
+        return 3 if any(sig in physical for sig in start_set) else 2
+
     def mousePressEvent(self, event):
         items = self.items(event.scenePos())
         port = None
@@ -449,8 +694,8 @@ class DiagramScene(QGraphicsScene):
                 self.start_port = port
                 self.temp_line = QGraphicsPathItem()
                 pen = QPen(QColor(port.line_color))
-                pen.setStyle(Qt.DashLine)
-                pen.setWidth(2)
+                self._apply_preview_style(pen, port)
+                pen.setWidth(self._preview_width(port))
                 self.temp_line.setPen(pen)
                 self.addItem(self.temp_line)
                 return
@@ -486,8 +731,18 @@ class DiagramScene(QGraphicsScene):
                 # 使用端口位置决定预览
                 end_port_pos = hovered_port.scenePos()
                 p2_ref = end_port_pos
+                pen = self.temp_line.pen()
+                pen.setColor(QColor(self.start_port.line_color))
+                self._apply_preview_style(pen, self.start_port, hovered_port)
+                pen.setWidth(self._preview_width(self.start_port, hovered_port))
+                self.temp_line.setPen(pen)
             else:
                 p2_ref = p2
+                pen = self.temp_line.pen()
+                pen.setColor(QColor(self.start_port.line_color))
+                self._apply_preview_style(pen, self.start_port)
+                pen.setWidth(self._preview_width(self.start_port))
+                self.temp_line.setPen(pen)
 
             # 根据两节点位置决定是否采用跨式绕行策略（当 x 接近且 y 差大时）
             # 若没有真正的 end port，则以鼠标点估算 dx/dy
@@ -564,7 +819,19 @@ class DiagramScene(QGraphicsScene):
 
         super().mouseReleaseEvent(event)
 
+    def _is_signal_type_matched(self, output_signals, input_signals):
+        output_set = self._signal_set_from_signals(output_signals)
+        input_set = self._signal_set_from_signals(input_signals)
+        if output_set & input_set:
+            return True
+        physical = {"level", "phase", "differential"}
+        if self.developer_mode and (output_set & physical) and (input_set & physical):
+            return True
+        return False
+
     def _is_valid_connection(self, start_port, end_port):
+        output_signals = start_port.get_signals()
+        input_signals = end_port.get_signals()
         if end_port.port_type != 'in':
             print("❌ 连接失败: 只能连接到输入端口")
             return False
@@ -572,12 +839,17 @@ class DiagramScene(QGraphicsScene):
         start_node = start_port.parent_node if hasattr(start_port, 'parent_node') and start_port.parent_node else None
         end_node = end_port.parent_node if hasattr(end_port, 'parent_node') and end_port.parent_node else None
 
+
         if start_node and end_node and end_node == start_node:
             print("❌ 连接失败: 不能连接到自己节点的端口")
             return False
 
         if end_port.has_connection():
             print("❌ 连接失败: 输入端口已被占用")
+            return False
+
+        if not self._is_signal_type_matched(output_signals, input_signals):
+            print("❌ 连接失败: 输出端口、输入端口信号类型不匹配")
             return False
 
         return True
@@ -594,6 +866,7 @@ class DiagramScene(QGraphicsScene):
     def finalize_connection(self, end_port):
         edge = EdgeItem(self.start_port, end_port)
         self.addItem(edge)
+        edge.refresh_style()
 
         start_node = self.start_port.parent_node if hasattr(self.start_port, 'parent_node') and self.start_port.parent_node else None
         end_node = end_port.parent_node if hasattr(end_port, 'parent_node') and end_port.parent_node else None
@@ -670,6 +943,8 @@ class DiagramView(QGraphicsView):
         self.setAcceptDrops(True)
         self.sync_scene_to_viewport()
         self.update_border_ports()
+        self.horizontalScrollBar().valueChanged.connect(self._on_view_scrolled)
+        self.verticalScrollBar().valueChanged.connect(self._on_view_scrolled)
 
     def sync_scene_to_viewport(self):
         scene = self.scene()
@@ -678,9 +953,14 @@ class DiagramView(QGraphicsView):
         
         top_left = self.mapToScene(self.viewport().rect().topLeft())
         bottom_right = self.mapToScene(self.viewport().rect().bottomRight())
+        view_rect = QRectF(top_left, bottom_right)
+        scene_rect = scene.sceneRect()
+        if not scene_rect.contains(view_rect):
+            scene.setSceneRect(scene_rect.united(view_rect))
 
-        rect = QRectF(top_left, bottom_right)
-        scene.setSceneRect(rect)
+    def _on_view_scrolled(self, _value):
+        self.sync_scene_to_viewport()
+        self.update_border_ports()
 
     def update_border_ports(self):
         scene = self.scene()
@@ -718,6 +998,15 @@ class DiagramView(QGraphicsView):
         #释放被删除的组件占用的下标
         self._used_indices.get(component_name, set()).discard(idx)
 
+    def _apply_mode_to_node(self, node):
+        scene = self.scene()
+        if not scene or not node:
+            return
+        developer_mode = getattr(scene, "developer_mode", False)
+        if hasattr(node, "free_mode"):
+            node.free_mode = not developer_mode
+
+
     def _is_near_node(self, scene_pos, margin=10):
         #判断拖拽位置是否在组件附近
         for item in self.scene().items():
@@ -739,7 +1028,6 @@ class DiagramView(QGraphicsView):
                 if expanded_rect.contains(scene_pos):
                     return True
         return False
-
     def dragEnterEvent(self, event):
         if event.mimeData().hasText():
             event.acceptProposedAction()
@@ -769,6 +1057,7 @@ class DiagramView(QGraphicsView):
                     node = moudle_cls(component_name, idx, position, 1, 1)
                 else:
                     node = moudle_cls(component_name, idx, position)
+                self._apply_mode_to_node(node)
                 self.scene().addItem(node)
                 event.acceptProposedAction()
 
@@ -810,6 +1099,7 @@ class DiagramView(QGraphicsView):
             delta = event.position().toPoint() - self._view_drag_start_pos
             self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
             self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
+            self.update_border_ports()
             self._view_drag_start_pos = event.position().toPoint()
             event.accept()
             return
@@ -880,6 +1170,7 @@ class DiagramView(QGraphicsView):
                     self._drag_start_pos = None
                     return
 
+
         super().mouseMoveEvent(event)
     
     def mouseReleaseEvent(self, event):
@@ -940,21 +1231,46 @@ class DiagramView(QGraphicsView):
         p.end()
         return QPixmap.fromImage(img)
 
+
+
     def remove_node(self, node: NodeItem):
-        #删除组件
-        for edge in list(node.edges):
-            edge.remove()
+            # 延时参数（毫秒）
+            delay_ms = 200  # 你可以改成 50/100/200
 
-        if node.scene():
-            self._free_index(node.component_name, int(node.index))
-            node.scene().removeItem(node)
+            edges = list(node.edges)  # 先复制出来，避免边被 remove() 后列表变化
 
-        node.edges.clear()
-        
-        self.scene().update()
-        self.viewport().update()
+            def remove_next_edge(i=0):
+                if i >= len(edges):
+                    # 所有边都断完了，再删节点本体
+                    if node.scene():
+                        self._free_index(node.component_name, int(node.index))
+                        node.scene().removeItem(node)
 
-        print(f"🗑️ 已移除组件: {node.name}")
+                    node.edges.clear()
+                    self.scene().update()
+                    self.viewport().update()
+                    print(f"🗑️ 已移除组件: {node.name}")
+                    return
+
+                edge = edges[i]
+                # edge 可能已经被别处删掉了，做个健壮性判断
+                if edge and edge.start_port and edge.end_port:
+                    src_name = edge.start_port.parent_node.name if getattr(edge.start_port, "parent_node", None) else edge.start_port.name
+                    src_port_idx = edge.start_port.index
+                    dst_name = edge.end_port.parent_node.name if getattr(edge.end_port, "parent_node", None) else edge.end_port.name
+                    dst_port_idx = edge.end_port.index
+
+                    # 先发断开信号（触发硬件清空路由）
+                    self.scene().signals.connection_removed.emit(src_name, src_port_idx, dst_name, dst_port_idx)
+
+                    # 再删图形连线
+                    edge.remove()
+
+                # 下一条边延时处理
+                QTimer.singleShot(delay_ms, lambda: remove_next_edge(i + 1))
+
+            # 开始异步断开第一条
+            remove_next_edge(0)
     
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -970,10 +1286,38 @@ class ComponentPalette(QListWidget):
         self.setDropIndicatorShown(True)
         self.setStyleSheet("font-size: 14px; padding: 5px;")
 
-        items = ["PID控制器", "累加器", "三角函数运算器", "反三角函数运算器", "线性缩放器", "FIR滤波器",  "线性变换器", "混频器", "解卷绕器", "PDH状态机",
-                 "LO自动校准状态机", "正弦波发生器", "数字控制振荡器"]
-        for i in items:
-            self.addItem(i)
+        normal_items = [
+            "PID控制器",
+            "累加器",
+            "三角函数运算器",
+            "反三角函数运算器",
+            "线性缩放器",
+            "FIR滤波器",
+            "线性变换器",
+            "混频器",
+            "解卷绕器",
+            "PDH状态机",
+            "LO自动校准状态机",
+        ]
+        composite_items = [
+            "正弦波发生器",
+            "数字控制振荡器",
+        ]
+
+        self._add_section("非组合模块", normal_items)
+        self._add_section("组合模块", composite_items)
+ 
+    def _add_section(self, title, items):
+        header = QListWidgetItem(title)
+        header.setFlags(Qt.ItemIsEnabled)
+        header.setTextAlignment(Qt.AlignCenter)
+        header.setForeground(QColor("#888888"))
+        self.addItem(header)
+
+        for name in items:
+            item = QListWidgetItem(name)
+            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled)
+            self.addItem(item)
 
     def _create_component_thumbnail(self, component_name, size=(120, 100)):
         #创建组件的缩略信息
@@ -1000,6 +1344,8 @@ class ComponentPalette(QListWidget):
 
     def startDrag(self, supportedActions):
         item = self.currentItem()
+        if not item or not (item.flags() & Qt.ItemIsDragEnabled):
+            return
         mimeData = QMimeData()
         mimeData.setText(item.text())
 
@@ -1041,7 +1387,15 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PySide6 节点流编辑器 - 支持复杂绕行规则")
         self.resize(1600, 900)
 
+        self._route_queue = deque()
+        self._route_sending = False
+        self.route_send_delay_ms = 80  # 你要的延时：可调 50/80/100/200
+
         self.comboBox = QComboBox()
+        self.mode_combo = QComboBox()
+        self.mode_combo.setFixedWidth(120)
+        self.mode_combo.addItems(["Free Mode", "Developer Mode"])
+        self.mode_combo.currentTextChanged.connect(self._on_mode_changed)
         self.comboBox.setFixedWidth(180)
 
         self.connect_btn = QPushButton("连接")
@@ -1053,11 +1407,15 @@ class MainWindow(QMainWindow):
         serial_layout.setContentsMargins(8, 4, 8, 4)
         serial_layout.addStretch()
         serial_layout.addWidget(self.comboBox)
+        serial_layout.addWidget(self.mode_combo)
         serial_layout.addWidget(self.connect_btn)
         serial_layout.addStretch()
         self.serial_port = QSerialPort(self)
         self.port_ctrl = Port(self, self.serial_port)
         self.port_ctrl.scan_ports(force_update=True)
+        _ensure_port_methods()
+        self.router_bus = None
+        self.router = None
 
         self.signals = NodeSignals()
         self.signals.connection_created.connect(self.run_business_logic)
@@ -1066,6 +1424,7 @@ class MainWindow(QMainWindow):
         self.scene = DiagramScene(self.signals)
         self.view = DiagramView(self.scene)
         self.palette = ComponentPalette()
+        self._on_mode_changed(self.mode_combo.currentText())
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(self.view)
@@ -1077,13 +1436,83 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(splitter)
 
         self.setCentralWidget(main_widget)
+        set_param_apply_handler(self._apply_param_to_hardware)
+
+    def _on_mode_changed(self, text):
+        developer_mode = (text == "Developer Mode")
+        self.scene.set_developer_mode(developer_mode)
+        for item in self.scene.items():
+            if isinstance(item, NodeItem) and hasattr(item, "free_mode"):
+                item.free_mode = not developer_mode
+
 
     def run_business_logic(self, src, src_port, dst, dst_port):
         print(f"🔄 >> 执行业务逻辑: 数据从 {src}:Out{src_port+1} 传输到 {dst}:In{dst_port+1}...")
+        src_port_num = _resolve_port_number(src, src_port, "out")
+        dst_port_num = _resolve_port_number(dst, dst_port, "in")
+        if src_port_num is None or dst_port_num is None:
+            print(f"[route] skip: unresolved port mapping src={src}:{src_port} dst={dst}:{dst_port}")
+            return
+        self._apply_routing(dst_port_num, src_port_num, f"{src}:Out{src_port+1} -> {dst}:In{dst_port+1}")
 
     def handle_connection_removed(self, src, src_port, dst, dst_port):
         print(f"🧹 >> 清理业务逻辑: 断开 {src}:Out{src_port+1} 到 {dst}:In{dst_port+1} 的数据流...")
+        dst_port_num = _resolve_port_number(dst, dst_port, "in")
+        if dst_port_num is None:
+            print(f"[route] skip: unresolved port mapping dst={dst}:{dst_port}")
+            return
+        src_port_num = pn.VOID_BOOL if dst_port_num >= 64 else pn.VOID
+        self._apply_routing(dst_port_num, src_port_num, f"{dst}:In{dst_port+1} cleared")
 
+
+
+    def _ensure_router(self):
+        if not self.port_ctrl.is_open():
+            print("[route] serial port not open, routing not sent")
+            return None
+        if self.router is None:
+            self.router_bus = PortBus(self.port_ctrl)
+            self.router = module_signal_router.ModuleSignalRouter(self.router_bus)
+        return self.router
+
+    def _apply_routing(self, dst_port_num, src_port_num, label):
+        router = self._ensure_router()
+        if router is None:
+            return
+        try:
+            router.set_routing(dst_port_num, src_port_num)
+            router.upload()
+            print(f"[route] sent: {label} ({src_port_num} -> {dst_port_num})")
+        except Exception as exc:
+            print(f"[route] failed: {label}: {exc}")
+
+    def _resolve_module_identity(self, node):
+        if isinstance(node, MoudlePID):
+            return "PID", node.index
+        if isinstance(node, MoudleAccumulator):
+            return "ACC", node.index
+        if isinstance(node, MoudleScaler):
+            return "SCLR", node.index
+        if isinstance(node, ModuleFIRFilter):
+            return "FIR", node.index
+        if isinstance(node, MoudleLinerTransformer):
+            return "LTRN", node.index
+        if isinstance(node, MoudlePDHFSM):
+            return "PDH", node.index
+        if isinstance(node, MoudleSCLOFSM):
+            return "SCLO", node.index
+        return None, None
+
+    def _apply_param_to_hardware(self, node, params):
+        module_type, module_index = self._resolve_module_identity(node)
+        if module_type is None:
+            return
+        try:
+            self.port_ctrl.send_param(module_type, module_index, params)
+            for key, value in params.items():
+                print(f"[param] sent {node.name}.{key} = {value}")
+        except Exception as exc:
+            print(f"[param] failed {node.name}: {exc}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

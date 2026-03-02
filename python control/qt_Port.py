@@ -153,6 +153,7 @@ class Port(QObject):
                         timeout=1
                     )
                     self.hw_controller.set_serial(self.qt_serial)
+                    self.hw_controller.init()
                 except Exception as e:
 
                     return
@@ -161,3 +162,45 @@ class Port(QObject):
                 qw.QMessageBox.critical(self.parent,
                                         self.tr("错误"),
                                         self.tr("无法打开串口！"))
+
+    def _resolve_hw_module(self, module_type, module_index):
+        if not self.hw_controller or not self.hw_controller.is_initialized():
+            return None
+        if module_type == "PID":
+            return self.hw_controller.pid if module_index == 0 else self.hw_controller.pid2
+        if module_type == "ACC":
+            return self.hw_controller.acc if module_index == 0 else self.hw_controller.acc2
+        if module_type == "SCLR":
+            if module_index == 0:
+                return self.hw_controller.sclr
+            if module_index == 1:
+                return self.hw_controller.sclr2
+            if module_index == 2:
+                return self.hw_controller.sclr3
+            if module_index == 3:
+                return self.hw_controller.sclr4
+        if module_type == "FIR":
+            if module_index == 0:
+                return self.hw_controller.fir
+            if module_index == 1:
+                return self.hw_controller.fir2
+            if module_index == 2:
+                return self.hw_controller.fir3
+            if module_index == 3:
+                return self.hw_controller.fir4
+        if module_type == "LTRN":
+            return self.hw_controller.ltrn if module_index == 0 else self.hw_controller.ltrn2
+        if module_type == "PDH":
+            return self.hw_controller.pdhfsm
+        if module_type == "SCLO":
+            return self.hw_controller.sclofsm if module_index == 0 else self.hw_controller.sclofsm2
+        return None
+
+    def send_param(self, module_type, module_index, params):
+        hw_module = self._resolve_hw_module(module_type, module_index)
+        if hw_module is None:
+            raise RuntimeError("Hardware controller not initialized")
+        for key, value in params.items():
+            if isinstance(value, bool):
+                value = int(value)
+            hw_module.write(key, value)

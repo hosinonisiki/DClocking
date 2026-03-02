@@ -1,4 +1,3 @@
-import uart
 import bus
 import module
 import module_signal_router
@@ -242,19 +241,24 @@ class HardwareController:
         self.pdhfsm.write("time_lock", 1000000)
         self.pdhfsm.write("time_scan", 2**29)
     
-    def setup_dpll(self):
-        """配置 DPLL"""
-        self._check_serial()
-        
+    def setup_sclo(self):
         self.router.set_routing(MIXER_IN_A, INPUT_F)
+        self.router.set_routing(MIXER_IN_B, TRI_SIN)
+        self.router.set_routing(MIXER2_IN_A, INPUT_F)
+        self.router.set_routing(MIXER2_IN_B, TRI_COS)
         self.router.set_routing(FIR_IN, MIXER_OUT)
-        self.router. set_routing(PID_IN, FIR_OUT)
+        self.router.set_routing(FIR2_IN, MIXER2_OUT)
+        self.router.set_routing(ATAN_IN_SIN, FIR_OUT)
+        self.router.set_routing(ATAN_IN_COS, FIR2_OUT)
+        self.router.set_routing(SCLOFSM_PHASE_IN, ATAN_OUT)
+        self.router.set_routing(ACC_BIAS_IN, SCLOFSM_BIAS_OUT)
+        self.router.set_routing(TRI_IN, ACC_FAST_OUT)
+        self.router.set_routing(PID_IN, FIR_OUT)
+        self.router.set_routing(PID_RESET, SCLOFSM_PID_RESET_CTRL)
         self.router.set_routing(SCALER_IN, PID_OUT)
-        self.router. set_routing(TRI_IN, ACC_SLOW_OUT)
-        self.router.set_routing(OUTPUT_A, TRI_SIN)
-        self.router.set_routing(TRI2_IN, ACC_FAST_OUT)
-        self.router.set_routing(MIXER_IN_B, TRI2_SIN)
+        self.router.set_routing(OUTPUT_A, SCALER_OUT)
         self.router.upload()
+        self.sclofsm.flip_on("clear")
     
     def load_fir(self, filename="fir_coef.txt"):
         """
