@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.signal as signal
+import fixed
 
 # Dedicated for 4th order IIR of parallel biquad structure with 4-sla
 # Optimal range and precisions:
@@ -108,4 +109,46 @@ def get_IIR_parameters(ftype, cutoff_frequency, sample_frequency):
             strategy = "balanced_norm"
     b_0, a_0, b_1, a_1 = balance_direct(b_0, a_0, b_1, a_1, k, strategy=strategy)
     b_0, a_0, b_1, a_1 = scatter_look_ahead(b_0, a_0, b_1, a_1)
+    a_0[1:] = -a_0[1:]
+    a_1[1:] = -a_1[1:]
     return b_0, a_0, b_1, a_1
+
+# Just for testing
+def print_IIR_parameters(b_0, a_0, b_1, a_1):
+    for _, b in enumerate(b_0):
+        quantized_b = fixed.fixed("Q3.24", b)
+        print(f"b_0[{_}] = ", quantized_b)
+    for _, a in enumerate(a_0):
+        quantized_a = fixed.fixed("Q2.25", a)
+        print(f"a_0[{_}] = ", quantized_a)
+    for _, b in enumerate(b_1):
+        quantized_b = fixed.fixed("Q3.24", b)
+        print(f"b_1[{_}] = ", quantized_b)
+    for _, a in enumerate(a_1):
+        quantized_a = fixed.fixed("Q2.25", a)
+        print(f"a_1[{_}] = ", quantized_a)
+
+# Used to generate parameters in a VHDL testbench
+def temp(b_0, a_0, b_1, a_1):
+    high = 26
+    low = 0
+    for b in b_0:
+        quantized_b = fixed.fixed("Q3.24", b)
+        print(f"core_param_in({high} downto {low}) <= \"", quantized_b.__str__()[-35:-8], "\";", sep="")
+        low += 32
+        high += 32
+    for a in a_0[4::4]:
+        quantized_a = fixed.fixed("Q2.25", a)
+        print(f"core_param_in({high} downto {low}) <= \"", quantized_a.__str__()[-35:-8], "\";", sep="")
+        low += 32
+        high += 32
+    for b in b_1:
+        quantized_b = fixed.fixed("Q3.24", b)
+        print(f"core_param_in({high} downto {low}) <= \"", quantized_b.__str__()[-35:-8], "\";", sep="")
+        low += 32
+        high += 32
+    for a in a_1[4::4]:
+        quantized_a = fixed.fixed("Q2.25", a)
+        print(f"core_param_in({high} downto {low}) <= \"", quantized_a.__str__()[-35:-8], "\";", sep="")
+        low += 32
+        high += 32
