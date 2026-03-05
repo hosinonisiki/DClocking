@@ -56,7 +56,7 @@ architecture structural of module_unwrapper is
 begin
     
     core_entity : entity work.unwrapper generic map(
-        io_buf => buf_for_io
+        io_buf => buf_o_only
     )port map(
         clk             =>  clk,
         rst             =>  core_rst,

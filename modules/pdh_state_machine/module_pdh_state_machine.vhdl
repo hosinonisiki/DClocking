@@ -52,7 +52,9 @@ architecture structural of module_pdh_state_machine is
 begin
     
     -- Instantiate the core functional entity
-    core_entity : entity work.pdh_state_machine port map(
+    core_entity : entity work.pdh_state_machine generic map(
+        io_buf => buf_for_io
+    )port map(
         clk             =>  clk,
         rst             =>  core_rst,
         core_param_in   =>  core_param,

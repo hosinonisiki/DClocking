@@ -56,7 +56,6 @@ architecture structural of module_pid_controller is
 begin
     
     core_entity : entity work.pid_controller generic map(
-        -- Removed buffer options for high bandwidth testing
         io_buf => buf_none    
     )port map(
         clk             =>  clk,

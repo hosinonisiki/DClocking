@@ -761,13 +761,13 @@ class ModuleIIRFilter(ModuleBase):
         if any(bq1_b_int < -2 ** 26) or any(bq1_b_int >= 2 ** 26) or any(bq1_a_int < -2 ** 26) or any(bq1_a_int >= 2 ** 26) or any(bq2_b_int < -2 ** 26) or any(bq2_b_int >= 2 ** 26) or any(bq2_a_int < -2 ** 26) or any(bq2_a_int >= 2 ** 26):
             raise ValueError("Coefficient values are out of range for fixed-point representation")
         for i in range(9):
-            self.write(i, bq1_b_int[i], hold = True)
-            self.write(i + 11, bq2_b_int[i], hold = True)
-        self.write(9, bq1_a_int[0], hold = True)
-        self.write(10, bq1_a_int[1], hold = True)
-        self.write(20, bq2_a_int[0], hold = True)
-        self.write(21, bq2_a_int[1])
+            self.write(i, int(bq1_b_int[i]), hold = True)
+            self.write(i + 11, int(bq2_b_int[i]), hold = True)
+        self.write(9, int(bq1_a_int[0]), hold = True)
+        self.write(10, int(bq1_a_int[1]), hold = True)
+        self.write(20, int(bq2_a_int[0]), hold = True)
+        self.write(21, int(bq2_a_int[1]))
 
     def design_lowpass(self, filter_type, freq_pass, freq_sample):
         b1, a1, b2, a2 = IIR.get_IIR_parameters(filter_type, freq_pass, freq_sample)
-        self.load_coef(b1, a1, b2, a2)
+        self.load_coef(b1, a1[4::4], b2, a2[4::4])

@@ -68,6 +68,10 @@ def init():
         pdhfsm.reset()
         sclofsm.reset()
         sclofsm2.reset()
+        iir.reset()
+        iir2.reset()
+        iir3.reset()
+        iir4.reset()
 
         print("Configure converters")
         init_FL9627(spi_inst, 1)

@@ -54,7 +54,9 @@ architecture structural of module_fir_filter is
 begin
     
     -- Only supports 24bit 64taps
-    core_entity : entity work.fir_filter port map(
+    core_entity : entity work.fir_filter generic map(
+        io_buf => buf_for_io
+    )port map(
         clk             =>  clk,
         rst             =>  core_rst,
         core_param_in   =>  core_param,

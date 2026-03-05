@@ -13,7 +13,7 @@ package mypak is
 
     constant dbus_w     :   integer := 32; -- Width of the data bus.
     constant abus_w     :   integer := 7; -- Width of the address bus. This determines the size of individual memories in each module.
-    constant mbus_w     :   integer := 5; -- Width of the module selection bus. This determines the max number of modules that can be connected to the bus.
+    constant mbus_w     :   integer := 6; -- Width of the module selection bus. This determines the max number of modules that can be connected to the bus.
     constant cbus_w     :   integer := 5; -- Width of the control bus.
     constant rdbus_w    :   integer := 32; -- Width of the response data bus.
     constant rsbus_w    :   integer := 3; -- Width of the response status bus.

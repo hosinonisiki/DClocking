@@ -53,7 +53,9 @@ architecture structural of module_trigonometric is
     signal ren              :   std_logic; -- Read enable signal
 begin
     
-    core_entity : entity work.trigonometric port map(
+    core_entity : entity work.trigonometric generic map(
+        io_buf => buf_o_only   
+    )port map(
         clk             =>  clk,
         rst             =>  core_rst,
         -- data flow ports
