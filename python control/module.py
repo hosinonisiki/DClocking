@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.signal as signal
+import IIR
 
 # Defines methods for module manipulation
 
@@ -515,18 +516,18 @@ class ModuleFIRFilter(ModuleBase):
         if max(abs(coef_list)) > 1:
             raise ValueError("Coefficient values must be normalized between -1 and 1")
         coef_int = np.round(coef_list * (2 ** 23 - 1))
+        if norm < 1 or norm > 1024 / taps:
+            raise ValueError(f"Normalization factor must be between 1 and {1024 / taps} for {taps}-tap filter")
         for i in range(taps):
             if coef_int[i] < 0:
                 coef_int[i] = 2 ** 24 + coef_int[i]
             self.write(i, int(coef_int[i]), hold = True)
-        if norm < 1 or norm > 1024 / taps:
-            raise ValueError(f"Normalization factor must be between 1 and {1024 / taps} for {taps}-tap filter")
         if taps == 64:
-            self.write(64, int(norm * (2 ** 13 - 1)))
+            self.write(64, int(norm * (2 ** 13 - 1)), hold = True)
         elif taps == 32:
-            self.write(65, int(norm * (2 ** 13 - 1)))
+            self.write(65, int(norm * (2 ** 13 - 1)), hold = True)
         elif taps == 16:
-            self.write(66, int(norm * (2 ** 13 - 1)))
+            self.write(66, int(norm * (2 ** 13 - 1)), hold = True)
         self.write(67, taps - 1)
         return
     
@@ -696,3 +697,77 @@ class ModuleSCLOFSM(ModuleBase):
         "lock": 0,
         "clear": 1
     }
+
+class ModuleIIRFilter(ModuleBase):
+    parameter_list = {
+        0: {"name": "coef_bq1_b0", "width": 27},
+        1: {"name": "coef_bq1_b1", "width": 27},
+        2: {"name": "coef_bq1_b2", "width": 27},
+        3: {"name": "coef_bq1_b3", "width": 27},
+        4: {"name": "coef_bq1_b4", "width": 27},
+        5: {"name": "coef_bq1_b5", "width": 27},
+        6: {"name": "coef_bq1_b6", "width": 27},
+        7: {"name": "coef_bq1_b7", "width": 27},
+        8: {"name": "coef_bq1_b8", "width": 27},
+        9: {"name": "coef_bq1_a4", "width": 27},
+        10: {"name": "coef_bq1_a8", "width": 27},
+        11: {"name": "coef_bq2_b0", "width": 27},
+        12: {"name": "coef_bq2_b1", "width": 27},
+        13: {"name": "coef_bq2_b2", "width": 27},
+        14: {"name": "coef_bq2_b3", "width": 27},
+        15: {"name": "coef_bq2_b4", "width": 27},
+        16: {"name": "coef_bq2_b5", "width": 27},
+        17: {"name": "coef_bq2_b6", "width": 27},
+        18: {"name": "coef_bq2_b7", "width": 27},
+        19: {"name": "coef_bq2_b8", "width": 27},
+        20: {"name": "coef_bq2_a4", "width": 27},
+        21: {"name": "coef_bq2_a8", "width": 27}
+    }
+    alias_list = {
+        "coef_bq1_b0": 0, "bq1_b0": 0,
+        "coef_bq1_b1": 1, "bq1_b1": 1,
+        "coef_bq1_b2": 2, "bq1_b2": 2,
+        "coef_bq1_b3": 3, "bq1_b3": 3,
+        "coef_bq1_b4": 4, "bq1_b4": 4,
+        "coef_bq1_b5": 5, "bq1_b5": 5,
+        "coef_bq1_b6": 6, "bq1_b6": 6,
+        "coef_bq1_b7": 7, "bq1_b7": 7,
+        "coef_bq1_b8": 8, "bq1_b8": 8,
+        "coef_bq1_a4": 9, "bq1_a4": 9,
+        "coef_bq1_a8": 10, "bq1_a8": 10,
+        "coef_bq2_b0": 11, "bq2_b0": 11,
+        "coef_bq2_b1": 12, "bq2_b1": 12,
+        "coef_bq2_b2": 13, "bq2_b2": 13,
+        "coef_bq2_b3": 14, "bq2_b3": 14,
+        "coef_bq2_b4": 15, "bq2_b4": 15,
+        "coef_bq2_b5": 16, "bq2_b5": 16,
+        "coef_bq2_b6": 17, "bq2_b6": 17,
+        "coef_bq2_b7": 18, "bq2_b7": 18,
+        "coef_bq2_b8": 19, "bq2_b8": 19,
+        "coef_bq2_a4": 20, "bq2_a4": 20,
+        "coef_bq2_a8": 21, "bq2_a8": 21
+    }
+    def load_coef(self, bq1_b, bq1_a, bq2_b, bq2_a):
+        if len(bq1_b) != 9 or len(bq1_a) != 2 or len(bq2_b) != 9 or len(bq2_a) != 2:
+            raise ValueError("Coefficient lists must have correct lengths (bq1_b: 9, bq1_a: 2, bq2_b: 9, bq2_a: 2)")
+        bq1_b = np.array(bq1_b)
+        bq1_a = np.array(bq1_a)
+        bq2_b = np.array(bq2_b)
+        bq2_a = np.array(bq2_a)
+        bq1_b_int = np.round(bq1_b * 2 ** 24)
+        bq1_a_int = np.round(bq1_a * 2 ** 25)
+        bq2_b_int = np.round(bq2_b * 2 ** 24)
+        bq2_a_int = np.round(bq2_a * 2 ** 25)
+        if any(bq1_b_int < -2 ** 26) or any(bq1_b_int >= 2 ** 26) or any(bq1_a_int < -2 ** 26) or any(bq1_a_int >= 2 ** 26) or any(bq2_b_int < -2 ** 26) or any(bq2_b_int >= 2 ** 26) or any(bq2_a_int < -2 ** 26) or any(bq2_a_int >= 2 ** 26):
+            raise ValueError("Coefficient values are out of range for fixed-point representation")
+        for i in range(9):
+            self.write(i, bq1_b_int[i], hold = True)
+            self.write(i + 11, bq2_b_int[i], hold = True)
+        self.write(9, bq1_a_int[0], hold = True)
+        self.write(10, bq1_a_int[1], hold = True)
+        self.write(20, bq2_a_int[0], hold = True)
+        self.write(21, bq2_a_int[1])
+
+    def design_lowpass(self, filter_type, freq_pass, freq_sample):
+        b1, a1, b2, a2 = IIR.get_IIR_parameters(filter_type, freq_pass, freq_sample)
+        self.load_coef(b1, a1, b2, a2)

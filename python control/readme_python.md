@@ -368,7 +368,7 @@ def design_lowpass(self, freq_pass, freq_stop, freq_sample, weight = 1, taps = 6
 参数说明：
 - freq_pass：通带截止频率，单位为Hz
 - freq_stop：阻带截止频率，单位为Hz
-- freq_sample：采样频率，单位为Hz，默认为250MHz，实际取决于硬件型号
+- freq_sample：采样频率，单位为Hz
 - weight：阻带权重，默认为1
 - taps：滤波器抽头数，默认为64，仅支持16、32或64抽头
 
@@ -588,6 +588,67 @@ fir.design_lowpass(1e6, 10e6, 250e6) # 设计一个通带截止频率为1MHz，�
 ### 可视化
 
 无
+
+## IIR滤波器
+
+### 基本信息
+
+数量：4
+
+类名：ModuleIIRFilter
+
+### 端口
+
+输入：
+- 信号输入（电平信号/相位差分信号）
+
+输出：
+- 信号输出（电平信号/相位差分信号）
+
+端口名：
+|标识符|信号输入|信号输出|
+|----|----|----|
+|IIRF|IIR_IN|IIR_OUT|
+|IIR2|IIR2_IN|IIR2_OUT|
+|IIR3|IIR3_IN|IIR3_OUT|
+|IIR4|IIR4_IN|IIR4_OUT|
+
+### 直接参数
+
+|地址|参数名|位宽|范围|含义|备注|
+|----|----|----|----|----|----|
+|0-8|coef_bq1_b0 ~ coef_bq1_b8|27|-2^26 ~ 2^26-1|第一二阶节b系数|Q3.24，仅推荐通过专用方法修改|
+|9-10|coef_bq1_a4、coef_bq1_a8|27|-2^26 ~ 2^26-1|第一二阶节a系数|Q2.25，仅推荐通过专用方法修改|
+|11-19|coef_bq2_b0 ~ coef_bq2_b8|27|-2^26 ~ 2^26-1|第三四阶节b系数|Q3.24，仅推荐通过专用方法修改|
+|20-21|coef_bq2_a4、coef_bq2_a8||27|-2^26 ~ 2^26-1|第三四阶节a系数|Q2.25，仅推荐通过专用方法修改|
+
+### 间接参数
+
+无
+
+### 特殊方法
+
+方法design_lowpass用于设计一个IIR低通滤波器并立即载入生效。
+
+定义：
+```python
+def design_lowpass(self, filter_type, freq_pass, freq_sample):
+```
+
+参数说明：
+- filter_type：滤波器类型，"butter"为Butterworth滤波器，"cheby1"为Chebyshev I型滤波器，"cheby2"为Chebyshev II型滤波器，"ellip"为椭圆滤波器
+- freq_pass：通带截止频率，单位为Hz
+- freq_sample：采样频率，单位为Hz
+
+用法：
+```python
+iir = module.ModuleIIRFilter(bus_inst, "IIRF")
+iir.design_lowpass("ellip", 10e6, 250e6) # 设计一个通带截止频率为10MHz的椭圆低通滤波器
+```
+
+### 可视化
+
+与FIR滤波器的可视化一同实现。
 
 # 封装后模块
 
