@@ -126,11 +126,11 @@ class Port(QObject):
         
         self.serial_port.setPortName(port)
         #设置波特率
-        self.serial_port.setBaudRate(9600)
+        self.serial_port.setBaudRate(115200)
         #设置数据位 8位数据位
         self.serial_port.setDataBits(QSerialPort.Data8)
         #设置校验位 无校验位
-        self.serial_port.setParity(QSerialPort.NoParity)
+        self.serial_port.setParity(QSerialPort.EvenParity)
         #设置停止位
         self.serial_port.setStopBits(QSerialPort.OneStop)
     
