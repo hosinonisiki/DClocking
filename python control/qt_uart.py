@@ -27,7 +27,7 @@ class QtSerial:
                 raise TypeError("serial_instance must be a QSerialPort object")
             if not serial_instance.isOpen():
                 raise Exception("Provided serial_instance is not open")
-            self. serial = serial_instance
+            self.serial = serial_instance
             self._own_serial = False
         else:
             # 自己创建并打开串口
@@ -74,6 +74,8 @@ class QtSerial:
         if isinstance(data, str):
             data = data.encode()
         self.serial.write(data)
+        self.serial.flush()
+        # time.sleep(0.1)
         # Blocking wait for write to complete
         if not self.serial.waitForBytesWritten(int(self.timeout * 1000)):
             print("Warning: Write timeout")

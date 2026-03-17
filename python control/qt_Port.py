@@ -188,6 +188,15 @@ class Port(QObject):
                 return self.hw_controller.fir3
             if module_index == 3:
                 return self.hw_controller.fir4
+        if module_type == "IIR":  # 新增 IIR 支持
+            if module_index == 0:
+                return self.hw_controller.iir
+            if module_index == 1:
+                return self.hw_controller.iir2
+            if module_index == 2:
+                return self.hw_controller.iir3
+            if module_index == 3:
+                return self.hw_controller.iir4
         if module_type == "LTRN":
             return self.hw_controller.ltrn if module_index == 0 else self.hw_controller.ltrn2
         if module_type == "PDH":

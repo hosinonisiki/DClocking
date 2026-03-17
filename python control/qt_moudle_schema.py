@@ -146,3 +146,31 @@ SCLO_SCHEMA = [
     {"key" : "lock", "label" : "锁定指令", "type" : "bool", "mode" : "direct", "free" : True, "note" : "上升沿时，更新校准值，打开PID。下降沿时，关闭PID，但校准值维持"},
     {"key" : "clear", "label" : "清除指令", "type" : "bool", "mode" : "direct", "free" : True, "note" : "上升沿时，清除校准值为0"}
 ]
+
+# 在文件末尾添加
+IIR_SCHEMA = [
+    # 直接参数
+    {"key": "coef_bq1_b0", "label": "第一二阶节b0系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq1_b1", "label": "第一二阶节b1系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq1_b2", "label": "第一二阶节b2系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq1_b3", "label": "第一二阶节b3系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq1_b4", "label": "第一二阶节b4系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq1_b5", "label": "第一二阶节b5系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq1_b6", "label": "第一二阶节b6系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq1_b7", "label": "第一二阶节b7系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq1_b8", "label": "第一二阶节b8系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq1_a4", "label": "第一二阶节a4系数", "type": "int", "min": -(2**25), "max": 2**25 - 1, "mode": "direct", "free": False, "note": "Q2.25格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq1_a8", "label": "第一二阶节a8系数", "type": "int", "min": -(2**25), "max": 2**25 - 1, "mode": "direct", "free": False, "note": "Q2.25格式，仅推荐通过专用方法修改"},
+    
+    {"key": "coef_bq2_b0", "label": "第二二阶节b0系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq2_b1", "label": "第二二阶节b1系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq2_b2", "label": "第二二阶节b2系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq2_b3", "label": "第二二阶节b3系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq2_b4", "label": "第二二阶节b4系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq2_b5", "label": "第二二阶节b5系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq2_b6", "label": "第二二阶节b6系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq2_b7", "label": "第二二阶节b7系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq2_b8", "label": "第二二阶节b8系数", "type": "int", "min": -(2**26), "max": 2**26 - 1, "mode": "direct", "free": False, "note": "Q3.24格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq2_a4", "label": "第二二阶节a4系数", "type": "int", "min": -(2**25), "max": 2**25 - 1, "mode": "direct", "free": False, "note": "Q2.25格式，仅推荐通过专用方法修改"},
+    {"key": "coef_bq2_a8", "label": "第二二阶节a8系数", "type": "int", "min": -(2**25), "max": 2**25 - 1, "mode": "direct", "free": False, "note": "Q2.25格式，仅推荐通过专用方法修改"},
+]

@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt, QMimeData, QPointF, QRectF, Signal, QObject, QByt
 # 导入PySide6.QtGui模块中的相关类
 from PySide6.QtGui import QDrag, QPainter, QPen, QBrush, QPainterPath, QColor, QFont, QPixmap, QImage, QCursor
 import math
-from qt_moudle_schema import PID_SCHEMA, ACCM_SCHEMA, SCLR_SCHEMA, FIRF_SCHEMA, LTRN_SCHEMA, PDH_SCHEMA, SCLO_SCHEMA
+from qt_moudle_schema import PID_SCHEMA, ACCM_SCHEMA, SCLR_SCHEMA, FIRF_SCHEMA, LTRN_SCHEMA, PDH_SCHEMA, SCLO_SCHEMA, IIR_SCHEMA
 
 _PARAM_APPLY_HANDLER = None
 
@@ -1199,7 +1199,114 @@ class MoudlePDHFSM(NodeItem):
         for key, value in params.items():
             self._params[key] = value
         self._notify_param_change(params)
+# 在 ModuleFIRFilter 类之后添加
 
+class ModuleIIRFilter(NodeItem):
+    def __init__(self, component_name, index, position, num_inputs = 1, num_outputs = 1):
+        if index == 0:
+            name = "IIRF"
+        else:
+            name = f"IIR{index + 1}"
+        super().__init__(name, component_name, index, position, num_inputs, num_outputs)
+        self.name = name
+        self.height = 180
+        self.width = 140
+        self.component_name = component_name
+        self.index = index
+        self.num_inputs = num_inputs
+        self.num_outputs = num_outputs
+        self.inputs = ["IN"]
+        self.outputs = ["OUT"]
+        self.inputs_signals = [["level", "differential"]]
+        self.outputs_signals = [["level", "differential"]]
+        self.maxm = 4
+        self.setPos(position)
+        self.schema = IIR_SCHEMA
+        self.free_mode = True
+        self._params = {}
+        self._init_params()
+
+        self.setFlag(QGraphicsItem.ItemIsFocusable)
+        self.setFlag(QGraphicsItem.ItemIsMovable)
+        self.setFlag(QGraphicsItem.ItemIsSelectable)
+        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)
+        
+        self._create_ports()
+
+    def paint(self, painter, option, widget):
+        rect = self.boundingRect()
+        painter.setBrush(QBrush(QColor("#2C3E50")))
+        painter.setPen(QPen(Qt.white, 2))
+        painter.drawRoundedRect(rect, 8, 8)
+
+        painter.setPen(Qt.white)
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(10)
+        painter.setFont(font)
+        
+        title_rect = QRectF(rect.left(), rect.top(), rect.width(), 25)
+        painter.drawText(title_rect, Qt.AlignCenter, self.name)
+        font.setBold(False)
+        font.setPointSize(5)
+        painter.setFont(font)
+
+        for i, port in enumerate(self.in_ports):
+            port_pos = port.pos()
+            text_rect = QRectF(-self.width / 2 + 10, port_pos.y() - 8, 80, 16)
+            if self.index:
+                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"IIR{self.index + 1}_{self.inputs[i]}")
+            else:
+                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"IIR_{self.inputs[i]}")
+
+        for i, port in enumerate(self.out_ports):
+            port_pos = port.pos()
+            text_rect = QRectF(self.width / 2 - 60, port_pos.y() - 8, 52, 16)
+            if self.index:
+                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"IIR{self.index + 1}_{self.outputs[i]}")
+            else:
+                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"IIR_{self.outputs[i]}")
+
+    def getmaxm(self):
+        return self.maxm
+  
+    def param_schema(self):
+        if self.free_mode:
+            return [f for f in self.schema if f.get("free", True)]
+        return self.schema
+    
+    def _default_for_field(self, field: dict):
+        if "default" in field:
+            return field["default"]
+        ftype = field.get("type", "str")
+        if ftype == "int":
+            return 0
+        if ftype == "float":
+            return 0.0
+        if ftype == "bool":
+            return False
+        return ""
+
+    def _init_params(self):
+        for field in self.schema:
+            key = field.get("key")
+            if key not in self._params:
+                self._params[key] = self._default_for_field(field)
+
+    def get_params(self):
+        params = {}
+        for field in self.param_schema():
+            key = field.get("key")
+            params[key] = self._params.get(key, self._default_for_field(field))
+        return params
+
+    def set_params(self, params: dict) -> None:
+        if not params:
+            return
+        for key, value in params.items():
+            self._params[key] = value
+        self._notify_param_change(params)
+        
 class MoudleSCLOFSM(NodeItem):
     def __init__(self, component_name, index, position, num_inputs = 1, num_outputs = 2):
         if index:

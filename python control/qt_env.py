@@ -1,4 +1,4 @@
-import bus
+import qt_bus
 import module
 import module_signal_router
 import spi
@@ -33,8 +33,8 @@ class HardwareController:
         self.fir2 = None
         self.mixer = None
         self.tri2 = None
-        self. acc2 = None
-        self. pid2 = None
+        self.acc2 = None
+        self.pid2 = None
         self.ltrn = None
         self. ltrn2 = None
         self.mixer3 = None
@@ -43,6 +43,14 @@ class HardwareController:
         self.fir4 = None
         self.pdhfsm = None
         self.spi_inst = None
+        self.pdhfsm = None
+        self.sclofsm = None
+        self.sclofsm2 = None
+        self.iir = None
+        self.iir2 = None
+        self.iir3 = None
+        self.iir4 = None
+        
         
         if serial_instance is not None:
             self.set_serial(serial_instance)
@@ -55,9 +63,9 @@ class HardwareController:
             serial_instance: QtSerial 实例
         """
         self.ser = serial_instance
-        self.bus_inst = bus.Bus(self.ser)
+        self.bus_inst = qt_bus.Bus(self.ser)
         self.router = module_signal_router.ModuleSignalRouter(self.bus_inst)
-        self.tri = module. ModuleBase(self.bus_inst, "TRIG")
+        self.tri = module.ModuleBase(self.bus_inst, "TRIG")
         self.acc = module.ModuleAccumulator(self.bus_inst, "ACCM")
         self.sclr = module.ModuleScaler(self.bus_inst, "SCLR")
         self.sclr2 = module.ModuleScaler(self.bus_inst, "SCL2")
@@ -75,9 +83,15 @@ class HardwareController:
         self.mixer3 = module.ModuleBase(self.bus_inst, "MIX3")
         self.mixer4 = module.ModuleBase(self.bus_inst, "MIX4")
         self.fir3 = module.ModuleFIRFilter(self.bus_inst, "FIR3")
-        self.fir4 = module.ModuleFIRFilter(self. bus_inst, "FIR4")
+        self.fir4 = module.ModuleFIRFilter(self.bus_inst, "FIR4")
         self.pdhfsm = module.ModulePDHFSM(self.bus_inst, "PDHS")
-        self.spi_inst = spi. Spi(self.ser)
+        self.sclofsm = module.ModuleSCLOFSM(self.bus_inst, "SCLO")
+        self.sclofsm2 = module.ModuleSCLOFSM(self.bus_inst, "SLO2")
+        self.iir = module.ModuleIIRFilter(self.bus_inst, "IIRF")
+        self.iir2 = module.ModuleIIRFilter(self.bus_inst, "IIR2")
+        self.iir3 = module.ModuleIIRFilter(self.bus_inst, "IIR3")
+        self.iir4 = module.ModuleIIRFilter(self.bus_inst, "IIR4")
+        self.spi_inst = spi.Spi(self.ser)
         
 
     

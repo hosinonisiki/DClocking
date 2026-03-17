@@ -14,7 +14,7 @@ from PySide6.QtCore import Qt, QMimeData, QPointF, QRectF, Signal, QObject, QByt
 # 导入PySide6.QtGui模块中的相关类
 from PySide6.QtGui import QDrag, QPainter, QPen, QBrush, QPainterPath, QColor, QFont, QPixmap, QImage, QCursor
 from qt_moudle import (PortItem, NodeItem, MoudlePID, MoudleAccumulator, MoudleBase, 
-                         MoudleScaler, ModuleFIRFilter, MoudleSCLOFSM, MoudlePDHFSM,
+                         MoudleScaler, ModuleFIRFilter, ModuleIIRFilter, MoudleSCLOFSM, MoudlePDHFSM,
                          MoudleLinerTransformer, CompositeMoudle, SINGenerator, DigitalControlledOscillator,
                          moudle_factory, moudle_maxm, set_param_apply_handler)
 from qt_Port import Port
@@ -106,6 +106,14 @@ def _resolve_port_number(node_name, port_index, role):
         outputs = [pn.FIR_OUT]
     elif node_name.startswith("FIR"):
         base = node_name
+        inputs = [getattr(pn, f"{base}_IN", None)]
+        outputs = [getattr(pn, f"{base}_OUT", None)]
+    elif node_name == "IIRF":
+        inputs = [pn.IIR_IN]
+        outputs = [pn.IIR_OUT]
+    elif node_name.startswith("IIR"):
+        suffix = node_name[3:]
+        base = f"IIR{suffix}"
         inputs = [getattr(pn, f"{base}_IN", None)]
         outputs = [getattr(pn, f"{base}_OUT", None)]
     elif node_name == "MIXR":
@@ -917,6 +925,7 @@ class DiagramView(QGraphicsView):
     "反三角函数运算器": MoudleBase,
     "线性缩放器": MoudleScaler,
     "FIR滤波器": ModuleFIRFilter,
+    "IIR滤波器": ModuleIIRFilter,  # 新增
     "线性变换器": MoudleLinerTransformer,
     "混频器": MoudleBase,
     "解卷绕器": MoudleBase,
@@ -932,14 +941,28 @@ class DiagramView(QGraphicsView):
 
     def __init__(self, scene):
         super().__init__(scene)
-        self._used_indices = {k : set() for k in moudle_factory}
-        self._maxnum = {k : moudle_maxm.get(k) for k in moudle_maxm}
+        
+        # ====== 视口更新和渲染设置 ======
+        self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        self.setCacheMode(QGraphicsView.CacheBackground)
+        
+        # ====== 渲染质量设置 ======
+        self.setRenderHint(QPainter.Antialiasing)
+        self.setRenderHint(QPainter.SmoothPixmapTransform)
+        self.setRenderHint(QPainter.TextAntialiasing)
+        
+        # ====== 性能优化 ======
+        self.setOptimizationFlag(QGraphicsView.DontAdjustForAntialiasing, False)
+        
+        # ====== 初始化属性 ======
+        self._used_indices = {k: set() for k in self.moudle_factory}
+        self._maxnum = {k: moudle_maxm.get(k, 1) for k in self.moudle_factory}
         self._drag_candidate_node = None
         self._drag_start_pos = None
         self._is_dragging_view = False
         self._view_drag_start_pos = None
         self.scale_factor = 1.0
-        self.setRenderHint(QPainter.Antialiasing)
+        
         self.setAcceptDrops(True)
         self.sync_scene_to_viewport()
         self.update_border_ports()
@@ -1293,6 +1316,7 @@ class ComponentPalette(QListWidget):
             "反三角函数运算器",
             "线性缩放器",
             "FIR滤波器",
+            "IIR滤波器",  # 新增
             "线性变换器",
             "混频器",
             "解卷绕器",
@@ -1471,8 +1495,9 @@ class MainWindow(QMainWindow):
             print("[route] serial port not open, routing not sent")
             return None
         if self.router is None:
-            self.router_bus = PortBus(self.port_ctrl)
-            self.router = module_signal_router.ModuleSignalRouter(self.router_bus)
+            self.router=self.port_ctrl.hw_controller.router
+            # self.router_bus = PortBus(self.port_ctrl)
+            # self.router = module_signal_router.ModuleSignalRouter(self.router_bus)
         return self.router
 
     def _apply_routing(self, dst_port_num, src_port_num, label):
@@ -1495,6 +1520,8 @@ class MainWindow(QMainWindow):
             return "SCLR", node.index
         if isinstance(node, ModuleFIRFilter):
             return "FIR", node.index
+        if isinstance(node, ModuleIIRFilter):  # 新增
+            return "IIR", node.index
         if isinstance(node, MoudleLinerTransformer):
             return "LTRN", node.index
         if isinstance(node, MoudlePDHFSM):
