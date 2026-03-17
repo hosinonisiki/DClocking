@@ -75,9 +75,21 @@ class ModuleSignalRouter(module.ModuleBase):
         self.routing_enable[channel] = 0
 
     def implement_routing(self):
+        """
+        实现信号路由配置
+        
+        根据端口配置(port_config)和端口使能(port_enable)设置内部通道路由和使能状态。
+        路由器由8个bank组成，每个bank有10x10开关，其中8个连接到接口，2个连接到16x16开关。
+        对于跨bank连接，使用转发开关实现信号传输，每个bank最多支持2个转发开关，接收端bank也最多支持2个转发输入。
+        
+        Raises:
+            ValueError: 当某个bank需要超过2个转发开关或接收超过2个转发信号时抛出异常
+        """
         if self.full_connection:
             return
-        # Check if the routing configuration can be realized
+        # 检查路由配置是否可以实现
+        # need_forward记录每个bank需要向外转发的信号数量
+        # receive_forward记录每个bank需要从外部接收的转发信号数量
         need_forward = [0] * 8
         receive_forward = [0] * 8
         for i in range(8):
@@ -90,6 +102,7 @@ class ModuleSignalRouter(module.ModuleBase):
                 raise ValueError(f"The {i}th bank requires {need_forward[i]} forward switches.")
             if receive_forward[i] >= 3:
                 raise ValueError(f"The {i}th bank receives {receive_forward[i]} forward switches.")
+        # 设置转发路径
         forward_destination = [None] * 16
         for i in range(8):
             nth_forward = 0
@@ -104,6 +117,7 @@ class ModuleSignalRouter(module.ModuleBase):
                         forward_destination[i * 2 + 1] = self.port_config[i * 8 + j]
                 else:
                     self._set_routing(i * 10 + j, self.port_config[i * 8 + j] % 8)
+        # 配置接收端的转发连接
         nth_receive = [0] * 8
         for i in range(16):
             if forward_destination[i] is not None:
@@ -111,13 +125,14 @@ class ModuleSignalRouter(module.ModuleBase):
                 self._set_routing(80 + i, target_bank * 2 + nth_receive[target_bank])
                 self._set_routing(target_bank * 10 + 8 + nth_receive[target_bank], forward_destination[i] % 8)
                 nth_receive[target_bank] += 1
+        # 设置端口使能状态
         for i in range(8):
             for j in range(8):
                 if self.port_enable[i * 8 + j]:
                     self._enable(i * 10 + j)
                 else:
                     self._disable(i * 10 + j)
-        # Repeat for control ports
+        # 为控制端口重复上述过程
         need_forward = [0] * 8
         receive_forward = [0] * 8
         for i in range(8):
@@ -130,6 +145,7 @@ class ModuleSignalRouter(module.ModuleBase):
                 raise ValueError(f"The {i}th bank requires {need_forward[i]} forward switches.")
             if receive_forward[i] >= 3:
                 raise ValueError(f"The {i}th bank receives {receive_forward[i]} forward switches.")
+        # 设置控制端口的转发路径
         forward_destination = [None] * 16
         for i in range(8):
             nth_forward = 0
@@ -144,6 +160,7 @@ class ModuleSignalRouter(module.ModuleBase):
                         forward_destination[i * 2 + 1] = self.port_config[64 + i * 8 + j]
                 else:
                     self._set_routing(96 + i * 10 + j, self.port_config[64 + i * 8 + j] % 8)
+        # 配置控制端口接收端的转发连接
         nth_receive = [0] * 8
         for i in range(16):
             if forward_destination[i] is not None:
@@ -151,6 +168,7 @@ class ModuleSignalRouter(module.ModuleBase):
                 self._set_routing(176 + i, target_bank * 2 + nth_receive[target_bank])
                 self._set_routing(96 + target_bank * 10 + 8 + nth_receive[target_bank], forward_destination[i] % 8)
                 nth_receive[target_bank] += 1
+        # 设置控制端口使能状态
         for i in range(8):
             for j in range(8):
                 if self.port_enable[64 + i * 8 + j]:
@@ -170,7 +188,24 @@ class ModuleSignalRouter(module.ModuleBase):
         self.port_enable[port] = 0
 
     def encode(self):
+        """
+        将路由配置编码为位序列
+        
+        根据当前是否处于全连接模式(full_connection)，将端口配置和使能状态信息
+        或路由配置和使能状态信息编码为一个二进制位字符串。在全连接模式下，直接根据
+        端口配置进行编码；否则基于内部通道路由配置进行编码。
+        
+        全连接模式下编码格式：
+        - 每个端口使用8位：1位保留位(0) + 1位使能位 + 6位端口配置
+        - 总长度补齐至1024位
+        
+        非全连接模式下编码格式：
+        - 每个通道使用5位：1位使能位 + 4位路由配置
+        - 前96个通道编码后补齐至512位
+        - 后96个通道(控制通道)编码后与前一部分合并，总长度补齐至1024位
+        """
         if self.full_connection:
+            # 全连接模式：直接根据端口配置编码
             bits = ""
             for i in range(self.port_count + self.port_count):
                 bits = bin(self.port_config[i])[2:].zfill(6) + bits
@@ -178,6 +213,7 @@ class ModuleSignalRouter(module.ModuleBase):
                 bits = "0" + bits
             bits = bits.zfill(1024)
         else:
+            # 非全连接模式：根据内部路由配置编码
             bits = ""
             for i in range(self.channel_count):
                 bits = bin(self.routing_config[i])[2:].zfill(4) + bits
