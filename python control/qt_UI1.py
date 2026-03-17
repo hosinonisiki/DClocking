@@ -182,18 +182,48 @@ class BorderPort(PortItem):
         self.width = 20  # virtual width
         self.height = 20  # virtual height
         self.connections = []
-        self.setPos(position)
+        
+        # 将 index (0~7) 映射为通道名 (A~H)
+        self.channel_name = chr(65 + index)
+        if self.port_type == 'out':
+            # 左侧端口，向右连线进入系统，对应硬件的 INPUT
+            self.display_text = f"INPUT_{self.channel_name}"
+        else:
+            # 右侧端口，接收系统的连线，对应硬件的 OUTPUT
+            self.display_text = f"OUTPUT_{self.channel_name}"
 
+        self.setPos(position)
         self.setAcceptHoverEvents(True)
         self.setZValue(10)
 
     def boundingRect(self):
-        return QRectF(-self.radius, -self.radius, 2*self.radius, 2*self.radius)
+        # 扩展边界框以包含文本区域，防止文字被渲染引擎裁剪
+        if self.port_type == 'out':
+            return QRectF(-self.radius, -15, 2 * self.radius + 100, 30)
+        else:
+            return QRectF(-self.radius - 100, -15, 2 * self.radius + 100, 30)
 
     def paint(self, painter, option, widget):
+        # 绘制端口圆点
         painter.setBrush(self.brush)
         painter.setPen(QPen(Qt.white, 1))
-        painter.drawEllipse(-self.radius, -self.radius, 2*self.radius, 2*self.radius)
+        painter.drawEllipse(-self.radius, -self.radius, 2 * self.radius, 2 * self.radius)
+
+        # 绘制附加通道名文本
+        painter.setPen(Qt.white)
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(10)
+        painter.setFont(font)
+
+        if self.port_type == 'out':
+            # 左侧输入端口，文字画在圆点右侧
+            text_rect = QRectF(15, -10, 80, 20)
+            painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, self.display_text)
+        else:
+            # 右侧输出端口，文字画在圆点左侧
+            text_rect = QRectF(-95, -10, 80, 20)
+            painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, self.display_text)
 
     def has_connection(self):
         return len(self.connections) > 0
@@ -215,8 +245,6 @@ class BorderPort(PortItem):
         base_extend = 30
         increment = 7
         return base_extend + (self.index * increment)
-
-
 class EdgeItem(QGraphicsPathItem):
     def __init__(self, start_port, end_port):
         super().__init__()
