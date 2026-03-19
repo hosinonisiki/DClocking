@@ -18,7 +18,7 @@ use ieee.numeric_std.all;
 
 use work.mypak.all;
 
-entity module_pid_controller is
+entity module_iir_filter is
     port(
         clk             :   in  std_logic;
         rst             :   in  std_logic;
@@ -29,15 +29,13 @@ entity module_pid_controller is
         rsp_data_out    :   out std_logic_vector(rdbus_w - 1 downto 0);
         rsp_stat_out    :   out std_logic_vector(rsbus_w - 1 downto 0);
         -- data flow ports
-        error_in        :   in  std_logic_vector(15 downto 0);
-        feedback_out    :   out std_logic_vector(15 downto 0);
-        -- control ports
-        auto_reset_in   :   in  std_logic
+        sig_in          :   in  std_logic_vector(15 downto 0);
+        sig_out         :   out std_logic_vector(15 downto 0)
     );
-end entity module_pid_controller;
+end entity module_iir_filter;
 
-architecture structural of module_pid_controller is
-    signal core_param       :   std_logic_vector(255 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
+architecture structural of module_iir_filter is
+    signal core_param       :   std_logic_vector(1023 downto 0) := (others => '0'); -- Storing all parameters and control bits for the core module
     signal core_rst         :   std_logic := '1';
 
     signal ram_rst          :   std_logic := '1';
@@ -55,22 +53,26 @@ architecture structural of module_pid_controller is
     signal ren              :   std_logic; -- Read enable signal
 begin
     
-    core_entity : entity work.pid_controller generic map(
-        io_buf => buf_none    
+    core_entity : entity work.iir_filter generic map(
+        io_buf => buf_for_io
     )port map(
         clk             =>  clk,
         rst             =>  core_rst,
         core_param_in   =>  core_param,
         -- data flow ports
-        error_in        =>  error_in,
-        feedback_out    =>  feedback_out,
-        -- control ports
-        auto_reset_in   =>  auto_reset_in
+        sig_in          =>  sig_in,
+        sig_out         =>  sig_out
     );
 
-    parameter_ram : entity work.parameter_ram_256 generic map(
-        ram_default     =>  x"00000000_00000000_00007fff_00007fff" &
-                            x"00000000_00000000_00000000_00000000"
+    parameter_ram : entity work.parameter_ram_1024 generic map(
+        ram_default     =>  x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000" &
+                            x"00000000000000000000000000000000"
     )port map(
         clk             =>  clk,
         rst             =>  ram_rst,

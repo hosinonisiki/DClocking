@@ -766,6 +766,83 @@ begin
         );
     end block module_30_block;
 
+    module_31_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_IIRF_ADDR else '0';
+        module_31 : entity work.module_iir_filter port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(31),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(31),
+            rsp_stat_out    =>  rsbus(31),
+            
+            sig_in          => sig_bank_out(47),
+            sig_out         => sig_bank_in(45)
+        );
+    end block module_31_block;
+
+    module_32_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_IIR2_ADDR else '0';
+        module_32 : entity work.module_iir_filter port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(32),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(32),
+            rsp_stat_out    =>  rsbus(32),
+            
+            sig_in          => sig_bank_out(48),
+            sig_out         => sig_bank_in(46)
+        );
+    end block module_32_block;
+
+    module_33_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_IIR3_ADDR else '0';
+        module_33 : entity work.module_iir_filter port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(33),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(33),
+            rsp_stat_out    =>  rsbus(33),
+            
+            sig_in          => sig_bank_out(49),
+            sig_out         => sig_bank_in(47)
+        );
+    end block module_33_block;
+
+    module_34_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_IIR4_ADDR else '0';
+        module_34 : entity work.module_iir_filter port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(34),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(34),
+            rsp_stat_out    =>  rsbus(34),
+            
+            sig_in          => sig_bank_out(50),
+            sig_out         => sig_bank_in(48)
+        );
+    end block module_34_block;
+
+
     -- signal banks provided by the router
     -- Last 8 channels reserved for top adc and dac ports
     

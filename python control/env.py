@@ -36,6 +36,10 @@ fir4 = module.ModuleFIRFilter(bus_inst, "FIR4")
 pdhfsm = module.ModulePDHFSM(bus_inst, "PDHS")
 sclofsm = module.ModuleSCLOFSM(bus_inst, "SCLO")
 sclofsm2 = module.ModuleSCLOFSM(bus_inst, "SLO2")
+iir = module.ModuleIIRFilter(bus_inst, "IIRF")
+iir2 = module.ModuleIIRFilter(bus_inst, "IIR2")
+iir3 = module.ModuleIIRFilter(bus_inst, "IIR3")
+iir4 = module.ModuleIIRFilter(bus_inst, "IIR4")
 spi_inst = spi.Spi(ser)
 
 def init():
@@ -64,6 +68,10 @@ def init():
         pdhfsm.reset()
         sclofsm.reset()
         sclofsm2.reset()
+        iir.reset()
+        iir2.reset()
+        iir3.reset()
+        iir4.reset()
 
         print("Configure converters")
         init_FL9627(spi_inst, 1)
@@ -249,6 +257,12 @@ def setup_sclo():
     router.set_routing(OUTPUT_A, SCALER_OUT)
     router.upload()
     sclofsm.flip_on("clear")
+
+def setup_iir_test():
+    router.set_routing(TRI_IN, ACC_FAST_OUT)
+    router.set_routing(IIR_IN, TRI_SIN)
+    router.set_routing(OUTPUT_A, IIR_OUT)
+    router.upload()
 
 if __name__ == "__main__":
     code.interact(local=locals())
