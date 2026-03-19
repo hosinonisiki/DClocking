@@ -7,7 +7,7 @@ def init_ADS54J60(spi, port, chip):
     chip = sp.SpiChip(name, spi)
     chip.write("000089")
     chip.write("000080")	
-    time.sleep(0.5)	
+	
     chip.write("400468")
     chip.write("400300")
     chip.write("604100")
@@ -55,105 +55,157 @@ def init_ADS54J69(spi, port, chip):
    
   
 
-def init_AD9144(spi, port, chip):
+def init_AD9144(spi, port, chip):  #1G
     print("Configuring AD9144 (no external ref) on fmc port {}, chip {}".format(port, chip))
     name = "P{}C{}".format(port, chip)
     chip = sp.SpiChip(name, spi)
    
     time.sleep(0.5)
-    chip.write("0000BD")
+    chip.write("0000BD") 
     chip.write("00003C")
-    chip.write("001100") # 
-    chip.write("008000")
-    chip.write("008100")
+    chip.write("001100") #Power up band gap
+    chip.write("008000") #all 4 DACs are being used
+    chip.write("008100") #PdSysref = 0x00 for Subclass 1
 	
     chip.write("012D8B")
     chip.write("014601")
     chip.write("02A4FF")
     chip.write("0232FF")
     chip.write("033301")
-    chip.write("008762") # 
-    chip.write("0088C9") # 010723 to enable pll1
-    chip.write("00890E")
-    chip.write("008A12")
-    chip.write("008D7B")
-    chip.write("01B000")
-    chip.write("01B924")
-    chip.write("01BC0D")
-    chip.write("01BE02") # 020301 to calib pll2 and 020300 to clear
-    chip.write("01BF8E")
-    chip.write("01C02A")
-    chip.write("01C12A")
-    chip.write("01C47E")
-    chip.write("008B02")
-    chip.write("008C03")
-    chip.write("008508")
+    chip.write("030000")
+#	config dac pll
+    chip.write("008762") # Optimal DAC PLL loop filter settings
+    chip.write("0088C9") # Optimal DAC PLL loop filter settings
+    chip.write("00890E") #Optimal DAC PLL loop filter settings
+    chip.write("008A12")#Optimal DAC PLL charge pump setting
+    chip.write("008D7B")#Optimal DAC LDO settings for DAC PLL
+    chip.write("01B000")#Power DAC PLL blocks when power machine is disabled
+    chip.write("01B924")#Optimal DAC PLL charge pump	settings
+    chip.write("01BC0D")#Optimal DAC PLL VCO control	settings
+    chip.write("01BE02") # Optimal DAC PLL VCO power control settings
+    chip.write("01BF8E")#Optimal DAC PLL VCO calibration	settings
+    chip.write("01C02A")#Optimal DAC PLL lock counter length	setting
+    chip.write("01C12A")#Optimal DAC PLL charge pump setting
+    chip.write("01C47E")#Optimal DAC PLL varactor settings
+    chip.write("008B02")#LODivMode
+    chip.write("008C03")#RefDivMode
+    chip.write("008508")#BCount
     chip.write("01B509")
     chip.write("01BB13")
     chip.write("01C506")
-    chip.write("008300")
-   
+    chip.write("008310")
+   #step 2 digital datapath
     chip.write("011200")
+    chip.write("011100")	
     chip.write("011000")
-    chip.write("020000")
-    chip.write("020100")
+   #step 3 TRANSPORT LAYER
+    chip.write("020000")#Power up the interface
+    chip.write("020100")#UnusedLanes
+    chip.write("030080")	
     chip.write("045000")
     chip.write("045100")
     chip.write("045200")
-    chip.write("045387")
-    chip.write("045400")
-    chip.write("04551F")
-    chip.write("045603")
-    chip.write("04570F")
-    chip.write("04582F")
-    chip.write("045920")
-    chip.write("045A80")
-    chip.write("045D00")
-    chip.write("046C00")
-    chip.write("047601")
-    chip.write("047DFF")
+    chip.write("045307")#Scrambling   L-1
+    chip.write("045400")#F-1
+    chip.write("04551F")#K-1
+    chip.write("045603")#M-1
+    chip.write("04570F")#N-1
+    chip.write("04582F")#subclass NP-1
+    chip.write("045920")#JESDVer S-1
+    chip.write("045A80")#HD CF
+    chip.write("046CFF")#Deskew lanes
+    chip.write("047601")#Deskew lanes
+    chip.write("047DFF")#Enable lanes
+	#step 4 PHYSICAL LAYER
+    chip.write("02AAB7")#SERDES interface termination setting
+    chip.write("02AB87")#SERDES interface termination setting
+    chip.write("02B1B7")#SERDES interface termination setting
+    chip.write("02B287")#SERDES interface termination setting
+    chip.write("02A701")#Autotune PHY setting
+    chip.write("02AE01")#Autotune PHY setting
+    chip.write("031401")#SERDES SPI configuration
+    chip.write("023038")#Set up CDR  SERDES PLL default configuration
+    chip.write("020600")# Reset CDR
+    chip.write("020601")#Release CDR reset
+    chip.write("028904")#SERDES PLL configuration  Set CDR oversampling for PLL
+    chip.write("028462")#Optimal SERDES PLL loop filter
+    chip.write("0285C9")#Optimal SERDES PLL loop filter
+    chip.write("02860E")#Optimal SERDES PLL loop filter
+    chip.write("028712")#Optimal SERDES PLL charge pump
+    chip.write("028A7B")#Optimal SERDES PLL VCO LDO
+    chip.write("028B00")#Optimal SERDES PLL configuration 
+    chip.write("029089")#Optimal SERDES PLL VCO varactor
+    chip.write("029424")#Optimal SERDES PLL charge pump
+    chip.write("029603")#Optimal SERDES PLL VCO
+    chip.write("02970D")#Optimal SERDES PLL VCO
+    chip.write("029902")#Optimal SERDES PLL configuration
+    chip.write("029A8E")#Optimal SERDES PLL VCO varactor
+    chip.write("029C2A")# Optimal SERDES PLL charge pump
+    chip.write("029F78")#Optimal SERDES PLL VCO varactor 
+    chip.write("02A006")# Optimal SERDES PLL VCO varactor
+    chip.write("028001") #Enable SERDES PLL
+    chip.write("026822") #Normal mode
 	
-    chip.write("02AAB7")
-    chip.write("02AB87")
-    chip.write("02B1B7")
-    chip.write("02B287")
-    chip.write("02A701")
-    chip.write("02AE01")
-    chip.write("031401")
-    chip.write("023018")
-    chip.write("020600") 
-    chip.write("020601")
-    chip.write("028905")
-    chip.write("028462")
-    chip.write("0285C9")
-    chip.write("02860E")
-    chip.write("028712")
-    chip.write("028A7B")
-    chip.write("028B00") 
-    chip.write("029089")
-    chip.write("029424")
-    chip.write("029603")
-    chip.write("02970D")
-    chip.write("029902")
-    chip.write("029A8E")
-    chip.write("029C2A") 
-    chip.write("029F78") 
-    chip.write("02A006") 
-    chip.write("028001") 
-    chip.write("026822") # 
-    chip.write("030101") # 
-    chip.write("030400") # 
-    chip.write("030500") # 
-    chip.write("030600") # 
-    chip.write("030700") # 
-    chip.write("003A02") # 
-	chip.write("003A82")
-    chip.write("003AC2")
-	chip.write("030001")	
+    chip.write("030101") # Subclass
+    chip.write("030400") #LMFCDel 
+    chip.write("030500") # LMFCDel
+    chip.write("030607") # LMFCDel
+    chip.write("030707") # LMFCDel
+    chip.write("003A01") # sync mode = one-shot sync
+	chip.write("003A81") #sync mode = one-shot sync
+    chip.write("003AC1") #sync mode = one-shot sync
 	
-   
-		
-		
+	chip.write("00E903")#GENERAL_JRX_CTRL_0
+	chip.write("00EDA2")#GENERAL_JRX_CTRL_0	
+    time.sleep(0.5)
+	chip.write("030001")#GENERAL_JRX_CTRL_0			
+	time.sleep(0.5)
+    chip.write("05201c")
+    chip.write("0521ff")
+    chip.write("05227f")
+    chip.write("0523ff")
+    chip.write("05247f")
+	time.sleep(0.5)
+	
+	
+def init_dac0_jesd204c(spi, port, chip):
+    print("Configuring jesd (no external ref) on fmc port {}, chip {}".format(port, chip))
+    name = "P{}C{}".format(port, chip)
+    chip = sp.SpiChip(name, spi)
+    time.sleep(0.5)
+    chip.write("2000000001")
+    chip.write("2000000000")
+    chip.write("3C030A1F00")
+
+def init_dac1_jesd204c(spi, port, chip):
+    print("Configuring jesd (no external ref) on fmc port {}, chip {}".format(port, chip))
+    name = "P{}C{}".format(port, chip)
+    chip = sp.SpiChip(name, spi)
+    time.sleep(0.5)
+    chip.write("2000000001")
+    chip.write("2000000000")
+    chip.write("3C030A1F00")
+
+def init_dac2_jesd204c(spi, port, chip):
+    print("Configuring jesd (no external ref) on fmc port {}, chip {}".format(port, chip))
+    name = "P{}C{}".format(port, chip)
+    chip = sp.SpiChip(name, spi)
+    time.sleep(0.5)
+    chip.write("2000000001")
+    chip.write("2000000000")
+    chip.write("3C030A1F00")
+
+def init_dac3_jesd204c(spi, port, chip):
+    print("Configuring jesd (no external ref) on fmc port {}, chip {}".format(port, chip))
+    name = "P{}C{}".format(port, chip)
+    chip = sp.SpiChip(name, spi)
+    time.sleep(0.5)
+    chip.write("2000000001")
+    chip.write("2000000000")
+    chip.write("3C030A1F00")
+
+	
+	
 def init_lmk04828(spi, port, chip):
     print("Configuring lmk04828 (no external ref) on fmc port {}, chip {}".format(port, chip))
     name = "P{}C{}".format(port, chip)
@@ -208,7 +260,7 @@ def init_lmk04828(spi, port, chip):
     chip.write("012500")
     chip.write("0126F0")
     chip.write("012711")
-    chip.write("012803")# dclkout10 3div 1000MHz
+    chip.write("012806")# dclkout10 3div 500MHz
     chip.write("012955")
     chip.write("012A55")
     chip.write("012B00")
@@ -351,7 +403,7 @@ def init_lmk04828_ext_ref(spi, port, chip):
     chip.write("012500")
     chip.write("0126F0")
     chip.write("012711")
-    chip.write("012803")# dclkout10 3div 1000MHz
+    chip.write("012806")# dclkout10 3div 500MHz
     chip.write("012955")
     chip.write("012A55")
     chip.write("012B00")

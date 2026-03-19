@@ -175,29 +175,29 @@ begin
 
     -- ODDREs
     dac_a_wrt_oddre1 : ODDRE1 port map(
-        D1 => '0',
-        D2 => '1',
+        D1 => std_logic'('0'),
+        D2 => std_logic'('1'),
         C => dac_clk_125M,
         Q => dac_a_wrt,
         SR => sys_rst
     );
     dac_b_wrt_oddre1 : ODDRE1 port map(
-        D1 => '0',
-        D2 => '1',
+        D1 => std_logic'('0'),
+        D2 => std_logic'('1'),
         C => dac_clk_125M,
         Q => dac_b_wrt,
         SR => sys_rst
     );
     dac_c_wrt_oddre1 : ODDRE1 port map(
-        D1 => '0',
-        D2 => '1',
+        D1 => std_logic'('0'),
+        D2 => std_logic'('1'),
         C => dac_clk_125M,
         Q => dac_c_wrt,
         SR => sys_rst
     );
     dac_d_wrt_oddre1 : ODDRE1 port map(
-        D1 => '0',
-        D2 => '1',
+        D1 => std_logic'('0'),
+        D2 => std_logic'('1'),
         C => dac_clk_125M,
         Q => dac_d_wrt,
         SR => sys_rst
