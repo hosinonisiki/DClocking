@@ -6,10 +6,12 @@ import spi
 from boards import *
 from chips import *
 from port_numbers import *
+import uart
 import numpy as np
 import time
 
 import code
+
 
 ser = uart.MySerial("COM9", baudrate = 115200, parity = "E", timeout = 0.5)
 bus_inst = bus.Bus(ser)
