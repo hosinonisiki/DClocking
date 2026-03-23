@@ -297,7 +297,6 @@ assign ad9144_tx_en1 = dac_tx_en;
 assign rf_out_en = {rf_tx_en,rf_tx_en,rf_tx_en,rf_tx_en};
 
 assign ad9144_core_reset = gpio_o[5];
-
 ////j69     
 //wire [63:0]   ads54j69_data_ch0;
 //wire [63:0]   ads54j69_data_lsb_ch0;

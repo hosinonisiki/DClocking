@@ -18,8 +18,6 @@
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
-
-
 module wrapper_KU060_custom(
     input           sysclk_p ,
     input           sysclk_n ,
@@ -132,7 +130,6 @@ module wrapper_KU060_custom(
     wire sys_rst_bar;
     wire sys_mmcm_rst;
     
-
 //clk
  
 //IBUFDS #(
@@ -249,12 +246,12 @@ IBUFDS core_clk_ibufds (
       
 );  
     wire [63:0] adc_in;
-    wire [63:0] dac_out;
+    wire [15:0] dac_out[0:3];
     assign adc_in = {ads54j60_adc_data_ch1,ads54j60_adc_data_ch0,ads54j69_adc_data_ch1,ads54j69_adc_data_ch0};
-    assign ad9144_tx_data_ch0 = dac_out[15:0]; 
-    assign ad9144_tx_data_ch1 = dac_out[31:16]; 
-    assign ad9144_tx_data_ch2 = dac_out[47:32];      
-    assign ad9144_tx_data_ch3 = dac_out[63:48]; 
+    assign ad9144_tx_data_ch0 = dac_out[0]; 
+    assign ad9144_tx_data_ch1 = dac_out[1]; 
+    assign ad9144_tx_data_ch2 = dac_out[2];      
+    assign ad9144_tx_data_ch3 = dac_out[3]; 
     
     wire  spi_mosi;  
     wire  spi_miso;
@@ -281,7 +278,7 @@ IBUFDS core_clk_ibufds (
         .io_tri (spi_io_tri),        // 三态控制
 
         .adc_in (adc_in),        // ADC 输入，位宽 = ADC_channel_count
-        .dac_out(dac_out)        // DAC 输出，位宽 = DAC_channel_count
+        .dac_out({dac_out[3],dac_out[2],dac_out[1],dac_out[0]})        // DAC 输出，位宽 = DAC_channel_count
 );
 
 assign user_led[0] = ~sys_mmcm_sel; 
@@ -393,8 +390,8 @@ debouncer #(
  ila_0 ila_data (
 	.clk(sys_clk), // input wire clk
 	.probe0(sys_rst_raw), // input wire [63:0]  probe0  
-	.probe1(sys_mmcm_sel_cmd_buf), // input wire [0:0]  probe1 
-	.probe2(sys_rst), // input wire [63:0]  probe2 
+	.probe1(uart_txd), // input wire [0:0]  probe1 
+	.probe2(uart_rxd), // input wire [63:0]  probe2 
 	.probe3(ad9144_tx_data_ch0)
 	
 );

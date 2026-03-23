@@ -15,8 +15,8 @@ entity debouncer is
     port(
         clk     : in  std_logic;
         rst     : in  std_logic;
-        input   : in  std_logic;
-        output  : out std_logic
+        keyin   : in  std_logic;
+        keyout  : out std_logic
     );
 end entity debouncer;
 
@@ -35,7 +35,7 @@ begin
             counter <= (others => '0');
         else
             if rising_edge(clk) then
-                if input_stable = '0' and input_1 = input then
+                if input_stable = '0' and input_1 = keyin then
                     counter <= counter + x"00000001";
                 else
                     counter <= (others => '0');
@@ -50,7 +50,7 @@ begin
             input_stable <= '0';
         else
             if rising_edge(clk) then
-                if input_stable = '1' and input_1 /= input then
+                if input_stable = '1' and input_1 /= keyin then
                     input_stable <= '0';
                 elsif input_stable = '0' and counter = debounce_cycles_unsigned then
                     input_stable <= '1';
@@ -62,11 +62,11 @@ begin
     process(clk, rst)
     begin
         if rst = '1' then
-            output <= default_output;
+            keyout <= default_output;
         else
             if rising_edge(clk) then
                 if input_stable = '1' then
-                    output <= input_2;
+                    keyout <= input_2;
                 end if;
             end if;
         end if;
@@ -79,7 +79,7 @@ begin
             input_2 <= default_output;
         else
             if rising_edge(clk) then
-                input_1 <= input;
+                input_1 <= keyin;
                 input_2 <= input_1;
             end if;
         end if;
