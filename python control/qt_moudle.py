@@ -1310,7 +1310,7 @@ class ModuleIIRFilter(NodeItem):
 class MoudleSCLOFSM(NodeItem):
     def __init__(self, component_name, index, position, num_inputs = 1, num_outputs = 2):
         if index:
-            name = f"SCL{index + 1}"
+            name = f"SLO{index + 1}"
         else:
             name = "SCLO"
         super().__init__(name, component_name, index, position, num_inputs, num_outputs)

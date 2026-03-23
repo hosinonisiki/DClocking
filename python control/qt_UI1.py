@@ -2,13 +2,15 @@
 from platform import node
 import sys
 import random
+import json
+from datetime import datetime
 from collections import deque
 from PySide6.QtCore import QTimer
 # 导入PySide6的QtWidgets模块中的相关组件
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QHBoxLayout, QListWidget, QListWidgetItem, QGraphicsView, QGraphicsScene,
                                QGraphicsItem, QGraphicsPathItem, QGraphicsTextItem,
-                               QSplitter, QGraphicsEllipseItem, QPushButton, QComboBox)
+                               QSplitter, QGraphicsEllipseItem, QPushButton, QComboBox, QFileDialog)
 # 导入PySide6的QtCore模块中的相关类
 from PySide6.QtCore import Qt, QMimeData, QPointF, QRectF, Signal, QObject, QByteArray, QPoint
 # 导入PySide6.QtGui模块中的相关类
@@ -125,11 +127,11 @@ def _resolve_port_number(node_name, port_index, role):
         inputs = [getattr(pn, f"{base}_IN_A", None), getattr(pn, f"{base}_IN_B", None)]
         outputs = [getattr(pn, f"{base}_OUT", None)]
     elif node_name == "TRIG":
-        inputs = [pn.TRI_IN, None]
-        outputs = [pn.TRI_COS]
+        inputs = [pn.TRI_IN]
+        outputs = [pn.TRI_SIN, pn.TRI_COS]
     elif node_name == "TRI2":
-        inputs = [pn.TRI2_IN, None]
-        outputs = [pn.TRI2_COS]
+        inputs = [pn.TRI2_IN]
+        outputs = [pn.TRI2_SIN, pn.TRI2_COS]
     elif node_name == "ATAN":
         inputs = [pn.ATAN_IN_SIN, pn.ATAN_IN_COS]
         outputs = [pn.ATAN_OUT]
@@ -148,6 +150,12 @@ def _resolve_port_number(node_name, port_index, role):
     elif node_name == "PDH":
         inputs = [pn.PDHFSM_IN_POWER, pn.PDHFSM_IN_SCAN]
         outputs = [pn.PDHFSM_PID_RESET_CTRL, pn.PDHFSM_MIXER_RESET_CTRL, pn.PDHFSM_SCAN_RESET_CTRL]
+    elif node_name == "SCLO":
+        inputs = [pn.SCLOFSM_PHASE_IN]
+        outputs = [pn.SCLOFSM_BIAS_OUT, pn.SCLOFSM_PID_RESET_CTRL]
+    elif node_name == "SLO2":
+        inputs = [pn.SCLOFSM2_PHASE_IN]
+        outputs = [pn.SCLOFSM2_BIAS_OUT, pn.SCLOFSM2_PID_RESET_CTRL]
     else:
         return None
 
@@ -1452,6 +1460,10 @@ class MainWindow(QMainWindow):
 
         self.connect_btn = QPushButton("连接")
         self.connect_btn.setFixedWidth(80)
+        self.save_cfg_btn = QPushButton("保存配置")
+        self.save_cfg_btn.setFixedWidth(90)
+        self.load_cfg_btn = QPushButton("加载配置")
+        self.load_cfg_btn.setFixedWidth(90)
 
         serial_bar = QWidget()
         serial_bar.setFixedHeight(40)
@@ -1461,6 +1473,8 @@ class MainWindow(QMainWindow):
         serial_layout.addWidget(self.comboBox)
         serial_layout.addWidget(self.mode_combo)
         serial_layout.addWidget(self.connect_btn)
+        serial_layout.addWidget(self.save_cfg_btn)
+        serial_layout.addWidget(self.load_cfg_btn)
         serial_layout.addStretch()
         self.serial_port = QSerialPort(self)
         self.port_ctrl = Port(self, self.serial_port)
@@ -1477,6 +1491,8 @@ class MainWindow(QMainWindow):
         self.view = DiagramView(self.scene)
         self.palette = ComponentPalette()
         self._on_mode_changed(self.mode_combo.currentText())
+        self.save_cfg_btn.clicked.connect(self.save_configuration)
+        self.load_cfg_btn.clicked.connect(self.load_configuration)
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(self.view)
@@ -1568,6 +1584,215 @@ class MainWindow(QMainWindow):
                 print(f"[param] sent {node.name}.{key} = {value}")
         except Exception as exc:
             print(f"[param] failed {node.name}: {exc}")
+
+    def _port_to_ref(self, port):
+        if isinstance(port, BorderPort):
+            return {
+                "kind": "border",
+                "port_type": port.port_type,
+                "index": int(port.index),
+                "name": port.name,
+            }
+
+        parent = getattr(port, "parent_node", None)
+        if parent is None:
+            return None
+        return {
+            "kind": "node",
+            "node_name": parent.name,
+            "port_type": port.port_type,
+            "index": int(port.index),
+        }
+
+    def _resolve_port_ref(self, ref, node_map):
+        if not isinstance(ref, dict):
+            return None
+
+        kind = ref.get("kind")
+        port_type = ref.get("port_type")
+        idx = int(ref.get("index", -1))
+
+        if kind == "border":
+            if idx < 0 or idx >= 8:
+                return None
+            if port_type == "out":
+                return self.scene.left_ports[idx]
+            if port_type == "in":
+                return self.scene.right_ports[idx]
+            return None
+
+        if kind == "node":
+            node_name = ref.get("node_name")
+            node = node_map.get(node_name)
+            if node is None:
+                return None
+            if port_type == "out" and 0 <= idx < len(node.out_ports):
+                return node.out_ports[idx]
+            if port_type == "in" and 0 <= idx < len(node.in_ports):
+                return node.in_ports[idx]
+        return None
+
+    def _clear_canvas(self):
+        for item in list(self.scene.items()):
+            if isinstance(item, EdgeItem):
+                item.remove()
+
+        for item in list(self.scene.items()):
+            if isinstance(item, NodeItem):
+                if item.scene():
+                    item.scene().removeItem(item)
+
+        for key in self.view._used_indices:
+            self.view._used_indices[key].clear()
+
+    def _build_config_dict(self):
+        nodes = []
+        edges = []
+
+        for item in self.scene.items():
+            if isinstance(item, NodeItem):
+                params = item.get_params() if hasattr(item, "get_params") else {}
+                nodes.append({
+                    "name": item.name,
+                    "component_name": item.component_name,
+                    "index": int(item.index),
+                    "pos": {
+                        "x": float(item.pos().x()),
+                        "y": float(item.pos().y()),
+                    },
+                    "params": params,
+                })
+
+        for item in self.scene.items():
+            if isinstance(item, EdgeItem):
+                src_ref = self._port_to_ref(item.start_port)
+                dst_ref = self._port_to_ref(item.end_port)
+                if src_ref and dst_ref:
+                    edges.append({"src": src_ref, "dst": dst_ref})
+
+        return {
+            "version": 1,
+            "saved_at": datetime.now().isoformat(timespec="seconds"),
+            "mode": self.mode_combo.currentText(),
+            "nodes": nodes,
+            "edges": edges,
+        }
+
+    def save_configuration(self):
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "保存配置",
+            "diagram_config.json",
+            "JSON Files (*.json);;All Files (*)",
+        )
+        if not file_path:
+            return
+
+        config = self._build_config_dict()
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+            print(f"[config] saved: {file_path}")
+        except Exception as exc:
+            print(f"[config] save failed: {exc}")
+
+    def _create_node_from_config(self, node_cfg):
+        component_name = node_cfg.get("component_name")
+        cls = self.view.moudle_factory.get(component_name)
+        if cls is None:
+            print(f"[config] skip unknown component: {component_name}")
+            return None
+
+        try:
+            idx = int(node_cfg.get("index", 0))
+            pos_cfg = node_cfg.get("pos", {})
+            pos = QPointF(float(pos_cfg.get("x", 0.0)), float(pos_cfg.get("y", 0.0)))
+            node = cls(component_name, idx, pos)
+        except Exception as exc:
+            print(f"[config] create node failed: {node_cfg}: {exc}")
+            return None
+
+        self.view._used_indices.setdefault(component_name, set()).add(idx)
+        self.view._apply_mode_to_node(node)
+        self.scene.addItem(node)
+
+        params = node_cfg.get("params", {})
+        if isinstance(params, dict) and params:
+            try:
+                node.set_params(params)
+            except Exception as exc:
+                print(f"[config] apply params failed for {node.name}: {exc}")
+
+        return node
+
+    def _restore_edges(self, edges_cfg, node_map):
+        for edge_cfg in edges_cfg:
+            src_port = self._resolve_port_ref(edge_cfg.get("src"), node_map)
+            dst_port = self._resolve_port_ref(edge_cfg.get("dst"), node_map)
+            if src_port is None or dst_port is None:
+                print(f"[config] skip invalid edge: {edge_cfg}")
+                continue
+
+            if dst_port.port_type != "in":
+                print(f"[config] skip non-input destination edge: {edge_cfg}")
+                continue
+            if dst_port.has_connection():
+                print(f"[config] skip occupied destination edge: {edge_cfg}")
+                continue
+
+            edge = EdgeItem(src_port, dst_port)
+            self.scene.addItem(edge)
+            edge.refresh_style()
+
+            start_node = src_port.parent_node if hasattr(src_port, "parent_node") else None
+            end_node = dst_port.parent_node if hasattr(dst_port, "parent_node") else None
+            if start_node:
+                start_node.edges.append(edge)
+            if end_node:
+                end_node.edges.append(edge)
+
+            src_name = start_node.name if start_node else src_port.name
+            dst_name = end_node.name if end_node else dst_port.name
+            self.signals.connection_created.emit(src_name, src_port.index, dst_name, dst_port.index)
+
+    def load_configuration(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "加载配置",
+            "",
+            "JSON Files (*.json);;All Files (*)",
+        )
+        if not file_path:
+            return
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+        except Exception as exc:
+            print(f"[config] load failed: {exc}")
+            return
+
+        nodes_cfg = config.get("nodes", [])
+        edges_cfg = config.get("edges", [])
+        if not isinstance(nodes_cfg, list) or not isinstance(edges_cfg, list):
+            print("[config] invalid format: nodes/edges must be list")
+            return
+
+        self._clear_canvas()
+
+        mode = config.get("mode")
+        if isinstance(mode, str) and mode in ["Free Mode", "Developer Mode"]:
+            self.mode_combo.setCurrentText(mode)
+
+        node_map = {}
+        for node_cfg in nodes_cfg:
+            node = self._create_node_from_config(node_cfg)
+            if node is not None:
+                node_map[node.name] = node
+
+        self._restore_edges(edges_cfg, node_map)
+        self.view.update_border_ports()
+        print(f"[config] loaded: {file_path}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
