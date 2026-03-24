@@ -52,7 +52,11 @@ class ModuleBase():
                     width = self.parameter_list.get(addr, {"name": "UNKNOWN", "width": 32})["width"]
                     dat = 2 ** width + dat
                 self.bus.write(self.name, addr, dat, True)
-            return self.bus.write(self.name, address_data_pairs[-1][0], address_data_pairs[-1][1], hold)
+            addr, dat = address_data_pairs[-1]
+            if type(dat) == int and dat < 0:
+                width = self.parameter_list.get(addr, {"name": "UNKNOWN", "width": 32})["width"]
+                dat = 2 ** width + dat
+            return self.bus.write(self.name, addr, dat, hold)
         
 
     def read(self, designator):
@@ -65,6 +69,13 @@ class ModuleBase():
             address_list, formula = func()
             data_list = [self.bus.read(self.name, addr) for addr in address_list]
             return formula(data_list)
+        
+    # Read value
+    def readv(self, designator):
+        data = self.read(designator)
+        if type(data) == bytes:
+            return int.from_bytes(data, "big", signed = True)
+        return data
         
     def flip_on(self, designator):
         ret = self.process_designator(designator)
@@ -287,7 +298,7 @@ class ModuleScaler(ModuleBase):
         if data is not None:
             # Write, return address-data pairs
             current_scale = int.from_bytes(self.read("scale"), "big", signed = True)
-            target_scale = np.sign(current_scale) * int(round(2 ** 16 * 10 ** (data / 20)))
+            target_scale = int(np.sign(current_scale) * round(2 ** 16 * 10 ** (data / 20)))
             if target_scale >= 2 ** 23 or target_scale < -2 ** 23:
                 raise ValueError("Resulting scale is out of range")
             return [(0, target_scale)]
@@ -353,6 +364,7 @@ class ModuleAccumulator(ModuleBase):
             # Write, return address-data pairs
             if not data in [2 ** n for n in range(16)]:
                 raise ValueError("Ratio must be a power of 2 between 1 and 32768")
+            data = int(data)
             freq = self.read("freq")
             target_var = int(round(freq * 2 ** 64 / 250000000 / data))
             low = target_var & 0xFFFFFFFF
