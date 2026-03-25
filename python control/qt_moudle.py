@@ -26,6 +26,7 @@ class ParamDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("参数修改")
         self._editors = {}
+        self._fields = {}
         self._apply_callback = apply_callback
 
         layout = QFormLayout(self)
@@ -34,6 +35,26 @@ class ParamDialog(QDialog):
             key = field["key"]
             label = field.get("label", key)
             ftype = field.get("type", "str")
+            self._fields[key] = field
+
+            control_mode = field.get("ui_control")
+            if control_mode == "flip_toggle":
+                w = QPushButton()
+                w.setCheckable(True)
+                w.setChecked(bool(values.get(key, field.get("default", False))))
+                self._set_toggle_button_text(w, label, w.isChecked())
+                w.toggled.connect(lambda checked, k=key, t=label, btn=w: self._apply_toggle_field(k, t, btn, checked))
+                self._editors[key] = ("flip_toggle", w)
+                layout.addRow(label, w)
+                continue
+
+            if control_mode == "flip_pulse":
+                w = QPushButton(label)
+                w.setCheckable(False)
+                w.clicked.connect(lambda _checked=False, k=key: self._apply_pulse_field(k))
+                self._editors[key] = ("flip_pulse", w)
+                layout.addRow(label, w)
+                continue
 
             if ftype == "int":
                 w = QSpinBox()
@@ -59,6 +80,22 @@ class ParamDialog(QDialog):
             row.addWidget(confirm_btn)
             layout.addRow(label, row)
 
+    def _set_toggle_button_text(self, button: QPushButton, label: str, checked: bool):
+        state_text = "按下" if checked else "弹起"
+        button.setText(f"{label}: {state_text}")
+
+    def _apply_toggle_field(self, key: str, label: str, button: QPushButton, checked: bool):
+        self._set_toggle_button_text(button, label, checked)
+        if not self._apply_callback:
+            return
+        self._apply_callback({key: bool(checked)})
+
+    def _apply_pulse_field(self, key: str):
+        if not self._apply_callback:
+            return
+        # Pulse style: click triggers a one-shot action.
+        self._apply_callback({key: None})
+
     def _apply_field(self, key: str) -> None:
         if not self._apply_callback:
             return
@@ -69,6 +106,10 @@ class ParamDialog(QDialog):
             value = float(w.value())
         elif ftype == "bool":
             value = bool(w.isChecked())
+        elif ftype == "flip_toggle":
+            value = bool(w.isChecked())
+        elif ftype == "flip_pulse":
+            value = None
         else:
             value = w.text()
         self._apply_callback({key: value})
@@ -82,6 +123,10 @@ class ParamDialog(QDialog):
                 out[key] = float(w.value())
             elif ftype == "bool":
                 out[key] = bool(w.isChecked())
+            elif ftype == "flip_toggle":
+                out[key] = bool(w.isChecked())
+            elif ftype == "flip_pulse":
+                out[key] = None
             else:
                 out[key] = w.text()
         return out

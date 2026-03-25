@@ -280,6 +280,21 @@ class Port(QObject):
 
         method(**method_args)
 
+    def send_flip_toggle(self, module_type, module_index, flip_on_key, flip_off_key, checked):
+        hw_module = self._resolve_hw_module(module_type, module_index)
+        if hw_module is None:
+            raise RuntimeError("Hardware controller not initialized")
+        if checked:
+            hw_module.flip_on(flip_on_key)
+        else:
+            hw_module.flip_off(flip_off_key)
+
+    def send_flip_pulse(self, module_type, module_index, flip_on_key):
+        hw_module = self._resolve_hw_module(module_type, module_index)
+        if hw_module is None:
+            raise RuntimeError("Hardware controller not initialized")
+        hw_module.flip_on(flip_on_key)
+
     def query_router_routes(self):
         if not self.hw_controller or not self.hw_controller.is_initialized():
             raise RuntimeError("Hardware controller not initialized")

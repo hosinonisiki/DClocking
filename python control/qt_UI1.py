@@ -1893,9 +1893,35 @@ class MainWindow(QMainWindow):
                 self.port_ctrl.send_special_method(module_type, module_index, method_name, method_args)
                 print(f"[method] sent {node.name}.{method_name}({method_args})")
                 return
-            self.port_ctrl.send_param(module_type, module_index, params)
+
+            schema_fields = node.param_schema() if hasattr(node, "param_schema") else []
+            schema_map = {field.get("key"): field for field in schema_fields if isinstance(field, dict) and field.get("key")}
+
+            regular_params = {}
             for key, value in params.items():
-                print(f"[param] sent {node.name}.{key} = {value}")
+                field = schema_map.get(key, {})
+                control_mode = field.get("ui_control")
+
+                if control_mode == "flip_toggle":
+                    flip_on_key = field.get("flip_on", key)
+                    flip_off_key = field.get("flip_off", key)
+                    checked = bool(value)
+                    self.port_ctrl.send_flip_toggle(module_type, module_index, flip_on_key, flip_off_key, checked)
+                    print(f"[param] flip_toggle {node.name}.{key} -> {'on' if checked else 'off'}")
+                    continue
+
+                if control_mode == "flip_pulse":
+                    flip_on_key = field.get("flip_on", key)
+                    self.port_ctrl.send_flip_pulse(module_type, module_index, flip_on_key)
+                    print(f"[param] flip_pulse {node.name}.{key}")
+                    continue
+
+                regular_params[key] = value
+
+            if regular_params:
+                self.port_ctrl.send_param(module_type, module_index, regular_params)
+                for key, value in regular_params.items():
+                    print(f"[param] sent {node.name}.{key} = {value}")
         except Exception as exc:
             print(f"[param] failed {node.name}: {exc}")
 

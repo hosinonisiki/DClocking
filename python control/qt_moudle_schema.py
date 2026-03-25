@@ -143,8 +143,8 @@ PDH_SCHEMA = [
 
 SCLO_SCHEMA = [
     # 直接参数
-    {"key" : "lock", "label" : "锁定指令", "type" : "bool", "mode" : "direct", "free" : True, "note" : "上升沿时，更新校准值，打开PID。下降沿时，关闭PID，但校准值维持"},
-    {"key" : "clear", "label" : "清除指令", "type" : "bool", "mode" : "direct", "free" : True, "note" : "上升沿时，清除校准值为0"}
+    {"key" : "lock", "label" : "锁定指令", "type" : "bool", "mode" : "direct", "free" : True, "ui_control" : "flip_toggle", "flip_on" : "lock", "flip_off" : "lock", "note" : "粘滞按键。按下触发flip_on，弹起触发flip_off。上升沿时更新校准值并打开PID；下降沿时关闭PID"},
+    {"key" : "clear", "label" : "清除指令", "type" : "bool", "mode" : "direct", "free" : True, "ui_control" : "flip_pulse", "flip_on" : "clear", "note" : "瞬时按键。每次点击仅触发一次flip_on，上升沿时清除校准值为0"}
 ]
 
 # 在文件末尾添加
