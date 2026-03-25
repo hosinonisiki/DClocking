@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QGraphicsItem, QGraphicsPathItem, QGraphicsTextItem,
                                QSplitter, QGraphicsEllipseItem, QDialog, QFormLayout,
                                QSpinBox, QDoubleSpinBox, QLineEdit,
-                               QCheckBox, QPushButton, QToolTip)
+                               QCheckBox, QPushButton, QToolTip, QComboBox, QMessageBox)
 # 导入PySide6的QtCore模块中的相关类
 from PySide6.QtCore import Qt, QMimeData, QPointF, QRectF, Signal, QObject, QByteArray, QPoint
 # 导入PySide6.QtGui模块中的相关类
@@ -85,6 +85,107 @@ class ParamDialog(QDialog):
             else:
                 out[key] = w.text()
         return out
+
+
+class SpecialMethodDialog(QDialog):
+    def __init__(self, methods: list[dict], parent=None, apply_callback=None):
+        super().__init__(parent)
+        self.setWindowTitle("特殊方法")
+        self._methods = methods or []
+        self._apply_callback = apply_callback
+        self._method_map = {m["name"]: m for m in self._methods if "name" in m}
+        self._param_editors = {}
+
+        root = QVBoxLayout(self)
+        self._method_combo = QComboBox()
+        for m in self._methods:
+            method_name = m.get("name")
+            method_label = m.get("label", method_name)
+            self._method_combo.addItem(method_label, method_name)
+        root.addWidget(self._method_combo)
+
+        self._form = QFormLayout()
+        root.addLayout(self._form)
+
+        btn_row = QHBoxLayout()
+        self._apply_btn = QPushButton("应用")
+        self._apply_btn.clicked.connect(self._apply_selected_method)
+        btn_row.addWidget(self._apply_btn)
+        root.addLayout(btn_row)
+
+        self._method_combo.currentIndexChanged.connect(self._rebuild_param_form)
+        self._rebuild_param_form()
+
+    def _clear_form(self):
+        while self._form.rowCount() > 0:
+            self._form.removeRow(0)
+        self._param_editors.clear()
+
+    def _current_method(self):
+        name = self._method_combo.currentData()
+        return self._method_map.get(name)
+
+    def _rebuild_param_form(self):
+        self._clear_form()
+        method = self._current_method()
+        if not method:
+            return
+
+        for field in method.get("params", []):
+            key = field["key"]
+            label = field.get("label", key)
+            ftype = field.get("type", "str")
+
+            if ftype == "int":
+                w = QSpinBox()
+                w.setRange(field.get("min", -10**9), field.get("max", 10**9))
+                w.setValue(int(field.get("default", 0)))
+            elif ftype == "float":
+                w = QDoubleSpinBox()
+                w.setDecimals(field.get("decimals", 6))
+                w.setRange(field.get("min", -1e18), field.get("max", 1e18))
+                w.setValue(float(field.get("default", 0.0)))
+            elif ftype == "choice":
+                w = QComboBox()
+                for option in field.get("options", []):
+                    if isinstance(option, dict):
+                        w.addItem(str(option.get("label", option.get("value", ""))), option.get("value"))
+                    else:
+                        w.addItem(str(option), option)
+                default_value = field.get("default", None)
+                if default_value is not None:
+                    idx = w.findData(default_value)
+                    if idx >= 0:
+                        w.setCurrentIndex(idx)
+            else:
+                w = QLineEdit()
+                w.setText(str(field.get("default", "")))
+
+            self._param_editors[key] = (ftype, w)
+            self._form.addRow(label, w)
+
+    def _collect_args(self):
+        args = {}
+        for key, (ftype, w) in self._param_editors.items():
+            if ftype == "int":
+                args[key] = int(w.value())
+            elif ftype == "float":
+                args[key] = float(w.value())
+            elif ftype == "choice":
+                args[key] = w.currentData()
+            else:
+                args[key] = w.text()
+        return args
+
+    def _apply_selected_method(self):
+        method = self._current_method()
+        if not method or not self._apply_callback:
+            return
+        try:
+            self._apply_callback(method["name"], self._collect_args())
+            QMessageBox.information(self, "成功", "特殊方法已应用")
+        except Exception as exc:
+            QMessageBox.critical(self, "失败", f"特殊方法执行失败:\n{exc}")
 
 class PortItem(QGraphicsItem):
     """
@@ -386,18 +487,30 @@ class NodeItem(QGraphicsItem):
     def set_params(self, params: dict) -> None:
         pass
 
+    def special_methods_schema(self) -> list[dict]:
+        return []
+
+    def apply_special_method(self, method_name: str, args: dict) -> None:
+        self._notify_param_change({"__special_method__": method_name, "args": args})
+
     def _notify_param_change(self, params: dict) -> None:
         if params:
             _dispatch_param_apply(self, params)
 
     def open_param_dialog(self):
         schema = self.param_schema()
-        if not schema:
+        special_methods = self.special_methods_schema()
+
+        if not schema and not special_methods:
             return
-        
+
         parent = QApplication.activeWindow()
-        dig = ParamDialog(schema, self.get_params(), parent = parent, apply_callback = self.set_params)
-        dig.exec()
+        if schema:
+            dig = ParamDialog(schema, self.get_params(), parent=parent, apply_callback=self.set_params)
+            dig.exec()
+        if special_methods:
+            special_dig = SpecialMethodDialog(special_methods, parent=parent, apply_callback=self.apply_special_method)
+            special_dig.exec()
 
     def _create_ports(self):
         if self.num_inputs > 0:
@@ -997,6 +1110,21 @@ class ModuleFIRFilter(NodeItem):
             self._params[key] = value
         self._notify_param_change(params)
 
+    def special_methods_schema(self):
+        return [
+            {
+                "name": "design_lowpass",
+                "label": "低通滤波器设计",
+                "params": [
+                    {"key": "freq_pass", "label": "通带截止频率(Hz)", "type": "float", "min": 0.0, "max": 1e12, "default": 1e6, "decimals": 3},
+                    {"key": "freq_stop", "label": "阻带截止频率(Hz)", "type": "float", "min": 0.0, "max": 1e12, "default": 10e6, "decimals": 3},
+                    {"key": "freq_sample", "label": "采样频率(Hz)", "type": "float", "min": 1.0, "max": 1e12, "default": 250e6, "decimals": 3},
+                    {"key": "weight", "label": "阻带权重", "type": "float", "min": 1e-6, "max": 1e6, "default": 1.0, "decimals": 6},
+                    {"key": "taps", "label": "抽头数", "type": "choice", "default": 64, "options": [16, 32, 64]},
+                ],
+            }
+        ]
+
 class MoudleLinerTransformer(NodeItem):
     def __init__(self, component_name, index, position, num_inputs = 2, num_outputs = 2):
         if index == 0:
@@ -1306,6 +1434,19 @@ class ModuleIIRFilter(NodeItem):
         for key, value in params.items():
             self._params[key] = value
         self._notify_param_change(params)
+
+    def special_methods_schema(self):
+        return [
+            {
+                "name": "design_lowpass",
+                "label": "低通滤波器设计",
+                "params": [
+                    {"key": "filter_type", "label": "滤波器类型", "type": "choice", "default": "butter", "options": ["butter", "ellip", "cheby1", "cheby2", "bessel"]},
+                    {"key": "freq_pass", "label": "通带截止频率(Hz)", "type": "float", "min": 0.0, "max": 1e12, "default": 1e6, "decimals": 3},
+                    {"key": "freq_sample", "label": "采样频率(Hz)", "type": "float", "min": 1.0, "max": 1e12, "default": 250e6, "decimals": 3},
+                ],
+            }
+        ]
         
 class MoudleSCLOFSM(NodeItem):
     def __init__(self, component_name, index, position, num_inputs = 1, num_outputs = 2):

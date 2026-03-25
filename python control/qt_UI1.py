@@ -1579,6 +1579,12 @@ class MainWindow(QMainWindow):
         if module_type is None:
             return
         try:
+            if isinstance(params, dict) and "__special_method__" in params:
+                method_name = params.get("__special_method__")
+                method_args = params.get("args", {})
+                self.port_ctrl.send_special_method(module_type, module_index, method_name, method_args)
+                print(f"[method] sent {node.name}.{method_name}({method_args})")
+                return
             self.port_ctrl.send_param(module_type, module_index, params)
             for key, value in params.items():
                 print(f"[param] sent {node.name}.{key} = {value}")

@@ -222,3 +222,20 @@ class Port(QObject):
             if isinstance(value, bool):
                 value = int(value)
             hw_module.write(key, value)
+
+    def send_special_method(self, module_type, module_index, method_name, method_args=None):
+        hw_module = self._resolve_hw_module(module_type, module_index)
+        if hw_module is None:
+            raise RuntimeError("Hardware controller not initialized")
+        if not method_name:
+            raise ValueError("method_name is required")
+        method = getattr(hw_module, method_name, None)
+        if not callable(method):
+            raise AttributeError(f"{module_type}[{module_index}] does not support method '{method_name}'")
+
+        if method_args is None:
+            method_args = {}
+        if not isinstance(method_args, dict):
+            raise TypeError("method_args must be a dict")
+
+        method(**method_args)
