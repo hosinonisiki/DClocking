@@ -1483,6 +1483,8 @@ class MainWindow(QMainWindow):
 
         self.connect_btn = QPushButton("连接")
         self.connect_btn.setFixedWidth(80)
+        self.init_btn = QPushButton("初始化")
+        self.init_btn.setFixedWidth(80)
         self.save_cfg_btn = QPushButton("保存配置")
         self.save_cfg_btn.setFixedWidth(90)
         self.load_cfg_btn = QPushButton("加载配置")
@@ -1496,6 +1498,7 @@ class MainWindow(QMainWindow):
         serial_layout.addWidget(self.comboBox)
         serial_layout.addWidget(self.mode_combo)
         serial_layout.addWidget(self.connect_btn)
+        serial_layout.addWidget(self.init_btn)
         serial_layout.addWidget(self.save_cfg_btn)
         serial_layout.addWidget(self.load_cfg_btn)
         serial_layout.addStretch()

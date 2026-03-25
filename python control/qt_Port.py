@@ -26,6 +26,11 @@ class Port(QObject):
         self.parent.comboBox.mousePressEvent = self.on_combo_clicked
 
         self.parent.connect_btn.clicked.connect(self.open_port)	#绑定打开串口
+        if hasattr(self.parent, "init_btn"):
+            self.parent.init_btn.clicked.connect(self.initialize_hardware)
+
+        if hasattr(self.parent, "init_btn"):
+            self.parent.init_btn.setEnabled(False)
 
        
 
@@ -140,6 +145,8 @@ class Port(QObject):
             self.parent.connect_btn.setText(self.tr("连接"))
             self.serial_port.close()
             self.qt_serial = None
+            if hasattr(self.parent, "init_btn"):
+                self.parent.init_btn.setEnabled(False)
         else:
             self.setport()	#设置串口
             
@@ -154,16 +161,19 @@ class Port(QObject):
                         timeout=1
                     )
                     self.hw_controller.set_serial(self.qt_serial)
-                    self.hw_controller.init()
+                    if hasattr(self.parent, "init_btn"):
+                        self.parent.init_btn.setEnabled(True)
                 except Exception as e:
-                    # 初始化失败时回滚连接状态并明确提示错误信息
+                    # 建立 QtSerial 失败时回滚连接状态
                     self.serial_port.close()
                     self.qt_serial = None
                     self.parent.connect_btn.setText(self.tr("连接"))
+                    if hasattr(self.parent, "init_btn"):
+                        self.parent.init_btn.setEnabled(False)
                     qw.QMessageBox.critical(
                         self.parent,
-                        self.tr("初始化失败"),
-                        self.tr(f"硬件初始化失败:\n{e}")
+                        self.tr("连接失败"),
+                        self.tr(f"串口连接失败:\n{e}")
                     )
                     return
 
@@ -171,6 +181,23 @@ class Port(QObject):
                 qw.QMessageBox.critical(self.parent,
                                         self.tr("错误"),
                                         self.tr("无法打开串口！"))
+
+    def initialize_hardware(self):
+        if not self.serial_port.isOpen() or self.qt_serial is None:
+            qw.QMessageBox.warning(self.parent,
+                                   self.tr("未连接"),
+                                   self.tr("请先点击“连接”打开串口。"))
+            return
+
+        try:
+            self.hw_controller.init()
+            qw.QMessageBox.information(self.parent,
+                                       self.tr("初始化完成"),
+                                       self.tr("硬件初始化成功。"))
+        except Exception as e:
+            qw.QMessageBox.critical(self.parent,
+                                    self.tr("初始化失败"),
+                                    self.tr(f"硬件初始化失败:\n{e}"))
 
     def _resolve_hw_module(self, module_type, module_index):
         if not self.hw_controller or not self.hw_controller.is_initialized():
