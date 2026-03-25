@@ -145,6 +145,8 @@ class Port(QObject):
             self.parent.connect_btn.setText(self.tr("连接"))
             self.serial_port.close()
             self.qt_serial = None
+            if hasattr(self.parent, "router"):
+                self.parent.router = None
             if hasattr(self.parent, "init_btn"):
                 self.parent.init_btn.setEnabled(False)
         else:
@@ -161,8 +163,19 @@ class Port(QObject):
                         timeout=1
                     )
                     self.hw_controller.set_serial(self.qt_serial)
+                    if hasattr(self.parent, "router"):
+                        self.parent.router = None
                     if hasattr(self.parent, "init_btn"):
                         self.parent.init_btn.setEnabled(True)
+                    if hasattr(self.parent, "sync_from_device"):
+                        try:
+                            self.parent.sync_from_device()
+                        except Exception as sync_exc:
+                            qw.QMessageBox.warning(
+                                self.parent,
+                                self.tr("同步失败"),
+                                self.tr(f"已连接串口，但同步下位机状态失败:\n{sync_exc}")
+                            )
                 except Exception as e:
                     # 建立 QtSerial 失败时回滚连接状态
                     self.serial_port.close()
@@ -266,3 +279,80 @@ class Port(QObject):
             raise TypeError("method_args must be a dict")
 
         method(**method_args)
+
+    def query_router_routes(self):
+        if not self.hw_controller or not self.hw_controller.is_initialized():
+            raise RuntimeError("Hardware controller not initialized")
+
+        # ROUT has 32 x 32-bit words. Address 31 is bits[0:32], address 0 is bits[992:1024].
+        words = []
+        for addr in range(32):
+            raw = self.hw_controller.bus_inst.read("ROUT", addr)
+            words.append(int.from_bytes(raw, "big", signed=False))
+
+        bit_chunks = [format(words[31 - i], "032b") for i in range(32)]
+        bits = "".join(bit_chunks)
+
+        routes = []
+        # Full-connection encoding: each port entry is 8 bits [reserved(1), enable(1), source(6)]
+        for port in range(128):
+            start = len(bits) - (port + 1) * 8
+            end = len(bits) - port * 8
+            if start < 0:
+                continue
+            entry = bits[start:end]
+            if len(entry) != 8:
+                continue
+
+            enable = int(entry[1], 2)
+            source = int(entry[2:], 2)
+            if enable != 1:
+                continue
+
+            if port < 64:
+                dst_port = port
+                src_port = source
+            else:
+                dst_port = port
+                src_port = source + 64
+
+            routes.append({
+                "dst_port": dst_port,
+                "src_port": src_port,
+            })
+        return routes
+
+    def query_module_params(self, module_type, module_index, schema_fields):
+        hw_module = self._resolve_hw_module(module_type, module_index)
+        if hw_module is None:
+            raise RuntimeError("Hardware controller not initialized")
+
+        result = {}
+        for field in schema_fields:
+            key = field.get("key")
+            if not key:
+                continue
+            try:
+                value = hw_module.read(key)
+            except Exception:
+                continue
+
+            if isinstance(value, (bytes, bytearray)):
+                address = hw_module.process_designator(key)
+                if isinstance(address, int):
+                    width = hw_module.parameter_list.get(address, {"width": 32}).get("width", 32)
+                else:
+                    width = 32
+                intval = int.from_bytes(value, "big", signed=False)
+                if field.get("type") == "bool" or width == 1:
+                    result[key] = bool(intval & 0x1)
+                else:
+                    if width < 32 and intval >= (1 << (width - 1)):
+                        intval -= (1 << width)
+                    elif width == 32 and intval >= (1 << 31):
+                        intval -= (1 << 32)
+                    result[key] = intval
+            else:
+                result[key] = value
+
+        return result

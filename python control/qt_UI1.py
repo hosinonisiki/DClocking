@@ -10,7 +10,7 @@ from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QHBoxLayout, QListWidget, QListWidgetItem, QGraphicsView, QGraphicsScene,
                                QGraphicsItem, QGraphicsPathItem, QGraphicsTextItem,
-                               QSplitter, QGraphicsEllipseItem, QPushButton, QComboBox, QFileDialog)
+                               QSplitter, QGraphicsEllipseItem, QPushButton, QComboBox, QFileDialog, QMessageBox)
 # 导入PySide6的QtCore模块中的相关类
 from PySide6.QtCore import Qt, QMimeData, QPointF, QRectF, Signal, QObject, QByteArray, QPoint
 # 导入PySide6.QtGui模块中的相关类
@@ -169,6 +169,78 @@ def _resolve_port_number(node_name, port_index, role):
     if role == "in":
         return inputs[port_index] if 0 <= port_index < len(inputs) else None
     return outputs[port_index] if 0 <= port_index < len(outputs) else None
+
+
+def _candidate_node_names():
+    names = []
+    names.extend([f"Border_out_{i}" for i in range(8)])
+    names.extend([f"Border_in_{i}" for i in range(8)])
+    names.extend(["Border_out_HIGH", "Border_out_LOW"])
+    names.extend(["PIDC", "PID2", "ACCM", "ACC2", "SCLR", "SCL2", "SCL3", "SCL4"])
+    names.extend(["FIRF", "FIR2", "FIR3", "FIR4", "IIRF", "IIR2", "IIR3", "IIR4"])
+    names.extend(["TRIG", "TRI2", "TRI3", "TRI4", "ATAN", "ATA2"])
+    names.extend(["MIXR", "MIX2", "MIX3", "MIX4", "UNWR", "LTRN", "LTR2", "PDH", "SCLO", "SLO2"])
+    return names
+
+
+def _resolve_node_port_from_number(port_num, role):
+    for node_name in _candidate_node_names():
+        for idx in range(8):
+            try:
+                mapped = _resolve_port_number(node_name, idx, role)
+            except Exception:
+                mapped = None
+            if mapped == port_num:
+                return node_name, idx
+    return None, None
+
+
+def _node_name_to_component(node_name):
+    if node_name in ("PIDC", "PID"):
+        return "PID控制器", 0
+    if node_name.startswith("PID") and node_name[3:].isdigit():
+        return "PID控制器", int(node_name[3:]) - 1
+    if node_name == "ACCM":
+        return "累加器", 0
+    if node_name.startswith("ACC") and node_name[3:].isdigit():
+        return "累加器", int(node_name[3:]) - 1
+    if node_name == "SCLR":
+        return "线性缩放器", 0
+    if node_name.startswith("SCL") and node_name[3:].isdigit():
+        return "线性缩放器", int(node_name[3:]) - 1
+    if node_name == "FIRF":
+        return "FIR滤波器", 0
+    if node_name.startswith("FIR") and node_name[3:].isdigit():
+        return "FIR滤波器", int(node_name[3:]) - 1
+    if node_name == "IIRF":
+        return "IIR滤波器", 0
+    if node_name.startswith("IIR") and node_name[3:].isdigit():
+        return "IIR滤波器", int(node_name[3:]) - 1
+    if node_name == "TRIG":
+        return "三角函数运算器", 0
+    if node_name.startswith("TRI") and node_name[3:].isdigit():
+        return "三角函数运算器", int(node_name[3:]) - 1
+    if node_name == "ATAN":
+        return "反三角函数运算器", 0
+    if node_name.startswith("ATA") and node_name[3:].isdigit():
+        return "反三角函数运算器", int(node_name[3:]) - 1
+    if node_name == "MIXR":
+        return "混频器", 0
+    if node_name.startswith("MIX") and node_name[3:].isdigit():
+        return "混频器", int(node_name[3:]) - 1
+    if node_name == "UNWR":
+        return "解卷绕器", 0
+    if node_name == "LTRN":
+        return "线性变换器", 0
+    if node_name == "LTR2":
+        return "线性变换器", 1
+    if node_name == "PDH":
+        return "PDH状态机", 0
+    if node_name == "SCLO":
+        return "LO自动校准状态机", 0
+    if node_name == "SLO2":
+        return "LO自动校准状态机", 1
+    return None, None
 
 
 class NodeSignals(QObject):
@@ -1359,6 +1431,32 @@ class DiagramView(QGraphicsView):
         self.sync_scene_to_viewport()
         self.update_border_ports()
 
+    def auto_fit_nodes(self, padding=80.0):
+        scene = self.scene()
+        if not scene:
+            return
+
+        node_rects = [item.sceneBoundingRect() for item in scene.items() if isinstance(item, NodeItem)]
+        if not node_rects:
+            self.resetTransform()
+            self.scale_factor = 1.0
+            self.sync_scene_to_viewport()
+            self.update_border_ports()
+            return
+
+        bounds = QRectF(node_rects[0])
+        for rect in node_rects[1:]:
+            bounds = bounds.united(rect)
+
+        fit_rect = bounds.adjusted(-padding, -padding, padding, padding)
+        if fit_rect.isEmpty():
+            return
+
+        self.fitInView(fit_rect, Qt.KeepAspectRatio)
+        self.scale_factor = self.transform().m11() if self.transform().m11() > 0 else 1.0
+        self.sync_scene_to_viewport()
+        self.update_border_ports()
+
 class ComponentPalette(QListWidget):
     def __init__(self):
         super().__init__()
@@ -1539,6 +1637,166 @@ class MainWindow(QMainWindow):
             if isinstance(item, NodeItem) and hasattr(item, "free_mode"):
                 item.free_mode = not developer_mode
 
+    def _port_ref_for_name_index(self, node_name, port_idx, role, node_map):
+        if node_name.startswith("Border_out_") and node_name not in ("Border_out_HIGH", "Border_out_LOW"):
+            idx = _border_port_index(node_name, "Border_out_")
+            if idx is not None and role == "out":
+                return self.scene.left_ports[idx]
+        if node_name.startswith("Border_in_"):
+            idx = _border_port_index(node_name, "Border_in_")
+            if idx is not None and role == "in":
+                return self.scene.right_ports[idx]
+        if node_name == "Border_out_HIGH" and role == "out":
+            return self.scene.constant_out_ports[0]
+        if node_name == "Border_out_LOW" and role == "out":
+            return self.scene.constant_out_ports[1]
+
+        node = node_map.get(node_name)
+        if node is None:
+            return None
+        if role == "out" and 0 <= port_idx < len(node.out_ports):
+            return node.out_ports[port_idx]
+        if role == "in" and 0 <= port_idx < len(node.in_ports):
+            return node.in_ports[port_idx]
+        return None
+
+    def sync_from_device(self):
+        if not self.port_ctrl.is_open():
+            return
+
+        routes = self.port_ctrl.query_router_routes()
+        self._prime_router_cache_from_device_routes(routes)
+        device_edges = []
+        required_nodes = set()
+        unresolved_route_count = 0
+        unknown_node_count = 0
+        missing_port_ref_count = 0
+        param_fail_count = 0
+
+        for route in routes:
+            src_name, src_idx = _resolve_node_port_from_number(route["src_port"], "out")
+            dst_name, dst_idx = _resolve_node_port_from_number(route["dst_port"], "in")
+            if src_name is None or dst_name is None:
+                unresolved_route_count += 1
+                continue
+            device_edges.append((src_name, src_idx, dst_name, dst_idx))
+            if not src_name.startswith("Border_"):
+                required_nodes.add(src_name)
+            if not dst_name.startswith("Border_"):
+                required_nodes.add(dst_name)
+
+        self._clear_canvas()
+
+        ordered_names = sorted(required_nodes)
+
+        # Topological layered layout for clearer structure than a flat grid.
+        internal_edges = []
+        for src_name, _src_idx, dst_name, _dst_idx in device_edges:
+            if src_name in required_nodes and dst_name in required_nodes:
+                internal_edges.append((src_name, dst_name))
+
+        adjacency = {name: set() for name in required_nodes}
+        indegree = {name: 0 for name in required_nodes}
+        for src_name, dst_name in internal_edges:
+            if dst_name not in adjacency[src_name]:
+                adjacency[src_name].add(dst_name)
+                indegree[dst_name] += 1
+
+        layer = {name: 0 for name in required_nodes}
+        queue = deque(sorted([name for name in required_nodes if indegree[name] == 0]))
+        visited = 0
+        while queue:
+            node_name = queue.popleft()
+            visited += 1
+            for nxt in adjacency[node_name]:
+                layer[nxt] = max(layer[nxt], layer[node_name] + 1)
+                indegree[nxt] -= 1
+                if indegree[nxt] == 0:
+                    queue.append(nxt)
+
+        if visited < len(required_nodes):
+            # Cycle fallback: place unprocessed nodes to deeper layers deterministically.
+            max_layer = max(layer.values()) if layer else 0
+            for name in sorted(required_nodes):
+                if indegree[name] > 0:
+                    max_layer += 1
+                    layer[name] = max_layer
+
+        layers = {}
+        for name in ordered_names:
+            lv = layer.get(name, 0)
+            layers.setdefault(lv, []).append(name)
+
+        node_map = {}
+        x0, y0 = 280.0, 170.0
+        dx, dy = 280.0, 190.0
+        for lv in sorted(layers.keys()):
+            names_in_layer = sorted(layers[lv])
+            for row, name in enumerate(names_in_layer):
+                component_name, index = _node_name_to_component(name)
+                if component_name is None:
+                    unknown_node_count += 1
+                    continue
+                cls = self.view.moudle_factory.get(component_name)
+                if cls is None:
+                    unknown_node_count += 1
+                    continue
+
+                pos = QPointF(x0 + lv * dx, y0 + row * dy)
+                node = cls(component_name, index, pos)
+                self.view._used_indices.setdefault(component_name, set()).add(index)
+                self.view._apply_mode_to_node(node)
+                self.scene.addItem(node)
+                node_map[name] = node
+
+        for src_name, src_idx, dst_name, dst_idx in device_edges:
+            src_port = self._port_ref_for_name_index(src_name, src_idx, "out", node_map)
+            dst_port = self._port_ref_for_name_index(dst_name, dst_idx, "in", node_map)
+            if src_port is None or dst_port is None:
+                missing_port_ref_count += 1
+                continue
+            if dst_port.has_connection():
+                continue
+
+            edge = EdgeItem(src_port, dst_port)
+            self.scene.addItem(edge)
+            edge.refresh_style()
+
+            start_node = src_port.parent_node if hasattr(src_port, "parent_node") else None
+            end_node = dst_port.parent_node if hasattr(dst_port, "parent_node") else None
+            if start_node:
+                start_node.edges.append(edge)
+            if end_node:
+                end_node.edges.append(edge)
+
+        # Query parameters from device and fill node cache without writing back.
+        for node in node_map.values():
+            module_type, module_index = self._resolve_module_identity(node)
+            if module_type is None:
+                continue
+            try:
+                schema = node.param_schema() if hasattr(node, "param_schema") else []
+                params = self.port_ctrl.query_module_params(module_type, module_index, schema)
+                if hasattr(node, "_params") and isinstance(node._params, dict):
+                    node._params.update(params)
+            except Exception as exc:
+                param_fail_count += 1
+                print(f"[sync] param query failed for {node.name}: {exc}")
+
+        self.view.auto_fit_nodes()
+        print(f"[sync] loaded {len(node_map)} nodes and {len(device_edges)} routes from device")
+
+        report = (
+            f"同步完成\n"
+            f"已识别连线: {len(device_edges)}\n"
+            f"已生成节点: {len(node_map)}\n"
+            f"未识别端口连线: {unresolved_route_count}\n"
+            f"端口映射失败连线: {missing_port_ref_count}\n"
+            f"未知模块节点: {unknown_node_count}\n"
+            f"参数读取失败模块: {param_fail_count}"
+        )
+        QMessageBox.information(self, "同步报告", report)
+
 
     def run_business_logic(self, src, src_port, dst, dst_port):
         print(f"🔄 >> 执行业务逻辑: 数据从 {src}:Out{src_port+1} 传输到 {dst}:In{dst_port+1}...")
@@ -1564,11 +1822,35 @@ class MainWindow(QMainWindow):
         if not self.port_ctrl.is_open():
             print("[route] serial port not open, routing not sent")
             return None
-        if self.router is None:
-            self.router=self.port_ctrl.hw_controller.router
-            # self.router_bus = PortBus(self.port_ctrl)
-            # self.router = module_signal_router.ModuleSignalRouter(self.router_bus)
+        # Always rebind to the latest router instance after reconnect.
+        hw_router = getattr(self.port_ctrl.hw_controller, "router", None)
+        if hw_router is None:
+            print("[route] router is not ready")
+            return None
+        self.router = hw_router
+        # self.router_bus = PortBus(self.port_ctrl)
+        # self.router = module_signal_router.ModuleSignalRouter(self.router_bus)
         return self.router
+
+    def _prime_router_cache_from_device_routes(self, routes):
+        router = self._ensure_router()
+        if router is None:
+            return
+
+        # Keep local router cache aligned with hardware routes.
+        router.port_config = [0] * 128
+        if not getattr(router, "port_enable", None) or len(router.port_enable) != 128:
+            router.port_enable = [1] * 128
+
+        for route in routes:
+            dst_port = route.get("dst_port")
+            src_port = route.get("src_port")
+            if dst_port is None or src_port is None:
+                continue
+            try:
+                router.set_routing(int(dst_port), int(src_port))
+            except Exception as exc:
+                print(f"[sync] skip cache prime route {src_port}->{dst_port}: {exc}")
 
     def _apply_routing(self, dst_port_num, src_port_num, label):
         router = self._ensure_router()
