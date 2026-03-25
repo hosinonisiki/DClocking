@@ -73,6 +73,11 @@ def _border_port_index(name, prefix):
 
 
 def _resolve_port_number(node_name, port_index, role):
+    if node_name == "Border_out_HIGH":
+        return pn.HIGH if role == "out" else None
+    if node_name == "Border_out_LOW":
+        return pn.LOW if role == "out" else None
+
     border_out_idx = _border_port_index(node_name, "Border_out_")
     if border_out_idx is not None:
         inputs = [pn.INPUT_A, pn.INPUT_B, pn.INPUT_C, pn.INPUT_D, pn.INPUT_E, pn.INPUT_F, pn.INPUT_G, pn.INPUT_H]
@@ -181,9 +186,11 @@ class BorderPort(PortItem):
     """
     表示边框上的输入/输出端口的图形项类
     """
-    def __init__(self, port_type, index, position):
-        super().__init__(None, port_type, index, ["bool", "level", "phase", "differential"])
-        self.name = f"Border_{port_type}_{index}"
+    def __init__(self, port_type, index, position, signals=None, display_text=None, name=None):
+        if signals is None:
+            signals = ["bool", "level", "phase", "differential"]
+        super().__init__(None, port_type, index, signals)
+        self.name = name if name is not None else f"Border_{port_type}_{index}"
         self.port_type = port_type
         self.index = index
         self.radius = 6
@@ -193,7 +200,9 @@ class BorderPort(PortItem):
         
         # 将 index (0~7) 映射为通道名 (A~H)
         self.channel_name = chr(65 + index)
-        if self.port_type == 'out':
+        if display_text is not None:
+            self.display_text = display_text
+        elif self.port_type == 'out':
             # 左侧端口，向右连线进入系统，对应硬件的 INPUT
             self.display_text = f"INPUT_{self.channel_name}"
         else:
@@ -661,6 +670,7 @@ class DiagramScene(QGraphicsScene):
         # Add border ports
         self.left_ports = []
         self.right_ports = []
+        self.constant_out_ports = []
         for i in range(8):
             left_port = BorderPort('out', i, QPointF(0, 0))
             self.addItem(left_port)
@@ -668,6 +678,12 @@ class DiagramScene(QGraphicsScene):
             right_port = BorderPort('in', i, QPointF(0, 0))
             self.addItem(right_port)
             self.right_ports.append(right_port)
+
+        high_port = BorderPort('out', 8, QPointF(0, 0), signals=["bool"], display_text="HIGH", name="Border_out_HIGH")
+        low_port = BorderPort('out', 9, QPointF(0, 0), signals=["bool"], display_text="LOW", name="Border_out_LOW")
+        self.addItem(high_port)
+        self.addItem(low_port)
+        self.constant_out_ports.extend([high_port, low_port])
 
     def set_developer_mode(self, enabled: bool):
         self.developer_mode = bool(enabled)
@@ -1038,6 +1054,13 @@ class DiagramView(QGraphicsView):
 
             right_scene_pos = self.mapToScene(QPoint(viewport_rect.width() - 5 * self.scale_factor, int(y_pos)))
             scene.right_ports[i].setPos(right_scene_pos)
+
+        # Place HIGH/LOW sources near the top-left for direct bool routing.
+        if hasattr(scene, "constant_out_ports") and len(scene.constant_out_ports) >= 2:
+            high_pos = self.mapToScene(QPoint(5 * self.scale_factor, int(spacing * 0.35)))
+            low_pos = self.mapToScene(QPoint(5 * self.scale_factor, int(spacing * 0.75)))
+            scene.constant_out_ports[0].setPos(high_pos)
+            scene.constant_out_ports[1].setPos(low_pos)
 
         # Update all connections after moving border ports
         for item in scene.items():
@@ -1619,6 +1642,12 @@ class MainWindow(QMainWindow):
         idx = int(ref.get("index", -1))
 
         if kind == "border":
+            name = ref.get("name")
+            if name == "Border_out_HIGH" and hasattr(self.scene, "constant_out_ports") and len(self.scene.constant_out_ports) >= 1:
+                return self.scene.constant_out_ports[0]
+            if name == "Border_out_LOW" and hasattr(self.scene, "constant_out_ports") and len(self.scene.constant_out_ports) >= 2:
+                return self.scene.constant_out_ports[1]
+
             if idx < 0 or idx >= 8:
                 return None
             if port_type == "out":
