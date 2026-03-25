@@ -147,7 +147,7 @@ class QtSerial:
         if verbose:
             print(response)
         
-        if not response.startswith(b": ACKN"):
+        if not (response.startswith(b":ACKN") or response.startswith(b": ACKN")):
             try:
                 resp_str = response. decode()
             except:

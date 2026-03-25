@@ -126,11 +126,12 @@ class Port(QObject):
         
         self.serial_port.setPortName(port)
         #设置波特率
-        self.serial_port.setBaudRate(9600)
+        # 与 env.py 中已验证可用的链路参数保持一致
+        self.serial_port.setBaudRate(115200)
         #设置数据位 8位数据位
         self.serial_port.setDataBits(QSerialPort.Data8)
-        #设置校验位 无校验位
-        self.serial_port.setParity(QSerialPort.NoParity)
+        # FPGA UART 使用偶校验
+        self.serial_port.setParity(QSerialPort.EvenParity)
         #设置停止位
         self.serial_port.setStopBits(QSerialPort.OneStop)
     
@@ -155,7 +156,15 @@ class Port(QObject):
                     self.hw_controller.set_serial(self.qt_serial)
                     self.hw_controller.init()
                 except Exception as e:
-
+                    # 初始化失败时回滚连接状态并明确提示错误信息
+                    self.serial_port.close()
+                    self.qt_serial = None
+                    self.parent.connect_btn.setText(self.tr("连接"))
+                    qw.QMessageBox.critical(
+                        self.parent,
+                        self.tr("初始化失败"),
+                        self.tr(f"硬件初始化失败:\n{e}")
+                    )
                     return
 
             else:
