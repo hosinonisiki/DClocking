@@ -3,12 +3,14 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QGraphicsItem, QGraphicsPathItem, QGraphicsTextItem,
                                QSplitter, QGraphicsEllipseItem, QDialog, QFormLayout,
                                QSpinBox, QDoubleSpinBox, QLineEdit,
-                               QCheckBox, QPushButton, QToolTip, QComboBox, QMessageBox)
+                               QCheckBox, QPushButton, QToolTip, QComboBox, QMessageBox, QLabel)
 # 导入PySide6的QtCore模块中的相关类
 from PySide6.QtCore import Qt, QMimeData, QPointF, QRectF, Signal, QObject, QByteArray, QPoint
 # 导入PySide6.QtGui模块中的相关类
 from PySide6.QtGui import QDrag, QPainter, QPen, QBrush, QPainterPath, QColor, QFont, QPixmap, QImage, QCursor
 import math
+import re
+from decimal import Decimal, InvalidOperation
 from qt_moudle_schema import PID_SCHEMA, ACCM_SCHEMA, SCLR_SCHEMA, FIRF_SCHEMA, LTRN_SCHEMA, PDH_SCHEMA, SCLO_SCHEMA, IIR_SCHEMA
 
 _PARAM_APPLY_HANDLER = None
@@ -20,6 +22,105 @@ def set_param_apply_handler(handler):
 def _dispatch_param_apply(node, params):
     if _PARAM_APPLY_HANDLER:
         _PARAM_APPLY_HANDLER(node, params)
+
+
+class QuantityLineEdit(QLineEdit):
+    PREFIX_MAP = {
+        "": Decimal("1"),
+        "m": Decimal("1e-3"),
+        "u": Decimal("1e-6"),
+        "n": Decimal("1e-9"),
+        "p": Decimal("1e-12"),
+        "f": Decimal("1e-15"),
+        "a": Decimal("1e-18"),
+        "k": Decimal("1e3"),
+        "M": Decimal("1e6"),
+        "G": Decimal("1e9"),
+        "T": Decimal("1e12"),
+    }
+
+    def __init__(self, value=0, unit="", decimals=6, parent=None):
+        super().__init__(parent)
+        self.unit = unit or ""
+        self.decimals = int(max(0, decimals))
+        self._re = re.compile(r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*$")
+        self.setText(self._format_display(Decimal(str(value))))
+
+    def _format_display(self, value: Decimal):
+        s = f"{value:.{self.decimals}f}".rstrip("0").rstrip(".")
+        if s in ("", "-", "+"):
+            s = "0"
+        return s
+
+    def _parse_text(self):
+        text = self.text().strip()
+        m = self._re.match(text)
+        if not m:
+            return None
+        num_str = m.group(1)
+        try:
+            base = Decimal(num_str)
+        except InvalidOperation:
+            return None
+        return {
+            "num": base,
+            "num_str": num_str,
+            "value": base,
+        }
+
+    def value_si(self):
+        parsed = self._parse_text()
+        return parsed["value"] if parsed else None
+
+    def keyPressEvent(self, event):
+        if event.key() not in (Qt.Key_Up, Qt.Key_Down):
+            super().keyPressEvent(event)
+            return
+
+        parsed = self._parse_text()
+        if not parsed:
+            super().keyPressEvent(event)
+            return
+
+        full_text = self.text()
+        num_str = parsed["num_str"]
+        sign_offset = 1 if num_str.startswith(("-", "+")) else 0
+        digits = num_str[sign_offset:]
+        dot_idx = digits.find(".")
+
+        start_idx = full_text.find(num_str)
+        if start_idx < 0:
+            super().keyPressEvent(event)
+            return
+        cursor = self.cursorPosition()
+        rel = max(0, min(len(num_str) - 1, cursor - start_idx))
+
+        if num_str[rel] in "+-":
+            rel = min(len(num_str) - 1, rel + 1)
+        if num_str[rel] == ".":
+            rel = min(len(num_str) - 1, rel + 1)
+
+        rel_no_sign = max(0, rel - sign_offset)
+        if dot_idx >= 0:
+            if rel_no_sign < dot_idx:
+                power = dot_idx - rel_no_sign - 1
+            elif rel_no_sign > dot_idx:
+                power = -(rel_no_sign - dot_idx)
+            else:
+                power = 0
+        else:
+            power = len(digits) - rel_no_sign - 1
+
+        step = Decimal(10) ** Decimal(power)
+        if event.key() == Qt.Key_Down:
+            step = -step
+
+        new_num = parsed["num"] + step
+        display = self._format_display(new_num)
+        self.setText(display)
+        self.setCursorPosition(max(0, min(len(display), cursor)))
+
+        event.accept()
 
 class ParamDialog(QDialog):
     def __init__(self, schema: list[dict], values: dict, parent = None, apply_callback = None):
@@ -57,14 +158,37 @@ class ParamDialog(QDialog):
                 continue
 
             if ftype == "int":
-                w = QSpinBox()
-                w.setRange(field.get("min", -10**9), field.get("max", 10**9))
-                w.setValue(int(values.get(key, field.get("default", 0))))
+                value = int(values.get(key, field.get("default", 0)))
+                edit = QuantityLineEdit(value=value, unit=field.get("unit", ""), decimals=0)
+                prefix_box = QComboBox()
+                for p in ["", "m", "u", "n", "p", "f", "a", "k", "M", "G", "T"]:
+                    prefix_box.addItem(p if p else "(base)", p)
+                prefix_box.setCurrentIndex(0)
+                unit_text = field.get("unit", "")
+                unit_label = QLabel(unit_text)
+                unit_label.setMinimumWidth(36)
+                w = QWidget()
+                w_layout = QHBoxLayout(w)
+                w_layout.setContentsMargins(0, 0, 0, 0)
+                w_layout.addWidget(edit)
+                w_layout.addWidget(prefix_box)
+                w_layout.addWidget(unit_label)
             elif ftype == "float":
-                w = QDoubleSpinBox()
-                w.setDecimals(field.get("decimals", 6))
-                w.setRange(field.get("min", -1e18), field.get("max", 1e18))
-                w.setValue(float(values.get(key, field.get("default", 0.0))))
+                value = float(values.get(key, field.get("default", 0.0)))
+                edit = QuantityLineEdit(value=value, unit=field.get("unit", ""), decimals=field.get("decimals", 6))
+                prefix_box = QComboBox()
+                for p in ["", "m", "u", "n", "p", "f", "a", "k", "M", "G", "T"]:
+                    prefix_box.addItem(p if p else "(base)", p)
+                prefix_box.setCurrentIndex(0)
+                unit_text = field.get("unit", "")
+                unit_label = QLabel(unit_text)
+                unit_label.setMinimumWidth(36)
+                w = QWidget()
+                w_layout = QHBoxLayout(w)
+                w_layout.setContentsMargins(0, 0, 0, 0)
+                w_layout.addWidget(edit)
+                w_layout.addWidget(prefix_box)
+                w_layout.addWidget(unit_label)
             elif ftype == "bool":
                 w = QCheckBox()
                 w.setChecked(bool(values.get(key, field.get("default", False))))
@@ -72,13 +196,66 @@ class ParamDialog(QDialog):
                 w = QLineEdit()
                 w.setText(str(values.get(key, field.get("default", ""))))
             
-            self._editors[key] = (ftype, w)
+            if ftype == "int":
+                self._editors[key] = ("int_qty", (edit, prefix_box))
+            elif ftype == "float":
+                self._editors[key] = ("float_qty", (edit, prefix_box))
+            else:
+                self._editors[key] = (ftype, w)
             row = QHBoxLayout()
             row.addWidget(w)
             confirm_btn = QPushButton("确认")
             confirm_btn.clicked.connect(lambda checked=False, k=key: self._apply_field(k))
             row.addWidget(confirm_btn)
             layout.addRow(label, row)
+
+    def _value_from_editor(self, key: str):
+        ftype, w = self._editors[key]
+        field = self._fields.get(key, {})
+        min_v = field.get("min", None)
+        max_v = field.get("max", None)
+
+        if ftype == "int_qty":
+            edit, prefix_box = w
+            si = edit.value_si()
+            if si is None:
+                raise ValueError("输入格式无效，请使用数字+可选前缀（m/u/n/p/f/a/k/M/G/T）")
+            prefix = prefix_box.currentData() if isinstance(prefix_box.currentData(), str) else ""
+            si = si * QuantityLineEdit.PREFIX_MAP.get(prefix, Decimal("1"))
+            if si != si.to_integral_value():
+                raise ValueError("整型参数经单位换算后必须是整数，请调整数值或前缀")
+            value = int(si)
+            if min_v is not None and value < min_v:
+                raise ValueError(f"参数值小于最小值 {min_v}")
+            if max_v is not None and value > max_v:
+                raise ValueError(f"参数值大于最大值 {max_v}")
+            return value
+
+        if ftype == "float_qty":
+            edit, prefix_box = w
+            si = edit.value_si()
+            if si is None:
+                raise ValueError("输入格式无效，请使用数字+可选前缀（m/u/n/p/f/a/k/M/G/T）")
+            prefix = prefix_box.currentData() if isinstance(prefix_box.currentData(), str) else ""
+            si = si * QuantityLineEdit.PREFIX_MAP.get(prefix, Decimal("1"))
+            value = float(si)
+            if min_v is not None and value < min_v:
+                raise ValueError(f"参数值小于最小值 {min_v}")
+            if max_v is not None and value > max_v:
+                raise ValueError(f"参数值大于最大值 {max_v}")
+            return value
+
+        if ftype == "bool":
+            return bool(w.isChecked())
+        if ftype == "flip_toggle":
+            return bool(w.isChecked())
+        if ftype == "flip_pulse":
+            return None
+        if ftype == "int":
+            return int(w.value())
+        if ftype == "float":
+            return float(w.value())
+        return w.text()
 
     def _set_toggle_button_text(self, button: QPushButton, label: str, checked: bool):
         state_text = "按下" if checked else "弹起"
@@ -99,36 +276,19 @@ class ParamDialog(QDialog):
     def _apply_field(self, key: str) -> None:
         if not self._apply_callback:
             return
-        ftype, w = self._editors[key]
-        if ftype == "int":
-            value = int(w.value())
-        elif ftype == "float":
-            value = float(w.value())
-        elif ftype == "bool":
-            value = bool(w.isChecked())
-        elif ftype == "flip_toggle":
-            value = bool(w.isChecked())
-        elif ftype == "flip_pulse":
-            value = None
-        else:
-            value = w.text()
-        self._apply_callback({key: value})
+        try:
+            value = self._value_from_editor(key)
+            self._apply_callback({key: value})
+        except Exception as exc:
+            QMessageBox.warning(self, "参数错误", str(exc))
 
     def values(self) -> dict:
         out = {}
-        for key, (ftype, w) in self._editors.items():
-            if ftype == "int":
-                out[key] = int(w.value())
-            elif ftype == "float":
-                out[key] = float(w.value())
-            elif ftype == "bool":
-                out[key] = bool(w.isChecked())
-            elif ftype == "flip_toggle":
-                out[key] = bool(w.isChecked())
-            elif ftype == "flip_pulse":
-                out[key] = None
-            else:
-                out[key] = w.text()
+        for key in self._editors.keys():
+            try:
+                out[key] = self._value_from_editor(key)
+            except Exception:
+                continue
         return out
 
 
