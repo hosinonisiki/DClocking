@@ -1,6 +1,36 @@
 # 概述
 这是一个用于创建和管理信号处理模块（如PID控制器、累加器、滤波器等）及其连接的图形化节点编辑器。它支持模块拖放、连线、参数设置、视图控制以及与硬件端口的信号路由。
 
+# 模块依赖图（新版）
+当前代码已按“入口层 -> 编排层 -> 图形层/工具层 -> 设备与模块层”拆分。
+
+依赖关系（简图）：
+
+qt_UI1.py
+  -> qt_ui_mainwindow.py
+      -> qt_ui_graph.py
+      -> qt_ui_utils.py
+      -> qt_Port.py
+      -> qt_moudle.py
+      -> port_numbers.py
+
+qt_ui_graph.py
+  -> qt_moudle.py
+
+qt_ui_utils.py
+  -> qt_Port.py
+  -> port_numbers.py
+
+qt_Port.py
+  -> qt_uart.py
+  -> qt_env.py
+
+说明：
+- qt_UI1.py：仅保留程序启动与主窗口装配。
+- qt_ui_mainwindow.py：主业务编排（同步、路由、参数下发、配置读写）。
+- qt_ui_graph.py：纯图形交互（Scene/View/Edge/Palette）。
+- qt_ui_utils.py：纯工具函数（端口映射、节点映射、端口扩展方法）。
+
 # 核心功能模块
 
 ## 1. 主窗口与基础布局
@@ -120,3 +150,31 @@
 - 设置参数：双击模块。
 - 平移视图：在画布空白处按住拖动。
 - 缩放视图：使用鼠标滚轮。
+
+# 协作维护说明（简版）
+为避免再次出现大文件耦合，建议按下面规则协作开发：
+
+1. 入口文件保持稳定
+- qt_UI1.py 只做启动，不写业务逻辑和绘制逻辑。
+
+2. 变更就近归属
+- 连接交互、拖拽、缩放、连线路径：改 qt_ui_graph.py。
+- 同步设备、路由写入、参数下发、配置保存：改 qt_ui_mainwindow.py。
+- 端口号映射、节点名映射、通用小函数：改 qt_ui_utils.py。
+- 串口协议与硬件模块读写：改 qt_Port.py / qt_uart.py / qt_env.py。
+
+3. 降低循环依赖
+- graph 层不反向依赖 mainwindow 层。
+- utils 层不依赖 graph 层。
+- 若出现跨层复用需求，优先下沉到 utils。
+
+4. 扩展新模块的最小修改面
+- 新增模块类型时，优先按顺序修改：
+  1) qt_moudle.py（模块类/参数）
+  2) qt_ui_graph.py（模块工厂映射）
+  3) qt_ui_utils.py（端口号映射）
+  4) qt_ui_mainwindow.py（模块身份解析，如需下发参数）
+
+5. 提交前检查建议
+- 至少检查 qt_UI1.py、qt_ui_mainwindow.py、qt_ui_graph.py、qt_ui_utils.py 无语法错误。
+- 手动验证 4 条关键流程：连接串口、同步下位机、拖拽连线、参数下发。
