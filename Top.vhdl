@@ -43,6 +43,8 @@ entity top is
         ss          :   out std_logic_vector(0 to 15);
         io_tri      :   out std_logic;
 
+        query_result    :   out std_logic_vector(0 to 3);
+
         adc_in      :   in  signal_array(0 to ADC_channel_count - 1); -- ADC input signals
 
         dac_out     :   out signal_array(0 to DAC_channel_count - 1) -- DAC output signals
@@ -113,7 +115,9 @@ begin
 
         rsp_sel_out     =>  rsp_sel,
         rsp_data_in     =>  rsp_data,
-        rsp_stat_in     =>  rsp_stat
+        rsp_stat_in     =>  rsp_stat,
+
+        query_result_out    =>  query_result
     );
     mc_rst <= rst;
 

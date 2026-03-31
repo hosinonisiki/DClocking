@@ -397,6 +397,8 @@ architecture peripheral_wrapper of wrapper is
 
     signal spi_miso_buf : std_logic_vector(0 to 3);
 
+    signal query_result : std_logic_vector(0 to 3);
+
     constant ADC_channel_count : integer := 8;
     constant DAC_channel_count : integer := 6;
     signal adc_buf          : signal_array(0 to ADC_channel_count - 1);
@@ -809,6 +811,8 @@ begin
         ss => spi_ss,
         io_tri => spi_io_tri,
 
+        query_result => query_result,
+
         adc_in => adc_buf,
 
         dac_out => dac_buf
@@ -824,11 +828,11 @@ begin
 
     -- leds
     led_1 <= not sys_mmcm_sel; -- indicates which clock source is selected, dark for internal, lit for external
-    led_2 <= uart_rxd nand uart_txd; -- detects uart bit flow
+    led_2 <= query_result(0); -- detects if external ref is available
     led_3 <= uart_err; -- detects uart error
     led_4 <= not (and spi_ss); -- detects if any spi chip is selected
     panel_led_1 <= '1'; -- detects if the system is running
-    panel_led_2 <= sys_rst; -- detects if the system is reset
+    panel_led_2 <= query_result(1); -- detects if AD9680 is running normally
 
     -- AN9767 adapter
     AN9767_1 : entity work.AN9767_adapter(direct) port map(
