@@ -1,8 +1,10 @@
 import json
+import sys
 from collections import deque
 from datetime import datetime
 
-from PySide6.QtCore import Qt, QPointF
+from PySide6.QtCore import Qt, QPointF, QObject, Signal
+from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -13,6 +15,10 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QMessageBox,
+    QLabel,
+    QScrollArea,
+    QFrame,
+    QPlainTextEdit,
 )
 from PySide6.QtSerialPort import QSerialPort
 
@@ -26,7 +32,10 @@ from qt_moudle import (
     MoudleSCLOFSM,
     MoudlePDHFSM,
     MoudleLinerTransformer,
+    ParamDialog,
+    SpecialMethodDialog,
     set_param_apply_handler,
+    set_param_open_handler,
 )
 from qt_Port import Port
 from qt_ui_graph import NodeSignals, BorderPort, EdgeItem, DiagramScene, DiagramView, ComponentPalette
@@ -38,6 +47,28 @@ from qt_ui_utils import (
     node_name_to_component,
 )
 import port_numbers as pn
+
+
+class _StreamProxy(QObject):
+    text_written = Signal(str)
+
+    def __init__(self, target_stream):
+        super().__init__()
+        self._target_stream = target_stream
+
+    def write(self, text):
+        if text is None:
+            return
+        chunk = str(text)
+        if not chunk:
+            return
+        self.text_written.emit(chunk)
+        if self._target_stream is not None:
+            self._target_stream.write(chunk)
+
+    def flush(self):
+        if self._target_stream is not None:
+            self._target_stream.flush()
 
 
 class MainWindow(QMainWindow):
@@ -92,6 +123,10 @@ class MainWindow(QMainWindow):
         self.scene = DiagramScene(self.signals)
         self.view = DiagramView(self.scene)
         self.palette = ComponentPalette()
+        self._param_panels = {}
+        self._build_side_panel()
+        self._build_log_panel()
+        self._setup_log_redirect()
         self._on_mode_changed(self.mode_combo.currentText())
 
         self.save_cfg_btn.clicked.connect(self.save_configuration)
@@ -99,15 +134,176 @@ class MainWindow(QMainWindow):
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(self.view)
-        splitter.addWidget(self.palette)
+        splitter.addWidget(self.side_panel)
+        splitter.setSizes([1200, 400])
 
         main_widget = QWidget()
         main_layout = QVBoxLayout(main_widget)
         main_layout.addWidget(serial_bar)
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(splitter, stretch=1)
+        main_layout.addWidget(self.log_panel, stretch=0)
         self.setCentralWidget(main_widget)
 
         set_param_apply_handler(self._apply_param_to_hardware)
+        set_param_open_handler(self._open_param_panel)
+
+    def _build_log_panel(self):
+        self.log_panel = QFrame(self)
+        self.log_panel.setFrameShape(QFrame.StyledPanel)
+        self.log_panel.setFixedHeight(140)
+
+        layout = QVBoxLayout(self.log_panel)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(4)
+
+        title = QLabel("命令行输出")
+        layout.addWidget(title)
+
+        self.log_output = QPlainTextEdit(self.log_panel)
+        self.log_output.setReadOnly(True)
+        self.log_output.document().setMaximumBlockCount(300)
+        layout.addWidget(self.log_output, stretch=1)
+
+    def _setup_log_redirect(self):
+        self._stdout_origin = sys.stdout
+        self._stderr_origin = sys.stderr
+
+        self._stdout_proxy = _StreamProxy(self._stdout_origin)
+        self._stderr_proxy = _StreamProxy(self._stderr_origin)
+        self._stdout_proxy.text_written.connect(self._append_log_text)
+        self._stderr_proxy.text_written.connect(self._append_log_text)
+
+        sys.stdout = self._stdout_proxy
+        sys.stderr = self._stderr_proxy
+
+    def _restore_log_redirect(self):
+        if getattr(self, "_stdout_origin", None) is not None and sys.stdout is getattr(self, "_stdout_proxy", None):
+            sys.stdout = self._stdout_origin
+        if getattr(self, "_stderr_origin", None) is not None and sys.stderr is getattr(self, "_stderr_proxy", None):
+            sys.stderr = self._stderr_origin
+
+    def _append_log_text(self, text):
+        if not text:
+            return
+        cursor = self.log_output.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText(text)
+        self.log_output.setTextCursor(cursor)
+        self.log_output.ensureCursorVisible()
+
+    def closeEvent(self, event):
+        self._restore_log_redirect()
+        super().closeEvent(event)
+
+    def _build_side_panel(self):
+        self.side_panel = QWidget()
+        side_layout = QHBoxLayout(self.side_panel)
+        side_layout.setContentsMargins(6, 6, 6, 6)
+        side_layout.setSpacing(8)
+
+        module_col = QWidget(self.side_panel)
+        module_layout = QVBoxLayout(module_col)
+        module_layout.setContentsMargins(0, 0, 0, 0)
+        module_layout.setSpacing(6)
+        palette_title = QLabel("模块列表")
+        module_layout.addWidget(palette_title)
+        module_layout.addWidget(self.palette, stretch=1)
+
+        param_col = QWidget(self.side_panel)
+        param_layout_root = QVBoxLayout(param_col)
+        param_layout_root.setContentsMargins(0, 0, 0, 0)
+        param_layout_root.setSpacing(6)
+
+        header_row = QHBoxLayout()
+        param_title = QLabel("参数窗口")
+        clear_btn = QPushButton("清空")
+        clear_btn.setFixedWidth(60)
+        clear_btn.clicked.connect(self._clear_param_panels)
+        header_row.addWidget(param_title)
+        header_row.addStretch()
+        header_row.addWidget(clear_btn)
+        param_layout_root.addLayout(header_row)
+
+        self.param_scroll = QScrollArea()
+        self.param_scroll.setWidgetResizable(True)
+        self.param_container = QWidget()
+        self.param_layout = QVBoxLayout(self.param_container)
+        self.param_layout.setContentsMargins(0, 0, 0, 0)
+        self.param_layout.setSpacing(8)
+        self.param_layout.addStretch()
+        self.param_scroll.setWidget(self.param_container)
+        param_layout_root.addWidget(self.param_scroll, stretch=1)
+
+        side_layout.addWidget(module_col, stretch=1)
+        side_layout.addWidget(param_col, stretch=2)
+
+    def _scroll_to_panel(self, panel_widget):
+        scrollbar = self.param_scroll.verticalScrollBar()
+        target = max(0, panel_widget.y() - 8)
+        scrollbar.setValue(target)
+
+    def _close_param_panel(self, panel_key):
+        panel = self._param_panels.pop(panel_key, None)
+        if panel is None:
+            return
+        panel.setParent(None)
+        panel.deleteLater()
+
+    def _clear_param_panels(self):
+        for key in list(self._param_panels.keys()):
+            self._close_param_panel(key)
+
+    def _open_param_panel(self, node):
+        if node is None:
+            return False
+
+        schema = node.param_schema() if hasattr(node, "param_schema") else []
+        special_methods = node.special_methods_schema() if hasattr(node, "special_methods_schema") else []
+        if not schema and not special_methods:
+            return False
+
+        panel_key = f"{node.name}@{node.component_name}:{node.index}"
+        existing = self._param_panels.get(panel_key)
+        if existing is not None:
+            self._scroll_to_panel(existing)
+            return True
+
+        card = QFrame(self.param_container)
+        card.setFrameShape(QFrame.StyledPanel)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(8, 8, 8, 8)
+        card_layout.setSpacing(6)
+
+        title_row = QHBoxLayout()
+        title = QLabel(f"{node.name} 参数")
+        close_btn = QPushButton("关闭")
+        close_btn.setFixedWidth(60)
+        close_btn.clicked.connect(lambda _=False, k=panel_key: self._close_param_panel(k))
+        title_row.addWidget(title)
+        title_row.addStretch()
+        title_row.addWidget(close_btn)
+        card_layout.addLayout(title_row)
+
+        if schema:
+            param_widget = ParamDialog(schema, node.get_params(), parent=self, apply_callback=node.set_params)
+            param_widget.setWindowFlags(Qt.Widget)
+            card_layout.addWidget(param_widget)
+
+        if special_methods:
+            special_widget = SpecialMethodDialog(
+                special_methods,
+                parent=self,
+                apply_callback=node.apply_special_method,
+                initial_values=getattr(node, "_special_method_args", {}),
+            )
+            special_widget.setWindowFlags(Qt.Widget)
+            card_layout.addWidget(special_widget)
+
+        insert_pos = max(0, self.param_layout.count() - 1)
+        self.param_layout.insertWidget(insert_pos, card)
+        self._param_panels[panel_key] = card
+        self._scroll_to_panel(card)
+        return True
 
     def _on_mode_changed(self, text):
         developer_mode = text == "Developer Mode"
@@ -448,6 +644,8 @@ class MainWindow(QMainWindow):
         return None
 
     def _clear_canvas(self):
+        self._clear_param_panels()
+
         for item in list(self.scene.items()):
             if isinstance(item, EdgeItem):
                 item.remove()
