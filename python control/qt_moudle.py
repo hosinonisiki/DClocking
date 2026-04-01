@@ -14,14 +14,27 @@ from decimal import Decimal, InvalidOperation
 from qt_moudle_schema import PID_SCHEMA, ACCM_SCHEMA, SCLR_SCHEMA, FIRF_SCHEMA, LTRN_SCHEMA, PDH_SCHEMA, SCLO_SCHEMA, IIR_SCHEMA
 
 _PARAM_APPLY_HANDLER = None
+_PARAM_OPEN_HANDLER = None
 
 def set_param_apply_handler(handler):
     global _PARAM_APPLY_HANDLER
     _PARAM_APPLY_HANDLER = handler
 
+def set_param_open_handler(handler):
+    global _PARAM_OPEN_HANDLER
+    _PARAM_OPEN_HANDLER = handler
+
 def _dispatch_param_apply(node, params):
     if _PARAM_APPLY_HANDLER:
         _PARAM_APPLY_HANDLER(node, params)
+
+def _dispatch_param_open(node):
+    if _PARAM_OPEN_HANDLER:
+        try:
+            return bool(_PARAM_OPEN_HANDLER(node))
+        except Exception as exc:
+            print(f"[param] open panel failed: {exc}")
+    return False
 
 
 class QuantityLineEdit(QLineEdit):
@@ -293,12 +306,13 @@ class ParamDialog(QDialog):
 
 
 class SpecialMethodDialog(QDialog):
-    def __init__(self, methods: list[dict], parent=None, apply_callback=None):
+    def __init__(self, methods: list[dict], parent=None, apply_callback=None, initial_values=None):
         super().__init__(parent)
         self.setWindowTitle("特殊方法")
         self._methods = methods or []
         self._apply_callback = apply_callback
         self._method_map = {m["name"]: m for m in self._methods if "name" in m}
+        self._initial_values = initial_values or {}
         self._param_editors = {}
 
         root = QVBoxLayout(self)
@@ -336,20 +350,24 @@ class SpecialMethodDialog(QDialog):
         if not method:
             return
 
+        method_name = method.get("name")
+        method_initials = self._initial_values.get(method_name, {}) if method_name else {}
+
         for field in method.get("params", []):
             key = field["key"]
             label = field.get("label", key)
             ftype = field.get("type", "str")
+            init_value = method_initials.get(key, field.get("default"))
 
             if ftype == "int":
                 w = QSpinBox()
                 w.setRange(field.get("min", -10**9), field.get("max", 10**9))
-                w.setValue(int(field.get("default", 0)))
+                w.setValue(int(init_value if init_value is not None else 0))
             elif ftype == "float":
                 w = QDoubleSpinBox()
                 w.setDecimals(field.get("decimals", 6))
                 w.setRange(field.get("min", -1e18), field.get("max", 1e18))
-                w.setValue(float(field.get("default", 0.0)))
+                w.setValue(float(init_value if init_value is not None else 0.0))
             elif ftype == "choice":
                 w = QComboBox()
                 for option in field.get("options", []):
@@ -357,14 +375,14 @@ class SpecialMethodDialog(QDialog):
                         w.addItem(str(option.get("label", option.get("value", ""))), option.get("value"))
                     else:
                         w.addItem(str(option), option)
-                default_value = field.get("default", None)
+                default_value = init_value
                 if default_value is not None:
                     idx = w.findData(default_value)
                     if idx >= 0:
                         w.setCurrentIndex(idx)
             else:
                 w = QLineEdit()
-                w.setText(str(field.get("default", "")))
+                w.setText(str(init_value if init_value is not None else ""))
 
             self._param_editors[key] = (ftype, w)
             self._form.addRow(label, w)
@@ -387,7 +405,10 @@ class SpecialMethodDialog(QDialog):
         if not method or not self._apply_callback:
             return
         try:
-            self._apply_callback(method["name"], self._collect_args())
+            method_name = method["name"]
+            args = self._collect_args()
+            self._apply_callback(method_name, args)
+            self._initial_values[method_name] = dict(args)
             QMessageBox.information(self, "成功", "特殊方法已应用")
         except Exception as exc:
             QMessageBox.critical(self, "失败", f"特殊方法执行失败:\n{exc}")
@@ -675,9 +696,13 @@ class NodeItem(QGraphicsItem):
         self.in_ports = []
         self.out_ports = []
         self.edges = []
+        self._special_method_args = {}
 
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.LeftButton:
+            if _dispatch_param_open(self):
+                event.accept()
+                return
             self.open_param_dialog()
             event.accept()
             return
@@ -696,6 +721,8 @@ class NodeItem(QGraphicsItem):
         return []
 
     def apply_special_method(self, method_name: str, args: dict) -> None:
+        if method_name:
+            self._special_method_args[method_name] = dict(args or {})
         self._notify_param_change({"__special_method__": method_name, "args": args})
 
     def _notify_param_change(self, params: dict) -> None:
@@ -714,7 +741,12 @@ class NodeItem(QGraphicsItem):
             dig = ParamDialog(schema, self.get_params(), parent=parent, apply_callback=self.set_params)
             dig.exec()
         if special_methods:
-            special_dig = SpecialMethodDialog(special_methods, parent=parent, apply_callback=self.apply_special_method)
+            special_dig = SpecialMethodDialog(
+                special_methods,
+                parent=parent,
+                apply_callback=self.apply_special_method,
+                initial_values=self._special_method_args,
+            )
             special_dig.exec()
 
     def _create_ports(self):
@@ -1794,6 +1826,7 @@ moudle_factory = {
     "反三角函数运算器": MoudleBase,
     "线性缩放器": MoudleScaler,
     "FIR滤波器": ModuleFIRFilter,
+    "IIR滤波器": ModuleIIRFilter,
     "线性变换器": MoudleLinerTransformer,
     "混频器": MoudleBase,
     "解卷绕器": MoudleBase,
@@ -1808,6 +1841,7 @@ moudle_maxm = {
     "反三角函数运算器": 2,
     "线性缩放器": 4,
     "FIR滤波器": 4,
+    "IIR滤波器": 4,
     "线性变换器": 2,
     "混频器": 4,
     "解卷绕器": 1,
