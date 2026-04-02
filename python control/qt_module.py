@@ -11,7 +11,7 @@ from PySide6.QtGui import QDrag, QPainter, QPen, QBrush, QPainterPath, QColor, Q
 import math
 import re
 from decimal import Decimal, InvalidOperation
-from qt_moudle_schema import PID_SCHEMA, ACCM_SCHEMA, SCLR_SCHEMA, FIRF_SCHEMA, LTRN_SCHEMA, PDH_SCHEMA, SCLO_SCHEMA, IIR_SCHEMA
+from qt_module_schema import PID_SCHEMA, ACCM_SCHEMA, SCLR_SCHEMA, FIRF_SCHEMA, LTRN_SCHEMA, PDH_SCHEMA, SCLO_SCHEMA, IIR_SCHEMA
 
 _PARAM_APPLY_HANDLER = None
 _PARAM_OPEN_HANDLER = None
@@ -782,7 +782,7 @@ class NodeItem(QGraphicsItem):
     def get_num_outputs(self):
         return self.num_outputs
 
-class MoudlePID(NodeItem):
+class ModulePID(NodeItem):
     def __init__(self, component_name, index, position, num_inputs = 2, num_outputs = 1):
         if index == 0:
             name = "PIDC"
@@ -889,7 +889,7 @@ class MoudlePID(NodeItem):
             self._params[key] = value
         self._notify_param_change(params)
 
-class MoudleAccumulator(NodeItem):
+class ModuleAccumulator(NodeItem):
     def __init__(self, component_name, index, position, num_inputs = 5, num_outputs = 2):
         if index == 0:
             name = "ACCM"
@@ -995,7 +995,7 @@ class MoudleAccumulator(NodeItem):
             self._params[key] = value
         self._notify_param_change(params)
 
-class MoudleBase(NodeItem):
+class ModuleBase(NodeItem):
     def __init__(self, component_name, index, position, num_inputs = 2, num_outputs = 1):
         if component_name == "三角函数运算器":
             if index == 0:
@@ -1135,7 +1135,7 @@ class MoudleBase(NodeItem):
     def getmaxm(self):
         return self.maxm
 
-class MoudleScaler(NodeItem):
+class ModuleScaler(NodeItem):
     def __init__(self, component_name, index, position, num_inputs = 1, num_outputs = 1):
         if index == 0:
             name = "SCLR"
@@ -1362,7 +1362,7 @@ class ModuleFIRFilter(NodeItem):
             }
         ]
 
-class MoudleLinerTransformer(NodeItem):
+class ModuleLinerTransformer(NodeItem):
     def __init__(self, component_name, index, position, num_inputs = 2, num_outputs = 2):
         if index == 0:
             name = "LTRN"
@@ -1468,7 +1468,7 @@ class MoudleLinerTransformer(NodeItem):
             self._params[key] = value
         self._notify_param_change(params)
 
-class MoudlePDHFSM(NodeItem):
+class ModulePDHFSM(NodeItem):
     def __init__(self, component_name, index,position, num_inputs = 2, num_outputs = 3):
         name = "PDH"
         super().__init__(name, component_name, index, position, num_inputs, num_outputs)
@@ -1685,7 +1685,7 @@ class ModuleIIRFilter(NodeItem):
             }
         ]
         
-class MoudleSCLOFSM(NodeItem):
+class ModuleSCLOFSM(NodeItem):
     def __init__(self, component_name, index, position, num_inputs = 1, num_outputs = 2):
         if index:
             name = f"SLO{index + 1}"
@@ -1785,56 +1785,56 @@ class MoudleSCLOFSM(NodeItem):
             self._params[key] = value
         self._notify_param_change(params)
 
-class CompositeMoudle:
+class CompositeModule:
 
-    sub_moudles = []
+    sub_modules = []
 
     @classmethod
     def create_sub_modules(cls, scene, position, alloc_index_func):
-        for sub_name, offset in cls.sub_moudles:
-            moudle_cls = moudle_factory.get(sub_name)
-            if moudle_cls:
+        for sub_name, offset in cls.sub_modules:
+            module_cls = module_factory.get(sub_name)
+            if module_cls:
                 idx = alloc_index_func(sub_name)
                 if idx is None:
                     print(f"❌ 超出 {sub_name} 模块数量上限")
                     continue
                 sub_position = position + offset
-                node = moudle_cls(sub_name, idx, sub_position)
+                node = module_cls(sub_name, idx, sub_position)
                 scene.addItem(node)
                 if hasattr(node, "free_mode"):
                     node.free_mode = not getattr(scene, "developer_mode", False)
 
-class SINGenerator(CompositeMoudle):
+class SINGenerator(CompositeModule):
 
-    sub_moudles = [
+    sub_modules = [
         ("累加器", QPointF(0, 0)),
         ("三角函数运算器", QPointF(200, 0)),
     ]
 
-class DigitalControlledOscillator(CompositeMoudle):
+class DigitalControlledOscillator(CompositeModule):
 
-    sub_moudles = [
+    sub_modules = [
         ("累加器", QPointF(0, 0)),
         ("三角函数运算器", QPointF(200, -150)),
         ("三角函数运算器", QPointF(200, 150)),
     ]
 
-moudle_factory = {
-    "PID控制器": MoudlePID,
-    "累加器": MoudleAccumulator,
-    "三角函数运算器": MoudleBase,
-    "反三角函数运算器": MoudleBase,
-    "线性缩放器": MoudleScaler,
+module_factory = {
+    "PID控制器": ModulePID,
+    "累加器": ModuleAccumulator,
+    "三角函数运算器": ModuleBase,
+    "反三角函数运算器": ModuleBase,
+    "线性缩放器": ModuleScaler,
     "FIR滤波器": ModuleFIRFilter,
     "IIR滤波器": ModuleIIRFilter,
-    "线性变换器": MoudleLinerTransformer,
-    "混频器": MoudleBase,
-    "解卷绕器": MoudleBase,
-    "PDH状态机": MoudlePDHFSM,
-    "LO自动校准状态机": MoudleSCLOFSM,
+    "线性变换器": ModuleLinerTransformer,
+    "混频器": ModuleBase,
+    "解卷绕器": ModuleBase,
+    "PDH状态机": ModulePDHFSM,
+    "LO自动校准状态机": ModuleSCLOFSM,
 }
 
-moudle_maxm = {
+module_maxm = {
     "PID控制器": 2,
     "累加器": 2,
     "三角函数运算器": 2,

@@ -22,16 +22,16 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtSerialPort import QSerialPort
 
-from qt_moudle import (
+from qt_module import (
     NodeItem,
-    MoudlePID,
-    MoudleAccumulator,
-    MoudleScaler,
+    ModulePID,
+    ModuleAccumulator,
+    ModuleScaler,
     ModuleFIRFilter,
     ModuleIIRFilter,
-    MoudleSCLOFSM,
-    MoudlePDHFSM,
-    MoudleLinerTransformer,
+    ModuleSCLOFSM,
+    ModulePDHFSM,
+    ModuleLinerTransformer,
     ParamDialog,
     SpecialMethodDialog,
     set_param_apply_handler,
@@ -410,7 +410,7 @@ class MainWindow(QMainWindow):
                 if component_name is None:
                     unknown_node_count += 1
                     continue
-                cls = self.view.moudle_factory.get(component_name)
+                cls = self.view.module_factory.get(component_name)
                 if cls is None:
                     unknown_node_count += 1
                     continue
@@ -529,21 +529,21 @@ class MainWindow(QMainWindow):
             print(f"[route] failed: {label}: {exc}")
 
     def _resolve_module_identity(self, node):
-        if isinstance(node, MoudlePID):
+        if isinstance(node, ModulePID):
             return "PID", node.index
-        if isinstance(node, MoudleAccumulator):
+        if isinstance(node, ModuleAccumulator):
             return "ACC", node.index
-        if isinstance(node, MoudleScaler):
+        if isinstance(node, ModuleScaler):
             return "SCLR", node.index
         if isinstance(node, ModuleFIRFilter):
             return "FIR", node.index
         if isinstance(node, ModuleIIRFilter):
             return "IIR", node.index
-        if isinstance(node, MoudleLinerTransformer):
+        if isinstance(node, ModuleLinerTransformer):
             return "LTRN", node.index
-        if isinstance(node, MoudlePDHFSM):
+        if isinstance(node, ModulePDHFSM):
             return "PDH", node.index
-        if isinstance(node, MoudleSCLOFSM):
+        if isinstance(node, ModuleSCLOFSM):
             return "SCLO", node.index
         return None, None
 
@@ -705,7 +705,7 @@ class MainWindow(QMainWindow):
 
     def _create_node_from_config(self, node_cfg):
         component_name = node_cfg.get("component_name")
-        cls = self.view.moudle_factory.get(component_name)
+        cls = self.view.module_factory.get(component_name)
         if cls is None:
             print(f"[config] skip unknown component: {component_name}")
             return None

@@ -11,21 +11,21 @@ from PySide6.QtWidgets import (
     QGraphicsEllipseItem,
 )
 
-from qt_moudle import (
+from qt_module import (
     PortItem,
     NodeItem,
-    MoudlePID,
-    MoudleAccumulator,
-    MoudleBase,
-    MoudleScaler,
+    ModulePID,
+    ModuleAccumulator,
+    ModuleBase,
+    ModuleScaler,
     ModuleFIRFilter,
     ModuleIIRFilter,
-    MoudleSCLOFSM,
-    MoudlePDHFSM,
-    MoudleLinerTransformer,
+    ModuleSCLOFSM,
+    ModulePDHFSM,
+    ModuleLinerTransformer,
     SINGenerator,
     DigitalControlledOscillator,
-    moudle_maxm,
+    module_maxm,
 )
 
 
@@ -631,19 +631,19 @@ class DiagramScene(QGraphicsScene):
 
 
 class DiagramView(QGraphicsView):
-    moudle_factory = {
-        "PID控制器": MoudlePID,
-        "累加器": MoudleAccumulator,
-        "三角函数运算器": MoudleBase,
-        "反三角函数运算器": MoudleBase,
-        "线性缩放器": MoudleScaler,
+    module_factory = {
+        "PID控制器": ModulePID,
+        "累加器": ModuleAccumulator,
+        "三角函数运算器": ModuleBase,
+        "反三角函数运算器": ModuleBase,
+        "线性缩放器": ModuleScaler,
         "FIR滤波器": ModuleFIRFilter,
         "IIR滤波器": ModuleIIRFilter,
-        "线性变换器": MoudleLinerTransformer,
-        "混频器": MoudleBase,
-        "解卷绕器": MoudleBase,
-        "PDH状态机": MoudlePDHFSM,
-        "LO自动校准状态机": MoudleSCLOFSM,
+        "线性变换器": ModuleLinerTransformer,
+        "混频器": ModuleBase,
+        "解卷绕器": ModuleBase,
+        "PDH状态机": ModulePDHFSM,
+        "LO自动校准状态机": ModuleSCLOFSM,
     }
 
     composite_modules = {
@@ -661,8 +661,8 @@ class DiagramView(QGraphicsView):
         self.setRenderHint(QPainter.TextAntialiasing)
         self.setOptimizationFlag(QGraphicsView.DontAdjustForAntialiasing, False)
 
-        self._used_indices = {k: set() for k in self.moudle_factory}
-        self._maxnum = {k: moudle_maxm.get(k, 1) for k in self.moudle_factory}
+        self._used_indices = {k: set() for k in self.module_factory}
+        self._maxnum = {k: module_maxm.get(k, 1) for k in self.module_factory}
         self._drag_candidate_node = None
         self._drag_start_pos = None
         self._is_dragging_view = False
@@ -770,16 +770,16 @@ class DiagramView(QGraphicsView):
             event.acceptProposedAction()
             return
 
-        moudle_cls = self.moudle_factory.get(component_name)
-        if moudle_cls:
+        module_cls = self.module_factory.get(component_name)
+        if module_cls:
             idx = self._alloc_index(component_name)
             if idx is None:
                 print(f"❌ 超出 {component_name} 模块数量上限")
                 return
             if component_name == "解卷绕机":
-                node = moudle_cls(component_name, idx, position, 1, 1)
+                node = module_cls(component_name, idx, position, 1, 1)
             else:
-                node = moudle_cls(component_name, idx, position)
+                node = module_cls(component_name, idx, position)
             self._apply_mode_to_node(node)
             self.scene().addItem(node)
             event.acceptProposedAction()

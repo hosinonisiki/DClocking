@@ -11,11 +11,11 @@ qt_UI1.py
       -> qt_ui_graph.py
       -> qt_ui_utils.py
       -> qt_Port.py
-      -> qt_moudle.py
+      -> qt_module.py
       -> port_numbers.py
 
 qt_ui_graph.py
-  -> qt_moudle.py
+  -> qt_module.py
 
 qt_ui_utils.py
   -> qt_Port.py
@@ -62,8 +62,8 @@ qt_Port.py
 ## 5.节点模块
 **功能:** 表示各种信号处理模块的图形化实体，每个模块包含输入/输出端口，可移动、选中和双击打开参数对话框。
 - **代码位置:**
-  - 基础节点类: qt_moudle.py中的 NodeItem类。
-  - 具体模块类: qt_moudle.py中的 MoudlePID、MoudleAccumulator、MoudleBase、MoudleScaler、ModuleFIRFilter、MoudleLinerTransformer、MoudlePDHFSM、MoudleSCLOFSM等。
+  - 基础节点类: qt_module.py中的 NodeItem类。
+  - 具体模块类: qt_module.py中的 ModulePID、ModuleAccumulator、ModuleBase、ModuleScaler、ModuleFIRFilter、ModuleLinerTransformer、ModulePDHFSM、ModuleSCLOFSM等。
 - 每个模块类定义了自身的尺寸、端口数量、端口标签、信号类型、最大实例数和参数模式。
 - 端口通过 PortItem类表示，具有信号类型标记、颜色、工具提示和交互功能。
 
@@ -71,10 +71,10 @@ qt_Port.py
 **功能:** 表示节点的输入/输出连接点，带有信号类型图标，是连线的起点和终点。
 
 - **代码位置:**
-  - 通用端口: qt_moudle.py中的 PortItem类。
+  - 通用端口: qt_module.py中的 PortItem类。
   - 边框端口: qt_UI1.py中的 BorderPort类。
 - 端口绘制为圆形，并带有指示信号类型的图形标记（如五角星表示 level，圆形表示 phase，方块表示 bool，菱形表示 differential）。
-  - 位置：qt_moudle.py中_draw_signal_markers
+  - 位置：qt_module.py中_draw_signal_markers
 
 - 输出端口有唯一的颜色，输入端口为固定颜色。
 
@@ -102,7 +102,7 @@ qt_Port.py
 ## 9.参数对话框
 **功能:** 双击节点模块打开参数设置对话框，修改模块内部参数。
 - **代码位置:**
-  - 对话框类: qt_moudle.py中的 ParamDialog类。
+  - 对话框类: qt_module.py中的 ParamDialog类。
   - 触发逻辑: NodeItem的 mouseDoubleClickEvent和 open_param_dialog方法。
 - 参数根据模块对应的模式（"direct"或 "indirect"）和 free_mode属性动态生成表单。
 - 支持 int、float、bool、str类型的参数控件。
@@ -124,7 +124,7 @@ qt_Port.py
 
 ## 12. 组合模块
 **功能:** 预定义的一组子模块的集合，一键放置多个已连接的模块。
-- **代码位置:** qt_moudle.py中的 CompositeMoudle基类及其子类 SINGenerator和 DigitalControlledOscillator，以及 composite_modules字典。
+- **代码位置:** qt_module.py中的 CompositeModule基类及其子类 SINGenerator和 DigitalControlledOscillator，以及 composite_modules字典。
 - 在 DiagramView的 dropEvent中识别并创建组合模块。
 
 ## 13. 信号路由与硬件映射
@@ -170,7 +170,7 @@ qt_Port.py
 
 4. 扩展新模块的最小修改面
 - 新增模块类型时，优先按顺序修改：
-  1) qt_moudle.py（模块类/参数）
+  1) qt_module.py（模块类/参数）
   2) qt_ui_graph.py（模块工厂映射）
   3) qt_ui_utils.py（端口号映射）
   4) qt_ui_mainwindow.py（模块身份解析，如需下发参数）
