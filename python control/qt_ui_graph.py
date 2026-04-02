@@ -51,9 +51,9 @@ class BorderPort(PortItem):
         if display_text is not None:
             self.display_text = display_text
         elif self.port_type == "out":
-            self.display_text = f"INPUT_{self.channel_name}"
+            self.display_text = f"输入通道{self.channel_name}"
         else:
-            self.display_text = f"OUTPUT_{self.channel_name}"
+            self.display_text = f"输出通道{self.channel_name}"
 
         self.setPos(position)
         self.setAcceptHoverEvents(True)

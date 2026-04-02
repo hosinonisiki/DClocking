@@ -275,7 +275,7 @@ class MainWindow(QMainWindow):
         card_layout.setSpacing(6)
 
         title_row = QHBoxLayout()
-        title = QLabel(f"{node.name} 参数")
+        title = QLabel(f"{node.display_name} 参数")
         close_btn = QPushButton("关闭")
         close_btn.setFixedWidth(60)
         close_btn.clicked.connect(lambda _=False, k=panel_key: self._close_param_panel(k))

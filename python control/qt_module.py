@@ -681,6 +681,7 @@ class NodeItem(QGraphicsItem):
         self.width = 140
         self.height = 180
         self.component_name = component_name
+        self.display_name = f"{self.component_name}{index + 1}"
         self.index = index
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
@@ -793,11 +794,14 @@ class ModulePID(NodeItem):
         self.height = 180
         self.width = 140
         self.component_name = component_name
+        self.display_name = f"{self.component_name}{index + 1}"
         self.index = index
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
         self.inputs = ["RESET", "IN"]
         self.outputs = ["OUT"]
+        self.inputs_display_name = ["关闭", "误差信号"]
+        self.outputs_display_name = ["反馈信号"]
         self.inputs_signals = [["bool"], ["level", "phase"]]
         self.outputs_signals = [["level", "differential"]]
         self.maxm = 2
@@ -827,27 +831,21 @@ class ModulePID(NodeItem):
         painter.setFont(font)
 
         title_rect = QRectF(rect.left(), rect.top(), rect.width(), 25)
-        painter.drawText(title_rect, Qt.AlignCenter, self.name)
+        painter.drawText(title_rect, Qt.AlignCenter, self.display_name)
 
         font.setBold(False)
-        font.setPointSize(5)
+        font.setPointSize(8)
         painter.setFont(font)
 
         for i, port in enumerate(self.in_ports):
             port_pos = port.pos()
             text_rect = QRectF(-self.width / 2 + 10, port_pos.y() - 8, 80, 16)
-            if self.index:
-                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"PID{self.index + 1}_{self.inputs[i]}")
-            else:
-                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"PID_{self.inputs[i]}")
+            painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"{self.inputs_display_name[i]}")
         
         for i, port in enumerate(self.out_ports):
             port_pos = port.pos()
             text_rect = QRectF(self.width / 2 - 65, port_pos.y() - 8, 57, 16)
-            if self.index:
-                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"PID{self.index + 1}_{self.outputs[i]}")
-            else:
-                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"PID_{self.outputs[i]}")
+            painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"{self.outputs_display_name[i]}")
 
     def getmaxm(self):
         return self.maxm
@@ -900,11 +898,14 @@ class ModuleAccumulator(NodeItem):
         self.height = 180
         self.width = 140
         self.component_name = component_name
+        self.display_name = f"{self.component_name}{index + 1}"
         self.index = index
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
         self.inputs = ["ERROR_IN", "BIAS_IN", "RESET", "PAUSE", "LF_RESET"]
         self.outputs = ["SLOW_OUT", "FAST_OUT"]
+        self.inputs_display_name = ["误差信号", "频率偏置", "关闭", "暂停", "关闭锁相环PID"]
+        self.outputs_display_name = ["分频输出", "默认输出"]
         self.inputs_signals = [["level", "phase"], ["differential"], ["bool"], ["bool"], ["bool"]]
         self.outputs_signals = [["level", "phase"], ["level", "phase"]]
         self.maxm = 2
@@ -934,26 +935,20 @@ class ModuleAccumulator(NodeItem):
         painter.setFont(font)
 
         title_rect = QRectF(rect.left(), rect.top(), rect.width(), 25)
-        painter.drawText(title_rect, Qt.AlignCenter, self.name)
+        painter.drawText(title_rect, Qt.AlignCenter, self.display_name)
         font.setBold(False)
-        font.setPointSize(5)
+        font.setPointSize(8)
         painter.setFont(font)
 
         for i, port in enumerate(self.in_ports):
             port_pos = port.pos()
             text_rect = QRectF(-self.width / 2 + 10, port_pos.y() - 8, 80, 16)
-            if self.index:
-                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"ACC{self.index + 1}_{self.inputs[i]}")
-            else:
-                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"ACC_{self.inputs[i]}")
+            painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"{self.inputs_display_name[i]}")
         
         for i, port in enumerate(self.out_ports):
             port_pos = port.pos()
             text_rect = QRectF(self.width / 2 - 80, port_pos.y() - 8, 72, 16)
-            if self.index:
-                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"ACC{self.index + 1}_{self.outputs[i]}")
-            else:
-                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"ACC_{self.outputs[i]}")
+            painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"{self.outputs_display_name[i]}")
 
     def getmaxm(self):
         return self.maxm
@@ -1030,28 +1025,37 @@ class ModuleBase(NodeItem):
         self.height = 180
         self.width = 140
         self.component_name = component_name
+        self.display_name = f"{self.component_name}{index + 1}"
         self.index = index
         if component_name == "三角函数运算器":
             self.inputs = ["IN"]
             self.outputs = ["SIN", "COS"]
+            self.inputs_display_name = ["相位输入"]
+            self.outputs_display_name = ["正弦输出", "余弦输出"]
             self.inputs_signals = [["phase"]]
             self.outputs_signals = [["level"], ["level"]]
             self.maxm = 2
         elif component_name == "反三角函数运算器":
             self.inputs = ["SIN", "COS"]
             self.outputs = ["OUT"]
+            self.inputs_display_name = ["正弦输入", "余弦输入"]
+            self.outputs_display_name = ["相位输出"]
             self.inputs_signals = [["level"], ["level"]]
             self.outputs_signals = [["phase"]]
             self.maxm = 2
         elif component_name == "混频器":
             self.inputs = ["IN_A", "IN_B"]
             self.outputs = ["OUT"]
+            self.inputs_display_name = ["输入A", "输入B"]
+            self.outputs_display_name = ["混频输出"]
             self.inputs_signals = [["level"], ["level"]]
             self.outputs_signals = [["level", "differential"]]
             self.maxm = 4
         elif component_name == "解卷绕器":
             self.inputs = ["IN"]
             self.outputs = ["OUT"]
+            self.inputs_display_name = ["相位输入"]
+            self.outputs_display_name = ["相位输出"]
             self.inputs_signals = [["phase"]]
             self.outputs_signals = [["phase"]]
             self.maxm = 1
@@ -1077,59 +1081,34 @@ class ModuleBase(NodeItem):
         painter.setFont(font)
 
         title_rect = QRectF(rect.left(), rect.top(), rect.width(), 25)
-        painter.drawText(title_rect, Qt.AlignCenter, self.name)
+        painter.drawText(title_rect, Qt.AlignCenter, self.display_name)
         font.setBold(False)
-        font.setPointSize(5)
+        font.setPointSize(8)
         painter.setFont(font)
 
         for i, port in enumerate(self.in_ports):
             port_pos = port.pos()
             text_rect = QRectF(-self.width / 2 + 10, port_pos.y() - 8, 80, 16)
             if self.component_name == "三角函数运算器":
-                if self.index:
-                    painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"TRI{self.index + 1}_{self.inputs[i]}")
-                else:
-                    painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"TRI_{self.inputs[i]}")
+                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"{self.inputs_display_name[i]}")
             elif self.component_name == "反三角函数运算器":
-                if self.index:
-                    painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"ATAN{self.index + 1}_{self.inputs[i]}")
-                else:
-                    painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"ATAN_{self.inputs[i]}")
+                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"{self.inputs_display_name[i]}")
             elif self.component_name == "混频器":
-                if self.index:
-                    painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"MIXER{self.index + 1}_{self.inputs[i]}")
-                else:
-                    painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"MIXER_{self.inputs[i]}")
+                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"{self.inputs_display_name[i]}")
             elif self.component_name == "解卷绕器":
-                if self.index:
-                    painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"UNWRAPPER{self.index + 1}_{self.inputs[i]}")
-                else:
-                    painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"UNWRAPPER_{self.inputs[i]}")
+                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"{self.inputs_display_name[i]}")
         
         for i, port in enumerate(self.out_ports):
             port_pos = port.pos()
             text_rect = QRectF(self.width / 2 - 60, port_pos.y() - 8, 52, 16)
             if self.component_name == "三角函数运算器":
-                if self.index:
-                    painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"TRI{self.index + 1}_{self.outputs[i]}")
-                else:
-                    painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"TRI_{self.outputs[i]}")
+                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"{self.outputs_display_name[i]}")
             elif self.component_name == "反三角函数运算器":
-                if self.index:
-                    painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"ATAN{self.index + 1}_{self.outputs[i]}")
-                else:
-                    painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"ATAN_{self.outputs[i]}")
+                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"{self.outputs_display_name[i]}")
             elif self.component_name == "混频器":
-                if self.index:
-                    painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"MIXER{self.index + 1}_{self.outputs[i]}")
-                else:
-                    painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"MIXER_{self.outputs[i]}")
-
+                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"{self.outputs_display_name[i]}")
             elif self.component_name == "解卷绕器":
-                if self.index:
-                    painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"UNWRAPPER{self.index + 1}_{self.outputs[i]}")
-                else:
-                    painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"UNWRAPPER_{self.outputs[i]}")
+                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"{self.outputs_display_name[i]}")
 
 
     def getmaxm(self):
@@ -1146,11 +1125,14 @@ class ModuleScaler(NodeItem):
         self.height = 180
         self.width = 140
         self.component_name = component_name
+        self.display_name = f"{self.component_name}{index + 1}"
         self.index = index
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
         self.inputs = ["IN"]
         self.outputs = ["OUT"]
+        self.inputs_display_name = ["信号输入"]
+        self.outputs_display_name = ["信号输出"]
         self.inputs_signals = [["level", "phase", "differential"]]
         self.outputs_signals = [["level", "phase", "differential"]]
         self.maxm = 4
@@ -1180,26 +1162,20 @@ class ModuleScaler(NodeItem):
         painter.setFont(font)
         
         title_rect = QRectF(rect.left(), rect.top(), rect.width(), 25)
-        painter.drawText(title_rect, Qt.AlignCenter, self.name)
+        painter.drawText(title_rect, Qt.AlignCenter, self.display_name)
         font.setBold(False)
-        font.setPointSize(5)
+        font.setPointSize(8)
         painter.setFont(font)
 
         for i, port in enumerate(self.in_ports):
             port_pos = port.pos()
             text_rect = QRectF(-self.width / 2 + 10, port_pos.y() - 8, 80, 16)
-            if self.index:
-                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"SCALER{self.index + 1}_{self.inputs[i]}")
-            else:
-                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"SCALER_{self.inputs[i]}")
+            painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"{self.inputs_display_name[i]}")
 
         for i, port in enumerate(self.out_ports):
             port_pos = port.pos()
             text_rect = QRectF(self.width / 2 - 60, port_pos.y() - 8, 52, 16)
-            if self.index:
-                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"SCALER{self.index + 1}_{self.outputs[i]}")
-            else:
-                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"SCALER_{self.outputs[i]}")
+            painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"{self.outputs_display_name[i]}")
 
     def getmaxm(self):
         return self.maxm
@@ -1252,11 +1228,14 @@ class ModuleFIRFilter(NodeItem):
         self.height = 180
         self.width = 140
         self.component_name = component_name
+        self.display_name = f"{self.component_name}{index + 1}"
         self.index = index
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
         self.inputs = ["IN"]
         self.outputs = ["OUT"]
+        self.inputs_display_name = ["信号输入"]
+        self.outputs_display_name = ["信号输出"]
         self.inputs_signals = [["level", "differential"]]
         self.outputs_signals = [["level", "differential"]]
         self.maxm = 4
@@ -1286,26 +1265,20 @@ class ModuleFIRFilter(NodeItem):
         painter.setFont(font)
         
         title_rect = QRectF(rect.left(), rect.top(), rect.width(), 25)
-        painter.drawText(title_rect, Qt.AlignCenter, self.name)
+        painter.drawText(title_rect, Qt.AlignCenter, self.display_name)
         font.setBold(False)
-        font.setPointSize(5)
+        font.setPointSize(8)
         painter.setFont(font)
 
         for i, port in enumerate(self.in_ports):
             port_pos = port.pos()
             text_rect = QRectF(-self.width / 2 + 10, port_pos.y() - 8, 80, 16)
-            if self.index:
-                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"FIR{self.index + 1}_{self.inputs[i]}")
-            else:
-                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"FIR_{self.inputs[i]}")
+            painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"{self.inputs_display_name[i]}")
 
         for i, port in enumerate(self.out_ports):
             port_pos = port.pos()
             text_rect = QRectF(self.width / 2 - 60, port_pos.y() - 8, 52, 16)
-            if self.index:
-                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"FIR{self.index + 1}_{self.outputs[i]}")
-            else:
-                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"FIR_{self.outputs[i]}")
+            painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"{self.outputs_display_name[i]}")
 
     def getmaxm(self):
         return self.maxm
@@ -1373,11 +1346,14 @@ class ModuleLinerTransformer(NodeItem):
         self.height = 180
         self.width = 140
         self.component_name = component_name
+        self.display_name = f"{self.component_name}{index + 1}"
         self.index = index
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
         self.inputs = ["IN_A", "IN_B"]
         self.outputs = ["OUT_A", "OUT_B"]
+        self.inputs_display_name = ["输入A", "输入B"]
+        self.outputs_display_name = ["输出A", "输出B"]
         self.inputs_signals = [["level", "differential"], ["level", "differential"]]
         self.outputs_signals = [["level", "differential"], ["level", "differential"]]
         self.maxm = 2
@@ -1407,26 +1383,20 @@ class ModuleLinerTransformer(NodeItem):
         painter.setFont(font)
         title_rect = QRectF(rect.left(), rect.top(), rect.width(), 25)
 
-        painter.drawText(title_rect, Qt.AlignCenter, self.name)
+        painter.drawText(title_rect, Qt.AlignCenter, self.display_name)
         font.setBold(False)
-        font.setPointSize(5)
+        font.setPointSize(8)
         painter.setFont(font)
 
         for i, port in enumerate(self.in_ports):
             port_pos = port.pos()
             text_rect = QRectF(-self.width / 2 + 10, port_pos.y() - 8, 80, 16)
-            if self.index:
-                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"LN_TRANSFORMER_{self.index + 1}_{self.inputs[i]}")
-            else:
-                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"LN_TRANSFORMER_{self.inputs[i]}")
+            painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"{self.inputs_display_name[i]}")
 
         for i, port in enumerate(self.out_ports):
             port_pos = port.pos()
             text_rect = QRectF(self.width / 2 - 80, port_pos.y() - 8, 72, 16)
-            if self.index:
-                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"LN_TRANSFORMER_{self.index + 1}_{self.outputs[i]}")
-            else:
-                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"LN_TRANSFORMER_{self.outputs[i]}")
+            painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"{self.outputs_display_name[i]}")
 
     def getmaxm(self):
         return self.maxm
@@ -1476,11 +1446,14 @@ class ModulePDHFSM(NodeItem):
         self.height = 180
         self.width = 140
         self.component_name = component_name
+        self.display_name = f"{self.component_name}{index + 1}"
         self.index = index
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
         self.inputs = ["POWER", "SCAN"]
-        self.outputs = ["PIN_RESET_CTRL", "MIXER_RESET_CTRL", "SCAN_RESET_CTRL"]
+        self.outputs = ["PID_RESET_CTRL", "MIXER_RESET_CTRL", "SCAN_RESET_CTRL"]
+        self.inputs_display_name = ["功率输入", "扫描信号"]
+        self.outputs_display_name = ["关闭PID", "关闭混频器", "暂停扫描"]
         self.inputs_signals = [["level"], ["level"]]
         self.outputs_signals = [["bool"], ["bool"], ["bool"]]
         self.maxm = 1
@@ -1510,20 +1483,20 @@ class ModulePDHFSM(NodeItem):
         painter.setFont(font)
         title_rect = QRectF(rect.left(), rect.top(), rect.width(), 25)
 
-        painter.drawText(title_rect, Qt.AlignCenter, self.name)
+        painter.drawText(title_rect, Qt.AlignCenter, self.display_name)
         font.setBold(False)
-        font.setPointSize(5)
+        font.setPointSize(8)
         painter.setFont(font)
 
         for i, port in enumerate(self.in_ports):
             port_pos = port.pos()
             text_rect = QRectF(-self.width / 2 + 10, port_pos.y() - 8, 80, 16)
-            painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"PDHFSM_IN_{self.inputs[i]}")
+            painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"{self.inputs_display_name[i]}")
 
         for i, port in enumerate(self.out_ports):
             port_pos = port.pos()
             text_rect = QRectF(self.width / 2 - 110, port_pos.y() - 8, 100, 16)
-            painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"PDHFSM_{self.outputs[i]}")
+            painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"{self.outputs_display_name[i]}")
 
     def getmaxm(self):
         return self.maxm
@@ -1577,11 +1550,14 @@ class ModuleIIRFilter(NodeItem):
         self.height = 180
         self.width = 140
         self.component_name = component_name
+        self.display_name = f"{self.component_name}{index + 1}"
         self.index = index
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
         self.inputs = ["IN"]
         self.outputs = ["OUT"]
+        self.inputs_display_name = ["信号输入"]
+        self.outputs_display_name = ["信号输出"]
         self.inputs_signals = [["level", "differential"]]
         self.outputs_signals = [["level", "differential"]]
         self.maxm = 4
@@ -1611,26 +1587,20 @@ class ModuleIIRFilter(NodeItem):
         painter.setFont(font)
         
         title_rect = QRectF(rect.left(), rect.top(), rect.width(), 25)
-        painter.drawText(title_rect, Qt.AlignCenter, self.name)
+        painter.drawText(title_rect, Qt.AlignCenter, self.display_name)
         font.setBold(False)
-        font.setPointSize(5)
+        font.setPointSize(8)
         painter.setFont(font)
 
         for i, port in enumerate(self.in_ports):
             port_pos = port.pos()
             text_rect = QRectF(-self.width / 2 + 10, port_pos.y() - 8, 80, 16)
-            if self.index:
-                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"IIR{self.index + 1}_{self.inputs[i]}")
-            else:
-                painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"IIR_{self.inputs[i]}")
+            painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"{self.inputs_display_name[i]}")
 
         for i, port in enumerate(self.out_ports):
             port_pos = port.pos()
             text_rect = QRectF(self.width / 2 - 60, port_pos.y() - 8, 52, 16)
-            if self.index:
-                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"IIR{self.index + 1}_{self.outputs[i]}")
-            else:
-                painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"IIR_{self.outputs[i]}")
+            painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"{self.outputs_display_name[i]}")
 
     def getmaxm(self):
         return self.maxm
@@ -1696,11 +1666,14 @@ class ModuleSCLOFSM(NodeItem):
         self.height = 180
         self.width = 140
         self.component_name = component_name
+        self.display_name = f"{self.component_name}{index + 1}"
         self.index = index
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
         self.inputs = ["PHASE_IN"]
         self.outputs = ["BIAS_OUT", "PID_RESET_CTRL"]
+        self.inputs_display_name = ["相位输入"]
+        self.outputs_display_name = ["频率偏置", "关闭PID"]
         self.inputs_signals = [["phase"]]
         self.outputs_signals = [["differential"], ["bool"]]
         self.maxm = 2
@@ -1730,20 +1703,20 @@ class ModuleSCLOFSM(NodeItem):
         painter.setFont(font)
         title_rect = QRectF(rect.left(), rect.top(), rect.width(), 25)
 
-        painter.drawText(title_rect, Qt.AlignCenter, self.name)
+        painter.drawText(title_rect, Qt.AlignCenter, self.display_name)
         font.setBold(False)
-        font.setPointSize(5)
+        font.setPointSize(8)
         painter.setFont(font)
 
         for i, port in enumerate(self.in_ports):
             port_pos = port.pos()
             text_rect = QRectF(-self.width / 2 + 10, port_pos.y() - 8, 80, 16)
-            painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"SCLOFSM_{self.inputs[i]}")
+            painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, f"{self.inputs_display_name[i]}")
 
         for i, port in enumerate(self.out_ports):
             port_pos = port.pos()
             text_rect = QRectF(self.width / 2 - 100, port_pos.y() - 8, 90, 16)
-            painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"SCLOFSM_{self.outputs[i]}")
+            painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"{self.outputs_display_name[i]}")
 
     def getmaxm(self):
         return self.maxm
@@ -1837,7 +1810,7 @@ module_factory = {
 module_maxm = {
     "PID控制器": 2,
     "累加器": 2,
-    "三角函数运算器": 2,
+    "三角函数运算器": 4,
     "反三角函数运算器": 2,
     "线性缩放器": 4,
     "FIR滤波器": 4,
