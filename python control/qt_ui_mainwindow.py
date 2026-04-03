@@ -470,22 +470,60 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "同步报告", report)
 
     def run_business_logic(self, src, src_port, dst, dst_port):
-        print(f"🔄 >> 执行业务逻辑: 数据从 {src}:Out{src_port+1} 传输到 {dst}:In{dst_port+1}...")
+        src_log = self._runtime_log_name(src, src_port, "out", dst, dst_port, "in")
+        dst_log = self._runtime_log_name(dst, dst_port, "in", src, src_port, "out")
+        print(f"🔄 >> 执行业务逻辑: 数据从 {src_log}:Out{src_port+1} 传输到 {dst_log}:In{dst_port+1}...")
         src_port_num = resolve_port_number(src, src_port, "out")
         dst_port_num = resolve_port_number(dst, dst_port, "in")
         if src_port_num is None or dst_port_num is None:
             print(f"[route] skip: unresolved port mapping src={src}:{src_port} dst={dst}:{dst_port}")
             return
-        self._apply_routing(dst_port_num, src_port_num, f"{src}:Out{src_port+1} -> {dst}:In{dst_port+1}")
+        self._apply_routing(dst_port_num, src_port_num, f"{src_log}:Out{src_port+1} -> {dst_log}:In{dst_port+1}")
 
     def handle_connection_removed(self, src, src_port, dst, dst_port):
-        print(f"🧹 >> 清理业务逻辑: 断开 {src}:Out{src_port+1} 到 {dst}:In{dst_port+1} 的数据流...")
+        src_log = self._runtime_log_name(src, src_port, "out", dst, dst_port, "in")
+        dst_log = self._runtime_log_name(dst, dst_port, "in", src, src_port, "out")
+        print(f"🧹 >> 清理业务逻辑: 断开 {src_log}:Out{src_port+1} 到 {dst_log}:In{dst_port+1} 的数据流...")
         dst_port_num = resolve_port_number(dst, dst_port, "in")
         if dst_port_num is None:
             print(f"[route] skip: unresolved port mapping dst={dst}:{dst_port}")
             return
         src_port_num = pn.VOID_BOOL if dst_port_num >= 64 else pn.VOID
-        self._apply_routing(dst_port_num, src_port_num, f"{dst}:In{dst_port+1} cleared")
+        self._apply_routing(dst_port_num, src_port_num, f"{dst_log}:In{dst_port+1} cleared")
+
+    def _runtime_log_name(self, node_name, port_idx, role, peer_name=None, peer_port_idx=None, peer_role=None):
+        if node_name not in ("HIGH", "LOW"):
+            return node_name
+
+        candidates = []
+        for item in self.scene.items():
+            if not isinstance(item, NodeItem):
+                continue
+            if getattr(item, "name", None) == node_name:
+                candidates.append(item)
+
+        if not candidates:
+            return f"{node_name}[?]"
+
+        if peer_name is not None and peer_port_idx is not None and peer_role is not None:
+            for node in candidates:
+                ports = node.out_ports if role == "out" else node.in_ports
+                if not (0 <= port_idx < len(ports)):
+                    continue
+                for edge in ports[port_idx].connections:
+                    peer_port = edge.end_port if role == "out" else edge.start_port
+                    peer_parent = peer_port.parent_node if hasattr(peer_port, "parent_node") and peer_port.parent_node else None
+                    if peer_parent is None:
+                        continue
+                    if getattr(peer_parent, "name", None) != peer_name:
+                        continue
+                    if int(peer_port.index) != int(peer_port_idx):
+                        continue
+                    return f"{node_name}[{int(getattr(node, 'index', 0))}]"
+
+        if len(candidates) == 1:
+            return f"{node_name}[{int(getattr(candidates[0], 'index', 0))}]"
+        return f"{node_name}[?]"
 
     def _ensure_router(self):
         if not self.port_ctrl.is_open():
@@ -605,6 +643,8 @@ class MainWindow(QMainWindow):
         return {
             "kind": "node",
             "node_name": parent.name,
+            "component_name": getattr(parent, "component_name", None),
+            "module_index": int(getattr(parent, "index", -1)),
             "port_type": port.port_type,
             "index": int(port.index),
         }
@@ -633,8 +673,20 @@ class MainWindow(QMainWindow):
             return None
 
         if kind == "node":
-            node_name = ref.get("node_name")
-            node = node_map.get(node_name)
+            node = None
+
+            component_name = ref.get("component_name")
+            module_index = ref.get("module_index", None)
+            if component_name is not None and module_index is not None:
+                try:
+                    node = node_map.get(f"{component_name}@{int(module_index)}")
+                except Exception:
+                    node = None
+
+            if node is None:
+                node_name = ref.get("node_name")
+                node = node_map.get(node_name)
+
             if node is None:
                 return None
             if port_type == "out" and 0 <= idx < len(node.out_ports):
@@ -791,6 +843,7 @@ class MainWindow(QMainWindow):
             node = self._create_node_from_config(node_cfg)
             if node is not None:
                 node_map[node.name] = node
+                node_map[f"{node.component_name}@{int(node.index)}"] = node
 
         self._restore_edges(edges_cfg, node_map)
         self.view.update_border_ports()

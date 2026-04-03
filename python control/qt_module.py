@@ -1798,7 +1798,7 @@ class ModuleSCLOFSM(NodeItem):
 class ModuleConstantBool(NodeItem):
     def __init__(self, component_name, index, position, num_inputs=0, num_outputs=1):
         base_name = "HIGH" if component_name == "HIGH" else "LOW"
-        name = f"{base_name}{index + 1}"
+        name = base_name
         super().__init__(name, component_name, index, position, 0, 1)
         self.name = name
         self.component_name = component_name

@@ -582,6 +582,16 @@ class DiagramScene(QGraphicsScene):
             print("⚠️ 连接已取消: 未找到有效的目标端口")
             self.start_port = None
 
+    def _runtime_node_label(self, port):
+        node = port.parent_node if hasattr(port, "parent_node") and port.parent_node else None
+        if node is None:
+            return getattr(port, "name", "Unknown")
+
+        base_name = getattr(node, "name", "Unknown")
+        if base_name in ("HIGH", "LOW"):
+            return f"{base_name}[{int(getattr(node, 'index', 0))}]"
+        return base_name
+
     def finalize_connection(self, end_port):
         edge = EdgeItem(self.start_port, end_port)
         self.addItem(edge)
@@ -600,13 +610,15 @@ class DiagramScene(QGraphicsScene):
         self.temp_line = None
 
         src_name = self.start_port.parent_node.name if hasattr(self.start_port, "parent_node") and self.start_port.parent_node else self.start_port.name
+        src_log_name = self._runtime_node_label(self.start_port)
         src_port_idx = self.start_port.index
         dst_name = end_port.parent_node.name if hasattr(end_port, "parent_node") and end_port.parent_node else end_port.name
+        dst_log_name = self._runtime_node_label(end_port)
         dst_port_idx = end_port.index
 
         self.start_port = None
         direction = "反向(绕行)" if edge._is_reverse_connection() else "正向"
-        print(f"✅ 连线建立: [{src_name}:Out{src_port_idx+1}] --> [{dst_name}:In{dst_port_idx+1}] ({direction}, 颜色: {edge.color})")
+        print(f"✅ 连线建立: [{src_log_name}:Out{src_port_idx+1}] --> [{dst_log_name}:In{dst_port_idx+1}] ({direction}, 颜色: {edge.color})")
         self.signals.connection_created.emit(src_name, src_port_idx, dst_name, dst_port_idx)
 
     def remove_connection(self, input_port):
@@ -615,13 +627,15 @@ class DiagramScene(QGraphicsScene):
 
         edge = input_port.get_connection()
         src_name = edge.start_port.parent_node.name if hasattr(edge.start_port, "parent_node") and edge.start_port.parent_node else edge.start_port.name
+        src_log_name = self._runtime_node_label(edge.start_port)
         src_port_idx = edge.start_port.index
         dst_name = edge.end_port.parent_node.name if hasattr(edge.end_port, "parent_node") and edge.end_port.parent_node else edge.end_port.name
+        dst_log_name = self._runtime_node_label(edge.end_port)
         dst_port_idx = edge.end_port.index
         edge_color = edge.color
 
         edge.remove()
-        print(f"🗑️ 连线已断开: [{src_name}:Out{src_port_idx+1}] -X-> [{dst_name}:In{dst_port_idx+1}] (颜色: {edge_color})")
+        print(f"🗑️ 连线已断开: [{src_log_name}:Out{src_port_idx+1}] -X-> [{dst_log_name}:In{dst_port_idx+1}] (颜色: {edge_color})")
         self.signals.connection_removed.emit(src_name, src_port_idx, dst_name, dst_port_idx)
 
 
