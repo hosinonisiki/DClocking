@@ -141,6 +141,7 @@ class ParamDialog(QDialog):
         self.setWindowTitle("参数修改")
         self._editors = {}
         self._fields = {}
+        self._batch_keys = []
         self._apply_callback = apply_callback
 
         layout = QFormLayout(self)
@@ -215,12 +216,13 @@ class ParamDialog(QDialog):
                 self._editors[key] = ("float_qty", (edit, prefix_box))
             else:
                 self._editors[key] = (ftype, w)
-            row = QHBoxLayout()
-            row.addWidget(w)
-            confirm_btn = QPushButton("确认")
-            confirm_btn.clicked.connect(lambda checked=False, k=key: self._apply_field(k))
-            row.addWidget(confirm_btn)
-            layout.addRow(label, row)
+            self._batch_keys.append(key)
+            layout.addRow(label, w)
+
+        if self._batch_keys:
+            self._confirm_all_btn = QPushButton("确认本模块参数")
+            self._confirm_all_btn.clicked.connect(self._apply_all_fields)
+            layout.addRow("", self._confirm_all_btn)
 
     def _value_from_editor(self, key: str):
         ftype, w = self._editors[key]
@@ -292,6 +294,18 @@ class ParamDialog(QDialog):
         try:
             value = self._value_from_editor(key)
             self._apply_callback({key: value})
+        except Exception as exc:
+            QMessageBox.warning(self, "参数错误", str(exc))
+
+    def _apply_all_fields(self) -> None:
+        if not self._apply_callback:
+            return
+        try:
+            payload = {}
+            for key in self._batch_keys:
+                payload[key] = self._value_from_editor(key)
+            if payload:
+                self._apply_callback(payload)
         except Exception as exc:
             QMessageBox.warning(self, "参数错误", str(exc))
 
@@ -751,6 +765,8 @@ class NodeItem(QGraphicsItem):
             special_dig.exec()
 
     def _create_ports(self):
+        self._apply_adaptive_size()
+
         if self.num_inputs > 0:
             port_spacing_in = self.height / (self.num_inputs + 1)
         if self.num_outputs > 0:
@@ -770,6 +786,26 @@ class NodeItem(QGraphicsItem):
 
     def boundingRect(self):
         return QRectF(-self.width/2, -self.height/2, self.width, self.height)
+
+    def _apply_adaptive_size(self):
+        max_ports = max(int(self.num_inputs), int(self.num_outputs))
+
+        # 按 max(输入, 输出) 分档，整体尺寸较之前更紧凑。
+        if max_ports <= 1:
+            self.width = 96
+            self.height = 114
+        elif max_ports == 2:
+            self.width = 108
+            self.height = 132
+        elif max_ports == 3:
+            self.width = 118
+            self.height = 150
+        elif max_ports == 4:
+            self.width = 128
+            self.height = 166
+        else:
+            self.width = 136
+            self.height = 180
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemPositionHasChanged:
