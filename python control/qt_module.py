@@ -1794,6 +1794,55 @@ class ModuleSCLOFSM(NodeItem):
             self._params[key] = value
         self._notify_param_change(params)
 
+
+class ModuleConstantBool(NodeItem):
+    def __init__(self, component_name, index, position, num_inputs=0, num_outputs=1):
+        base_name = "HIGH" if component_name == "HIGH" else "LOW"
+        name = f"{base_name}{index + 1}"
+        super().__init__(name, component_name, index, position, 0, 1)
+        self.name = name
+        self.component_name = component_name
+        self.display_name = base_name
+        self.index = index
+        self.num_inputs = 0
+        self.num_outputs = 1
+        self.inputs = []
+        self.outputs = [base_name]
+        self.inputs_display_name = []
+        self.outputs_display_name = [base_name]
+        self.inputs_signals = []
+        self.outputs_signals = [["bool"]]
+        self.maxm = -1
+        self.free_mode = True
+        self.setPos(position)
+
+        self.setFlag(QGraphicsItem.ItemIsFocusable)
+        self.setFlag(QGraphicsItem.ItemIsMovable)
+        self.setFlag(QGraphicsItem.ItemIsSelectable)
+        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)
+
+        self._create_ports()
+
+    def _apply_adaptive_size(self):
+        self.width = 74
+        self.height = 52
+
+    def paint(self, painter, option, widget):
+        rect = self.boundingRect()
+        painter.setBrush(QBrush(QColor("#2C3E50")))
+        painter.setPen(QPen(Qt.white, 2))
+        painter.drawRoundedRect(rect, 8, 8)
+
+        painter.setPen(Qt.white)
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(9)
+        painter.setFont(font)
+        painter.drawText(rect, Qt.AlignCenter, self.display_name)
+
+    def getmaxm(self):
+        return self.maxm
+
 class CompositeModule:
 
     sub_modules = []
@@ -1831,6 +1880,8 @@ class DigitalControlledOscillator(CompositeModule):
 module_factory = {
     "PID控制器": ModulePID,
     "累加器": ModuleAccumulator,
+    "HIGH": ModuleConstantBool,
+    "LOW": ModuleConstantBool,
     "三角函数运算器": ModuleBase,
     "反三角函数运算器": ModuleBase,
     "线性缩放器": ModuleScaler,
@@ -1846,6 +1897,8 @@ module_factory = {
 module_maxm = {
     "PID控制器": 2,
     "累加器": 2,
+    "HIGH": -1,
+    "LOW": -1,
     "三角函数运算器": 4,
     "反三角函数运算器": 2,
     "线性缩放器": 4,

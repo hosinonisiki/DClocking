@@ -42,6 +42,13 @@ def border_port_index(name, prefix):
 
 
 def resolve_port_number(node_name, port_index, role):
+    if node_name.startswith("HIGH"):
+        outputs = [pn.HIGH]
+        return outputs[port_index] if role == "out" and 0 <= port_index < len(outputs) else None
+    if node_name.startswith("LOW"):
+        outputs = [pn.LOW]
+        return outputs[port_index] if role == "out" and 0 <= port_index < len(outputs) else None
+
     if node_name == "Border_out_HIGH":
         return pn.HIGH if role == "out" else None
     if node_name == "Border_out_LOW":
@@ -142,6 +149,7 @@ def resolve_port_number(node_name, port_index, role):
 
 def candidate_node_names():
     names = []
+    names.extend(["HIGH1", "LOW1"])
     names.extend([f"Border_out_{i}" for i in range(8)])
     names.extend([f"Border_in_{i}" for i in range(8)])
     names.extend(["Border_out_HIGH", "Border_out_LOW"])
@@ -165,6 +173,17 @@ def resolve_node_port_from_number(port_num, role):
 
 
 def node_name_to_component(node_name):
+    if node_name.startswith("HIGH"):
+        suffix = node_name[4:]
+        if suffix.isdigit():
+            return "HIGH", int(suffix) - 1
+        return "HIGH", 0
+    if node_name.startswith("LOW"):
+        suffix = node_name[3:]
+        if suffix.isdigit():
+            return "LOW", int(suffix) - 1
+        return "LOW", 0
+
     if node_name in ("PIDC", "PID"):
         return "PID控制器", 0
     if node_name.startswith("PID") and node_name[3:].isdigit():

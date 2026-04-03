@@ -16,6 +16,7 @@ from qt_module import (
     NodeItem,
     ModulePID,
     ModuleAccumulator,
+    ModuleConstantBool,
     ModuleBase,
     ModuleScaler,
     ModuleFIRFilter,
@@ -360,12 +361,6 @@ class DiagramScene(QGraphicsScene):
             self.addItem(right_port)
             self.right_ports.append(right_port)
 
-        high_port = BorderPort("out", 8, QPointF(0, 0), signals=["bool"], display_text="HIGH", name="Border_out_HIGH")
-        low_port = BorderPort("out", 9, QPointF(0, 0), signals=["bool"], display_text="LOW", name="Border_out_LOW")
-        self.addItem(high_port)
-        self.addItem(low_port)
-        self.constant_out_ports.extend([high_port, low_port])
-
     def set_developer_mode(self, enabled: bool):
         self.developer_mode = bool(enabled)
         for item in self.items():
@@ -634,6 +629,8 @@ class DiagramView(QGraphicsView):
     module_factory = {
         "PID控制器": ModulePID,
         "累加器": ModuleAccumulator,
+        "HIGH": ModuleConstantBool,
+        "LOW": ModuleConstantBool,
         "三角函数运算器": ModuleBase,
         "反三角函数运算器": ModuleBase,
         "线性缩放器": ModuleScaler,
@@ -719,7 +716,16 @@ class DiagramView(QGraphicsView):
 
     def _alloc_index(self, component_name: str):
         used = self._used_indices[component_name]
-        for i in range(self._maxnum[component_name]):
+        max_count = self._maxnum[component_name]
+
+        if max_count is None or max_count <= 0:
+            i = 0
+            while i in used:
+                i += 1
+            used.add(i)
+            return i
+
+        for i in range(max_count):
             if i not in used:
                 used.add(i)
                 return i
@@ -997,6 +1003,8 @@ class ComponentPalette(QListWidget):
         normal_items = [
             "PID控制器",
             "累加器",
+            "HIGH",
+            "LOW",
             "三角函数运算器",
             "反三角函数运算器",
             "线性缩放器",
