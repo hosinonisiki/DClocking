@@ -1,8 +1,5 @@
 -- ///////////////Documentation////////////////////
 -- This design is the main control unit of the system.
--- It involves an entity containing control logic,
--- a uart receiver and a transmitter, along with
--- two fifo buffers.
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -28,7 +25,8 @@ entity main_control is
         cbus_out        :   out std_logic_vector(cbus_w - 1 downto 0);
         rsp_sel_out     :   out std_logic_vector(mbus_w - 1 downto 0);
         rsp_data_in     :   in  std_logic_vector(rdbus_w - 1 downto 0);
-        rsp_stat_in     :   in  std_logic_vector(rsbus_w - 1 downto 0)
+        rsp_stat_in     :   in  std_logic_vector(rsbus_w - 1 downto 0);
+        query_result_out    :   out std_logic_vector(0 to 3)
     );
 end entity main_control;
 
@@ -69,6 +67,15 @@ architecture structural of main_control is
     signal spi_rxd      :   std_logic_vector(31 downto 0);
     signal spi_val      :   std_logic;
     signal spi_idle     :   std_logic;
+
+    signal spi_tc_rst   :   std_logic;
+    signal cmd_spi_ss_bin   :   std_logic_vector(3 downto 0);
+    signal cmd_spi_en       :   std_logic;
+    signal cmd_spi_control  :   std_logic_vector(31 downto 0);
+    signal cmd_spi_txd      :   std_logic_vector(31 downto 0);
+    signal cmd_spi_rxd      :   std_logic_vector(31 downto 0);
+    signal cmd_spi_val     :   std_logic;
+    signal cmd_spi_idle     :   std_logic;
 
     signal cc_rst       :   std_logic;
 
@@ -208,6 +215,27 @@ begin
     );
     spi_rst <= rst;
 
+    spi_task_control : entity work.spi_task_control port map(
+        clk => clk,
+        rst => spi_tc_rst,
+        cmd_spi_en_in => cmd_spi_en,
+        cmd_ss_in => cmd_spi_ss_bin,
+        cmd_control_in => cmd_spi_control,
+        cmd_din => cmd_spi_txd,
+        cmd_dout => cmd_spi_rxd,
+        cmd_dval_out => cmd_spi_val,
+        cmd_idle_out => cmd_spi_idle,
+        trx_spi_en_out => spi_en,
+        trx_ss_out => spi_ss_bin,
+        trx_control_out => spi_control,
+        trx_dout => spi_txd,
+        trx_din => spi_rxd,
+        trx_dval_in => spi_val,
+        trx_idle_in => spi_idle,
+        query_result_out => query_result_out
+    );
+    spi_tc_rst <= rst;
+
     central_control : entity work.central_control port map(
         clk             =>  clk,
         rst             =>  cc_rst,
@@ -217,12 +245,13 @@ begin
         txd_out         =>  tx_char,
         txen_out        =>  tx_wen,
         txful_in        =>  tx_full,
-        spi_ss_out      =>  spi_ss_bin,
-        spi_en_out      =>  spi_en,
-        spi_control_out =>  spi_control,
-        spi_txd_out     =>  spi_txd,
-        spi_rxd_in      =>  spi_rxd,
-        spi_val_in      =>  spi_val,
+        spi_ss_out      =>  cmd_spi_ss_bin,
+        spi_en_out      =>  cmd_spi_en,
+        spi_control_out =>  cmd_spi_control,
+        spi_txd_out     =>  cmd_spi_txd,
+        spi_rxd_in      =>  cmd_spi_rxd,
+        spi_val_in      =>  cmd_spi_val,
+        spi_idle_in     =>  cmd_spi_idle,
         rsp_sel_out     =>  rsp_sel_out,
         rsp_data_in     =>  rsp_data_in,
         rsp_stat_in     =>  rsp_stat_in,
