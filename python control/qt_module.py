@@ -1846,9 +1846,11 @@ class ModuleConstantBool(NodeItem):
 class CompositeModule:
 
     sub_modules = []
+    auto_edges = []
 
     @classmethod
-    def create_sub_modules(cls, scene, position, alloc_index_func):
+    def create_sub_modules(cls, scene, position, alloc_index_func, connect_func=None):
+        created_nodes = []
         for sub_name, offset in cls.sub_modules:
             module_cls = module_factory.get(sub_name)
             if module_cls:
@@ -1859,14 +1861,49 @@ class CompositeModule:
                 sub_position = position + offset
                 node = module_cls(sub_name, idx, sub_position)
                 scene.addItem(node)
+                created_nodes.append(node)
                 if hasattr(node, "free_mode"):
                     node.free_mode = not getattr(scene, "developer_mode", False)
+
+        if connect_func and created_nodes and cls.auto_edges:
+            for edge_spec in cls.auto_edges:
+                if not isinstance(edge_spec, (tuple, list)) or len(edge_spec) != 4:
+                    print(f"⚠️ 跳过无效自动连线配置: {edge_spec}")
+                    continue
+
+                src_node_idx, src_out_idx, dst_node_idx, dst_in_idx = edge_spec
+
+                if not (0 <= src_node_idx < len(created_nodes)) or not (0 <= dst_node_idx < len(created_nodes)):
+                    print(f"⚠️ 自动连线节点索引越界: {edge_spec}")
+                    continue
+
+                src_node = created_nodes[src_node_idx]
+                dst_node = created_nodes[dst_node_idx]
+
+                if not (0 <= src_out_idx < len(src_node.out_ports)):
+                    print(f"⚠️ 自动连线输出端口索引越界: {edge_spec}")
+                    continue
+
+                if not (0 <= dst_in_idx < len(dst_node.in_ports)):
+                    print(f"⚠️ 自动连线输入端口索引越界: {edge_spec}")
+                    continue
+
+                src_port = src_node.out_ports[src_out_idx]
+                dst_port = dst_node.in_ports[dst_in_idx]
+                if not connect_func(src_port, dst_port):
+                    print(f"⚠️ 自动连线失败: {src_node.name}.Out{src_out_idx + 1} -> {dst_node.name}.In{dst_in_idx + 1}")
+
+        return created_nodes
 
 class SINGenerator(CompositeModule):
 
     sub_modules = [
         ("累加器", QPointF(0, 0)),
         ("三角函数运算器", QPointF(200, 0)),
+    ]
+    auto_edges = [
+        # 累加器默认输出 -> 三角函数运算器相位输入
+        (0, 1, 1, 0),
     ]
 
 class DigitalControlledOscillator(CompositeModule):

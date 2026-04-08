@@ -592,12 +592,15 @@ class DiagramScene(QGraphicsScene):
             return f"{base_name}[{int(getattr(node, 'index', 0))}]"
         return base_name
 
-    def finalize_connection(self, end_port):
-        edge = EdgeItem(self.start_port, end_port)
+    def create_connection(self, start_port, end_port):
+        if not self._is_valid_connection(start_port, end_port):
+            return False
+
+        edge = EdgeItem(start_port, end_port)
         self.addItem(edge)
         edge.refresh_style()
 
-        start_node = self.start_port.parent_node if hasattr(self.start_port, "parent_node") and self.start_port.parent_node else None
+        start_node = start_port.parent_node if hasattr(start_port, "parent_node") and start_port.parent_node else None
         end_node = end_port.parent_node if hasattr(end_port, "parent_node") and end_port.parent_node else None
 
         if start_node:
@@ -605,21 +608,29 @@ class DiagramScene(QGraphicsScene):
         if end_node:
             end_node.edges.append(edge)
 
-        if self.temp_line:
-            self.removeItem(self.temp_line)
-        self.temp_line = None
-
-        src_name = self.start_port.parent_node.name if hasattr(self.start_port, "parent_node") and self.start_port.parent_node else self.start_port.name
-        src_log_name = self._runtime_node_label(self.start_port)
-        src_port_idx = self.start_port.index
+        src_name = start_port.parent_node.name if hasattr(start_port, "parent_node") and start_port.parent_node else start_port.name
+        src_log_name = self._runtime_node_label(start_port)
+        src_port_idx = start_port.index
         dst_name = end_port.parent_node.name if hasattr(end_port, "parent_node") and end_port.parent_node else end_port.name
         dst_log_name = self._runtime_node_label(end_port)
         dst_port_idx = end_port.index
 
-        self.start_port = None
         direction = "反向(绕行)" if edge._is_reverse_connection() else "正向"
         print(f"✅ 连线建立: [{src_log_name}:Out{src_port_idx+1}] --> [{dst_log_name}:In{dst_port_idx+1}] ({direction}, 颜色: {edge.color})")
         self.signals.connection_created.emit(src_name, src_port_idx, dst_name, dst_port_idx)
+        return True
+
+    def finalize_connection(self, end_port):
+        start_port = self.start_port
+        if start_port is None:
+            return
+
+        self.create_connection(start_port, end_port)
+
+        if self.temp_line:
+            self.removeItem(self.temp_line)
+        self.temp_line = None
+        self.start_port = None
 
     def remove_connection(self, input_port):
         if not input_port.has_connection():
@@ -786,7 +797,12 @@ class DiagramView(QGraphicsView):
 
         if component_name in self.composite_modules:
             composite_cls = self.composite_modules[component_name]
-            composite_cls.create_sub_modules(self.scene(), position, self._alloc_index)
+            composite_cls.create_sub_modules(
+                self.scene(),
+                position,
+                self._alloc_index,
+                connect_func=self.scene().create_connection,
+            )
             event.acceptProposedAction()
             return
 
