@@ -170,6 +170,20 @@ class EdgeItem(QGraphicsPathItem):
     def _base_pen_width(self):
         return 4 if self._has_physical_signal() else 2
 
+    def _lane_offset(self):
+        """Spread sibling edges from the same output port into parallel lanes."""
+        if not self.start_port:
+            return 0.0
+        siblings = self.start_port.connections
+        if not siblings:
+            return 0.0
+        try:
+            idx = siblings.index(self)
+        except ValueError:
+            return 0.0
+        center = (len(siblings) - 1) / 2.0
+        return (idx - center) * 10.0
+
     def _is_reverse_connection(self):
         p1 = self.start_port.scenePos()
         p2 = self.end_port.scenePos()
@@ -184,7 +198,7 @@ class EdgeItem(QGraphicsPathItem):
         e_bottom = e_node.scenePos().y() + e_node.height / 2
         return (s_top, s_bottom, e_top, e_bottom)
 
-    def _calculate_bypass_y(self, bypass_offset):
+    def _calculate_bypass_y(self, bypass_offset, lane_offset=0.0):
         p1_node = self.start_port.parent_node if hasattr(self.start_port, "parent_node") and self.start_port.parent_node else self.start_port
         p2_node = self.end_port.parent_node if hasattr(self.end_port, "parent_node") and self.end_port.parent_node else self.end_port
         s_pos = p1_node.scenePos()
@@ -201,40 +215,41 @@ class EdgeItem(QGraphicsPathItem):
             base_clearance = 15
             port_offset = self.start_port.index * 10
             if e_pos.y() > s_pos.y():
-                return e_top - base_clearance - port_offset
-            return e_bottom + base_clearance + port_offset
+                return e_top - base_clearance - port_offset + lane_offset
+            return e_bottom + base_clearance + port_offset + lane_offset
 
         if dx <= node_w:
             if self.start_port.pos().y() > 0 and self.end_port.pos().y() < 0:
-                return ((s_top - bypass_offset) + (e_bottom + bypass_offset)) / 2.0
+                return ((s_top - bypass_offset) + (e_bottom + bypass_offset)) / 2.0 + lane_offset
             if self.start_port.pos().y() < 0 and self.end_port.pos().y() > 0:
-                return ((s_bottom + bypass_offset) + (e_top - bypass_offset)) / 2.0
+                return ((s_bottom + bypass_offset) + (e_top - bypass_offset)) / 2.0 + lane_offset
             if self.end_port.pos().y() > 0:
-                return max(s_bottom, e_bottom) + bypass_offset
-            return min(s_top, e_top) - bypass_offset
+                return max(s_bottom, e_bottom) + bypass_offset + lane_offset
+            return min(s_top, e_top) - bypass_offset + lane_offset
 
         if self.end_port.pos().y() > 0:
-            return max(s_bottom, e_bottom) + bypass_offset
-        return min(s_top, e_top) - bypass_offset
+            return max(s_bottom, e_bottom) + bypass_offset + lane_offset
+        return min(s_top, e_top) - bypass_offset + lane_offset
 
-    def _calculate_route_using_bypass(self, p1, p2, bypass_y, h_extend):
+    def _calculate_route_using_bypass(self, p1, p2, bypass_y, h_extend, lane_offset=0.0):
+        lane_x = lane_offset * 0.6
         return [
             p1,
-            QPointF(p1.x() + h_extend, p1.y()),
-            QPointF(p1.x() + h_extend, bypass_y),
-            QPointF(p2.x() - h_extend + self.reverse_horizontal_offset, bypass_y),
+            QPointF(p1.x() + h_extend + lane_x, p1.y()),
+            QPointF(p1.x() + h_extend + lane_x, bypass_y),
+            QPointF(p2.x() - h_extend + self.reverse_horizontal_offset - lane_x, bypass_y),
             QPointF(p2.x() - h_extend, p2.y()),
             p2,
         ]
 
-    def _calculate_reverse_route(self, p1, p2):
+    def _calculate_reverse_route(self, p1, p2, lane_offset=0.0):
         h_extend = self.start_port.get_reverse_h_extend()
         bypass_offset = self.start_port.get_bypass_offset()
-        bypass_y = self._calculate_bypass_y(bypass_offset)
-        return self._calculate_route_using_bypass(p1, p2, bypass_y, h_extend)
+        bypass_y = self._calculate_bypass_y(bypass_offset, lane_offset=lane_offset)
+        return self._calculate_route_using_bypass(p1, p2, bypass_y, h_extend, lane_offset=lane_offset)
 
-    def _calculate_simple_z_route(self, p1, p2):
-        vertical_x = p1.x() + 30 + (self.start_port.index * 7)
+    def _calculate_simple_z_route(self, p1, p2, lane_offset=0.0):
+        vertical_x = p1.x() + 30 + (self.start_port.index * 7) + lane_offset
         return [p1, QPointF(vertical_x, p1.y()), QPointF(vertical_x, p2.y()), p2]
 
     def update_path(self):
@@ -253,26 +268,27 @@ class EdgeItem(QGraphicsPathItem):
         node_w = max(s_node.width, e_node.width)
         node_h = max(s_node.height, e_node.height)
         is_reverse = self._is_reverse_connection()
+        lane_offset = self._lane_offset()
 
         if not is_reverse and dx > node_w * 1.5 and dy > node_h:
-            route = self._calculate_simple_z_route(p1, p2)
+            route = self._calculate_simple_z_route(p1, p2, lane_offset=lane_offset)
             for point in route[1:]:
                 path.lineTo(point)
         elif dy > node_h:
             h_extend = self.start_port.get_reverse_h_extend()
-            bypass_y = self._calculate_bypass_y(self.start_port.get_bypass_offset())
-            route = self._calculate_route_using_bypass(p1, p2, bypass_y, h_extend)
+            bypass_y = self._calculate_bypass_y(self.start_port.get_bypass_offset(), lane_offset=lane_offset)
+            route = self._calculate_route_using_bypass(p1, p2, bypass_y, h_extend, lane_offset=lane_offset)
             for point in route[1:]:
                 path.lineTo(point)
         else:
             if is_reverse:
-                route = self._calculate_reverse_route(p1, p2)
+                route = self._calculate_reverse_route(p1, p2, lane_offset=lane_offset)
                 for point in route[1:]:
                     path.lineTo(point)
             else:
-                turn_x = p1.x() + self.start_port.get_turn_distance()
-                y1_with_offset = p1.y() + self.horizontal_offset
-                y2_with_offset = p2.y() + self.horizontal_offset
+                turn_x = p1.x() + self.start_port.get_turn_distance() + lane_offset
+                y1_with_offset = p1.y() + self.horizontal_offset + lane_offset
+                y2_with_offset = p2.y() + self.horizontal_offset + lane_offset
                 path.lineTo(turn_x, p1.y())
                 path.lineTo(turn_x, y1_with_offset)
                 path.lineTo(turn_x, y2_with_offset)
@@ -324,6 +340,10 @@ class EdgeItem(QGraphicsPathItem):
             for edge in self.start_port.connections:
                 edge._create_control_points()
                 break
+
+        # Re-route siblings after removal to keep lane offsets balanced.
+        for edge in list(self.start_port.connections):
+            edge.update_path()
 
         if self.scene():
             self.scene().removeItem(self)

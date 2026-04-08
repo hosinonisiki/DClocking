@@ -345,6 +345,7 @@ class MainWindow(QMainWindow):
         device_edges = []
         required_nodes = set()
         unresolved_route_count = 0
+        unresolved_samples = []
         unknown_node_count = 0
         missing_port_ref_count = 0
         param_fail_count = 0
@@ -354,6 +355,8 @@ class MainWindow(QMainWindow):
             dst_name, dst_idx = resolve_node_port_from_number(route["dst_port"], "in")
             if src_name is None or dst_name is None:
                 unresolved_route_count += 1
+                if len(unresolved_samples) < 12:
+                    unresolved_samples.append((route.get("src_port"), route.get("dst_port")))
                 continue
             device_edges.append((src_name, src_idx, dst_name, dst_idx))
             if not src_name.startswith("Border_"):
@@ -370,10 +373,12 @@ class MainWindow(QMainWindow):
                 internal_edges.append((src_name, dst_name))
 
         adjacency = {name: set() for name in required_nodes}
+        predecessors = {name: set() for name in required_nodes}
         indegree = {name: 0 for name in required_nodes}
         for src_name, dst_name in internal_edges:
             if dst_name not in adjacency[src_name]:
                 adjacency[src_name].add(dst_name)
+                predecessors[dst_name].add(src_name)
                 indegree[dst_name] += 1
 
         layer = {name: 0 for name in required_nodes}
@@ -400,11 +405,30 @@ class MainWindow(QMainWindow):
             lv = layer.get(name, 0)
             layers.setdefault(lv, []).append(name)
 
-        node_map = {}
-        x0, y0 = 280.0, 170.0
-        dx, dy = 280.0, 190.0
+        # Reduce crossing by ordering each layer using predecessor barycenter.
+        ordered_layers = {}
+        prev_rank = {}
         for lv in sorted(layers.keys()):
-            names_in_layer = sorted(layers[lv])
+            names_in_layer = list(layers[lv])
+            if not prev_rank:
+                names_in_layer.sort()
+            else:
+                def _barycenter(node_name):
+                    preds = [p for p in predecessors.get(node_name, set()) if p in prev_rank]
+                    if not preds:
+                        return float("inf")
+                    return sum(prev_rank[p] for p in preds) / len(preds)
+
+                names_in_layer.sort(key=lambda n: (_barycenter(n), n))
+            ordered_layers[lv] = names_in_layer
+            prev_rank = {n: i for i, n in enumerate(names_in_layer)}
+
+        node_map = {}
+        x0, y_center = 260.0, 520.0
+        dx, dy = 320.0, 180.0
+        for lv in sorted(ordered_layers.keys()):
+            names_in_layer = ordered_layers[lv]
+            start_y = y_center - ((len(names_in_layer) - 1) * dy) / 2.0
             for row, name in enumerate(names_in_layer):
                 component_name, index = node_name_to_component(name)
                 if component_name is None:
@@ -415,7 +439,7 @@ class MainWindow(QMainWindow):
                     unknown_node_count += 1
                     continue
 
-                pos = QPointF(x0 + lv * dx, y0 + row * dy)
+                pos = QPointF(x0 + lv * dx, start_y + row * dy)
                 node = cls(component_name, index, pos)
                 self.view._used_indices.setdefault(component_name, set()).add(index)
                 self.view._apply_mode_to_node(node)
@@ -467,6 +491,9 @@ class MainWindow(QMainWindow):
             f"未知模块节点: {unknown_node_count}\n"
             f"参数读取失败模块: {param_fail_count}"
         )
+        if unresolved_samples:
+            sample_text = ", ".join([f"{s}->{d}" for s, d in unresolved_samples])
+            report += f"\n未识别样例(src->dst): {sample_text}"
         QMessageBox.information(self, "同步报告", report)
 
     def run_business_logic(self, src, src_port, dst, dst_port):
@@ -640,11 +667,14 @@ class MainWindow(QMainWindow):
         parent = getattr(port, "parent_node", None)
         if parent is None:
             return None
+        module_index = int(getattr(parent, "index", -1))
+        component_name = getattr(parent, "component_name", None)
         return {
             "kind": "node",
             "node_name": parent.name,
-            "component_name": getattr(parent, "component_name", None),
-            "module_index": int(getattr(parent, "index", -1)),
+            "component_name": component_name,
+            "module_index": module_index,
+            "node_key": f"{component_name}@{module_index}",
             "port_type": port.port_type,
             "index": int(port.index),
         }
@@ -675,9 +705,13 @@ class MainWindow(QMainWindow):
         if kind == "node":
             node = None
 
+            node_key = ref.get("node_key")
+            if isinstance(node_key, str):
+                node = node_map.get(node_key)
+
             component_name = ref.get("component_name")
             module_index = ref.get("module_index", None)
-            if component_name is not None and module_index is not None:
+            if node is None and component_name is not None and module_index is not None:
                 try:
                     node = node_map.get(f"{component_name}@{int(module_index)}")
                 except Exception:
@@ -686,6 +720,11 @@ class MainWindow(QMainWindow):
             if node is None:
                 node_name = ref.get("node_name")
                 node = node_map.get(node_name)
+                if node is None and isinstance(node_name, str) and node_name in ("HIGH", "LOW") and module_index is not None:
+                    try:
+                        node = node_map.get(f"{node_name}{int(module_index) + 1}")
+                    except Exception:
+                        node = None
 
             if node is None:
                 return None
@@ -842,8 +881,10 @@ class MainWindow(QMainWindow):
         for node_cfg in nodes_cfg:
             node = self._create_node_from_config(node_cfg)
             if node is not None:
-                node_map[node.name] = node
+                node_map.setdefault(node.name, node)
                 node_map[f"{node.component_name}@{int(node.index)}"] = node
+                if node.component_name in ("HIGH", "LOW"):
+                    node_map[f"{node.component_name}{int(node.index) + 1}"] = node
 
         self._restore_edges(edges_cfg, node_map)
         self.view.update_border_ports()

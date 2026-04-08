@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import time
+
 from PySide6.QtCore import  QTimer, Qt, QPoint,QEvent,QObject 
 import PySide6.QtWidgets as qw
 from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
@@ -299,11 +301,37 @@ class Port(QObject):
         if not self.hw_controller or not self.hw_controller.is_initialized():
             raise RuntimeError("Hardware controller not initialized")
 
+        def _read_router_word(addr, retries=4):
+            last_exc = None
+            for _ in range(max(1, retries)):
+                try:
+                    raw = self.hw_controller.bus_inst.read("ROUT", addr)
+                    if isinstance(raw, (bytes, bytearray)) and len(raw) == 4:
+                        return int.from_bytes(raw, "big", signed=False)
+                except Exception as exc:
+                    last_exc = exc
+                time.sleep(0.01)
+
+            if last_exc is not None:
+                raise RuntimeError(f"Failed to read ROUT[{addr}]: {last_exc}")
+            raise RuntimeError(f"Failed to read ROUT[{addr}]: invalid response")
+
+        def _read_snapshot():
+            return [_read_router_word(addr) for addr in range(32)]
+
         # ROUT has 32 x 32-bit words. Address 31 is bits[0:32], address 0 is bits[992:1024].
-        words = []
-        for addr in range(32):
-            raw = self.hw_controller.bus_inst.read("ROUT", addr)
-            words.append(int.from_bytes(raw, "big", signed=False))
+        snapshots = []
+        words = None
+        for _ in range(3):
+            snap = _read_snapshot()
+            snapshots.append(snap)
+            if len(snapshots) >= 2 and snapshots[-1] == snapshots[-2]:
+                words = snapshots[-1]
+                break
+        if words is None:
+            # Fall back to the most informative snapshot when back-to-back reads are unstable.
+            words = max(snapshots, key=lambda s: sum(1 for w in s if w != 0))
+            print("[sync] warning: ROUT snapshots unstable, using best-effort decode")
 
         bit_chunks = [format(words[31 - i], "032b") for i in range(32)]
         bits = "".join(bit_chunks)
