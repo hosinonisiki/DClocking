@@ -307,6 +307,8 @@ class ModuleScaler(ModuleBase):
             address_list = [0]
             def formula(data_list):
                 scale = int.from_bytes(data_list[0], "big", signed = True)
+                if scale == 0:
+                    return -np.inf
                 return 20 * np.log10(np.abs(scale) / 2 ** 16)
             return address_list, formula
 
