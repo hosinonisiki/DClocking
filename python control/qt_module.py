@@ -557,7 +557,7 @@ class PortItem(QGraphicsItem):
         painter.setBrush(brush)
 
         # 同一侧横向排布
-        h_step = 13
+        h_step = 10
         n = len(items)
         if n:
             start_x = x_pos - (n - 1) * h_step / 2
@@ -565,8 +565,8 @@ class PortItem(QGraphicsItem):
                 sx = start_x + i * h_step
 
                 if kind == "tick":
-                    outer_r = 6
-                    inner_r = 2.5
+                    outer_r = 4
+                    inner_r = 1.6
                     path = QPainterPath()
                     for j in range(10):
                         angle_deg = -90 + j * 36
@@ -583,17 +583,17 @@ class PortItem(QGraphicsItem):
                     painter.fillPath(path, brush)
 
                 elif kind == "circle":
-                    painter.drawEllipse(sx - 4, y_base - 4, 8, 8)
+                    painter.drawEllipse(sx - 3, y_base - 3, 6, 6)
 
                 elif kind == "square":
-                    painter.drawRect(sx - 4, y_base - 4, 8, 8)
+                    painter.drawRect(sx - 3, y_base - 3, 6, 6)
 
                 elif kind == "diamond":
                     pts = [
-                        QPointF(sx, y_base - 6),
-                        QPointF(sx + 6, y_base),
-                        QPointF(sx, y_base + 6),
-                        QPointF(sx - 6, y_base),
+                        QPointF(sx, y_base - 4),
+                        QPointF(sx + 4, y_base),
+                        QPointF(sx, y_base + 4),
+                        QPointF(sx - 4, y_base),
                     ]
                     path = QPainterPath()
                     path.moveTo(pts[0])
@@ -609,7 +609,7 @@ class PortItem(QGraphicsItem):
             start_x = x_pos - (n_u - 1) * h_step / 2
             for i, _k in enumerate(unknown):
                 sx = start_x + i * h_step
-                pts = [QPointF(sx, y_base - 5), QPointF(sx - 5, y_base + 3), QPointF(sx + 5, y_base + 3)]
+                pts = [QPointF(sx, y_base - 4), QPointF(sx - 4, y_base + 2.4), QPointF(sx + 4, y_base + 2.4)]
                 path = QPainterPath()
                 path.moveTo(pts[0])
                 path.lineTo(pts[1])
@@ -792,19 +792,19 @@ class NodeItem(QGraphicsItem):
 
         # 按 max(输入, 输出) 分档，整体尺寸较之前更紧凑。
         if max_ports <= 1:
-            self.width = 96
-            self.height = 114
+            self.width = 128
+            self.height = 84
         elif max_ports == 2:
-            self.width = 108
-            self.height = 132
+            self.width = 128
+            self.height = 108
         elif max_ports == 3:
-            self.width = 118
-            self.height = 150
+            self.width = 128
+            self.height = 132
         elif max_ports == 4:
             self.width = 128
-            self.height = 166
+            self.height = 156
         else:
-            self.width = 136
+            self.width = 128
             self.height = 180
 
     def itemChange(self, change, value):
