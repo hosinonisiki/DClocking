@@ -16,6 +16,7 @@ from qt_module import (
     NodeItem,
     ModulePID,
     ModuleAccumulator,
+    ModuleConstantBool,
     ModuleBase,
     ModuleScaler,
     ModuleFIRFilter,
@@ -169,6 +170,20 @@ class EdgeItem(QGraphicsPathItem):
     def _base_pen_width(self):
         return 4 if self._has_physical_signal() else 2
 
+    def _lane_offset(self):
+        """Spread sibling edges from the same output port into parallel lanes."""
+        if not self.start_port:
+            return 0.0
+        siblings = self.start_port.connections
+        if not siblings:
+            return 0.0
+        try:
+            idx = siblings.index(self)
+        except ValueError:
+            return 0.0
+        center = (len(siblings) - 1) / 2.0
+        return (idx - center) * 10.0
+
     def _is_reverse_connection(self):
         p1 = self.start_port.scenePos()
         p2 = self.end_port.scenePos()
@@ -183,7 +198,7 @@ class EdgeItem(QGraphicsPathItem):
         e_bottom = e_node.scenePos().y() + e_node.height / 2
         return (s_top, s_bottom, e_top, e_bottom)
 
-    def _calculate_bypass_y(self, bypass_offset):
+    def _calculate_bypass_y(self, bypass_offset, lane_offset=0.0):
         p1_node = self.start_port.parent_node if hasattr(self.start_port, "parent_node") and self.start_port.parent_node else self.start_port
         p2_node = self.end_port.parent_node if hasattr(self.end_port, "parent_node") and self.end_port.parent_node else self.end_port
         s_pos = p1_node.scenePos()
@@ -200,40 +215,41 @@ class EdgeItem(QGraphicsPathItem):
             base_clearance = 15
             port_offset = self.start_port.index * 10
             if e_pos.y() > s_pos.y():
-                return e_top - base_clearance - port_offset
-            return e_bottom + base_clearance + port_offset
+                return e_top - base_clearance - port_offset + lane_offset
+            return e_bottom + base_clearance + port_offset + lane_offset
 
         if dx <= node_w:
             if self.start_port.pos().y() > 0 and self.end_port.pos().y() < 0:
-                return ((s_top - bypass_offset) + (e_bottom + bypass_offset)) / 2.0
+                return ((s_top - bypass_offset) + (e_bottom + bypass_offset)) / 2.0 + lane_offset
             if self.start_port.pos().y() < 0 and self.end_port.pos().y() > 0:
-                return ((s_bottom + bypass_offset) + (e_top - bypass_offset)) / 2.0
+                return ((s_bottom + bypass_offset) + (e_top - bypass_offset)) / 2.0 + lane_offset
             if self.end_port.pos().y() > 0:
-                return max(s_bottom, e_bottom) + bypass_offset
-            return min(s_top, e_top) - bypass_offset
+                return max(s_bottom, e_bottom) + bypass_offset + lane_offset
+            return min(s_top, e_top) - bypass_offset + lane_offset
 
         if self.end_port.pos().y() > 0:
-            return max(s_bottom, e_bottom) + bypass_offset
-        return min(s_top, e_top) - bypass_offset
+            return max(s_bottom, e_bottom) + bypass_offset + lane_offset
+        return min(s_top, e_top) - bypass_offset + lane_offset
 
-    def _calculate_route_using_bypass(self, p1, p2, bypass_y, h_extend):
+    def _calculate_route_using_bypass(self, p1, p2, bypass_y, h_extend, lane_offset=0.0):
+        lane_x = lane_offset * 0.6
         return [
             p1,
-            QPointF(p1.x() + h_extend, p1.y()),
-            QPointF(p1.x() + h_extend, bypass_y),
-            QPointF(p2.x() - h_extend + self.reverse_horizontal_offset, bypass_y),
+            QPointF(p1.x() + h_extend + lane_x, p1.y()),
+            QPointF(p1.x() + h_extend + lane_x, bypass_y),
+            QPointF(p2.x() - h_extend + self.reverse_horizontal_offset - lane_x, bypass_y),
             QPointF(p2.x() - h_extend, p2.y()),
             p2,
         ]
 
-    def _calculate_reverse_route(self, p1, p2):
+    def _calculate_reverse_route(self, p1, p2, lane_offset=0.0):
         h_extend = self.start_port.get_reverse_h_extend()
         bypass_offset = self.start_port.get_bypass_offset()
-        bypass_y = self._calculate_bypass_y(bypass_offset)
-        return self._calculate_route_using_bypass(p1, p2, bypass_y, h_extend)
+        bypass_y = self._calculate_bypass_y(bypass_offset, lane_offset=lane_offset)
+        return self._calculate_route_using_bypass(p1, p2, bypass_y, h_extend, lane_offset=lane_offset)
 
-    def _calculate_simple_z_route(self, p1, p2):
-        vertical_x = p1.x() + 30 + (self.start_port.index * 7)
+    def _calculate_simple_z_route(self, p1, p2, lane_offset=0.0):
+        vertical_x = p1.x() + 30 + (self.start_port.index * 7) + lane_offset
         return [p1, QPointF(vertical_x, p1.y()), QPointF(vertical_x, p2.y()), p2]
 
     def update_path(self):
@@ -252,26 +268,27 @@ class EdgeItem(QGraphicsPathItem):
         node_w = max(s_node.width, e_node.width)
         node_h = max(s_node.height, e_node.height)
         is_reverse = self._is_reverse_connection()
+        lane_offset = self._lane_offset()
 
         if not is_reverse and dx > node_w * 1.5 and dy > node_h:
-            route = self._calculate_simple_z_route(p1, p2)
+            route = self._calculate_simple_z_route(p1, p2, lane_offset=lane_offset)
             for point in route[1:]:
                 path.lineTo(point)
         elif dy > node_h:
             h_extend = self.start_port.get_reverse_h_extend()
-            bypass_y = self._calculate_bypass_y(self.start_port.get_bypass_offset())
-            route = self._calculate_route_using_bypass(p1, p2, bypass_y, h_extend)
+            bypass_y = self._calculate_bypass_y(self.start_port.get_bypass_offset(), lane_offset=lane_offset)
+            route = self._calculate_route_using_bypass(p1, p2, bypass_y, h_extend, lane_offset=lane_offset)
             for point in route[1:]:
                 path.lineTo(point)
         else:
             if is_reverse:
-                route = self._calculate_reverse_route(p1, p2)
+                route = self._calculate_reverse_route(p1, p2, lane_offset=lane_offset)
                 for point in route[1:]:
                     path.lineTo(point)
             else:
-                turn_x = p1.x() + self.start_port.get_turn_distance()
-                y1_with_offset = p1.y() + self.horizontal_offset
-                y2_with_offset = p2.y() + self.horizontal_offset
+                turn_x = p1.x() + self.start_port.get_turn_distance() + lane_offset
+                y1_with_offset = p1.y() + self.horizontal_offset + lane_offset
+                y2_with_offset = p2.y() + self.horizontal_offset + lane_offset
                 path.lineTo(turn_x, p1.y())
                 path.lineTo(turn_x, y1_with_offset)
                 path.lineTo(turn_x, y2_with_offset)
@@ -324,6 +341,10 @@ class EdgeItem(QGraphicsPathItem):
                 edge._create_control_points()
                 break
 
+        # Re-route siblings after removal to keep lane offsets balanced.
+        for edge in list(self.start_port.connections):
+            edge.update_path()
+
         if self.scene():
             self.scene().removeItem(self)
 
@@ -359,12 +380,6 @@ class DiagramScene(QGraphicsScene):
             right_port = BorderPort("in", i, QPointF(0, 0))
             self.addItem(right_port)
             self.right_ports.append(right_port)
-
-        high_port = BorderPort("out", 8, QPointF(0, 0), signals=["bool"], display_text="HIGH", name="Border_out_HIGH")
-        low_port = BorderPort("out", 9, QPointF(0, 0), signals=["bool"], display_text="LOW", name="Border_out_LOW")
-        self.addItem(high_port)
-        self.addItem(low_port)
-        self.constant_out_ports.extend([high_port, low_port])
 
     def set_developer_mode(self, enabled: bool):
         self.developer_mode = bool(enabled)
@@ -587,12 +602,25 @@ class DiagramScene(QGraphicsScene):
             print("⚠️ 连接已取消: 未找到有效的目标端口")
             self.start_port = None
 
-    def finalize_connection(self, end_port):
-        edge = EdgeItem(self.start_port, end_port)
+    def _runtime_node_label(self, port):
+        node = port.parent_node if hasattr(port, "parent_node") and port.parent_node else None
+        if node is None:
+            return getattr(port, "name", "Unknown")
+
+        base_name = getattr(node, "name", "Unknown")
+        if base_name in ("HIGH", "LOW"):
+            return f"{base_name}[{int(getattr(node, 'index', 0))}]"
+        return base_name
+
+    def create_connection(self, start_port, end_port):
+        if not self._is_valid_connection(start_port, end_port):
+            return False
+
+        edge = EdgeItem(start_port, end_port)
         self.addItem(edge)
         edge.refresh_style()
 
-        start_node = self.start_port.parent_node if hasattr(self.start_port, "parent_node") and self.start_port.parent_node else None
+        start_node = start_port.parent_node if hasattr(start_port, "parent_node") and start_port.parent_node else None
         end_node = end_port.parent_node if hasattr(end_port, "parent_node") and end_port.parent_node else None
 
         if start_node:
@@ -600,19 +628,29 @@ class DiagramScene(QGraphicsScene):
         if end_node:
             end_node.edges.append(edge)
 
+        src_name = start_port.parent_node.name if hasattr(start_port, "parent_node") and start_port.parent_node else start_port.name
+        src_log_name = self._runtime_node_label(start_port)
+        src_port_idx = start_port.index
+        dst_name = end_port.parent_node.name if hasattr(end_port, "parent_node") and end_port.parent_node else end_port.name
+        dst_log_name = self._runtime_node_label(end_port)
+        dst_port_idx = end_port.index
+
+        direction = "反向(绕行)" if edge._is_reverse_connection() else "正向"
+        print(f"✅ 连线建立: [{src_log_name}:Out{src_port_idx+1}] --> [{dst_log_name}:In{dst_port_idx+1}] ({direction}, 颜色: {edge.color})")
+        self.signals.connection_created.emit(src_name, src_port_idx, dst_name, dst_port_idx)
+        return True
+
+    def finalize_connection(self, end_port):
+        start_port = self.start_port
+        if start_port is None:
+            return
+
+        self.create_connection(start_port, end_port)
+
         if self.temp_line:
             self.removeItem(self.temp_line)
         self.temp_line = None
-
-        src_name = self.start_port.parent_node.name if hasattr(self.start_port, "parent_node") and self.start_port.parent_node else self.start_port.name
-        src_port_idx = self.start_port.index
-        dst_name = end_port.parent_node.name if hasattr(end_port, "parent_node") and end_port.parent_node else end_port.name
-        dst_port_idx = end_port.index
-
         self.start_port = None
-        direction = "反向(绕行)" if edge._is_reverse_connection() else "正向"
-        print(f"✅ 连线建立: [{src_name}:Out{src_port_idx+1}] --> [{dst_name}:In{dst_port_idx+1}] ({direction}, 颜色: {edge.color})")
-        self.signals.connection_created.emit(src_name, src_port_idx, dst_name, dst_port_idx)
 
     def remove_connection(self, input_port):
         if not input_port.has_connection():
@@ -620,13 +658,15 @@ class DiagramScene(QGraphicsScene):
 
         edge = input_port.get_connection()
         src_name = edge.start_port.parent_node.name if hasattr(edge.start_port, "parent_node") and edge.start_port.parent_node else edge.start_port.name
+        src_log_name = self._runtime_node_label(edge.start_port)
         src_port_idx = edge.start_port.index
         dst_name = edge.end_port.parent_node.name if hasattr(edge.end_port, "parent_node") and edge.end_port.parent_node else edge.end_port.name
+        dst_log_name = self._runtime_node_label(edge.end_port)
         dst_port_idx = edge.end_port.index
         edge_color = edge.color
 
         edge.remove()
-        print(f"🗑️ 连线已断开: [{src_name}:Out{src_port_idx+1}] -X-> [{dst_name}:In{dst_port_idx+1}] (颜色: {edge_color})")
+        print(f"🗑️ 连线已断开: [{src_log_name}:Out{src_port_idx+1}] -X-> [{dst_log_name}:In{dst_port_idx+1}] (颜色: {edge_color})")
         self.signals.connection_removed.emit(src_name, src_port_idx, dst_name, dst_port_idx)
 
 
@@ -634,6 +674,8 @@ class DiagramView(QGraphicsView):
     module_factory = {
         "PID控制器": ModulePID,
         "累加器": ModuleAccumulator,
+        "布尔值：是": ModuleConstantBool,
+        "布尔值：否": ModuleConstantBool,
         "三角函数运算器": ModuleBase,
         "反三角函数运算器": ModuleBase,
         "线性缩放器": ModuleScaler,
@@ -719,7 +761,16 @@ class DiagramView(QGraphicsView):
 
     def _alloc_index(self, component_name: str):
         used = self._used_indices[component_name]
-        for i in range(self._maxnum[component_name]):
+        max_count = self._maxnum[component_name]
+
+        if max_count is None or max_count <= 0:
+            i = 0
+            while i in used:
+                i += 1
+            used.add(i)
+            return i
+
+        for i in range(max_count):
             if i not in used:
                 used.add(i)
                 return i
@@ -766,7 +817,12 @@ class DiagramView(QGraphicsView):
 
         if component_name in self.composite_modules:
             composite_cls = self.composite_modules[component_name]
-            composite_cls.create_sub_modules(self.scene(), position, self._alloc_index)
+            composite_cls.create_sub_modules(
+                self.scene(),
+                position,
+                self._alloc_index,
+                connect_func=self.scene().create_connection,
+            )
             event.acceptProposedAction()
             return
 
@@ -997,6 +1053,8 @@ class ComponentPalette(QListWidget):
         normal_items = [
             "PID控制器",
             "累加器",
+            "布尔值：是",
+            "布尔值：否",
             "三角函数运算器",
             "反三角函数运算器",
             "线性缩放器",

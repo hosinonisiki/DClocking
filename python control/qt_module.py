@@ -141,6 +141,7 @@ class ParamDialog(QDialog):
         self.setWindowTitle("参数修改")
         self._editors = {}
         self._fields = {}
+        self._batch_keys = []
         self._apply_callback = apply_callback
 
         layout = QFormLayout(self)
@@ -215,12 +216,13 @@ class ParamDialog(QDialog):
                 self._editors[key] = ("float_qty", (edit, prefix_box))
             else:
                 self._editors[key] = (ftype, w)
-            row = QHBoxLayout()
-            row.addWidget(w)
-            confirm_btn = QPushButton("确认")
-            confirm_btn.clicked.connect(lambda checked=False, k=key: self._apply_field(k))
-            row.addWidget(confirm_btn)
-            layout.addRow(label, row)
+            self._batch_keys.append(key)
+            layout.addRow(label, w)
+
+        if self._batch_keys:
+            self._confirm_all_btn = QPushButton("确认本模块参数")
+            self._confirm_all_btn.clicked.connect(self._apply_all_fields)
+            layout.addRow("", self._confirm_all_btn)
 
     def _value_from_editor(self, key: str):
         ftype, w = self._editors[key]
@@ -292,6 +294,18 @@ class ParamDialog(QDialog):
         try:
             value = self._value_from_editor(key)
             self._apply_callback({key: value})
+        except Exception as exc:
+            QMessageBox.warning(self, "参数错误", str(exc))
+
+    def _apply_all_fields(self) -> None:
+        if not self._apply_callback:
+            return
+        try:
+            payload = {}
+            for key in self._batch_keys:
+                payload[key] = self._value_from_editor(key)
+            if payload:
+                self._apply_callback(payload)
         except Exception as exc:
             QMessageBox.warning(self, "参数错误", str(exc))
 
@@ -543,7 +557,7 @@ class PortItem(QGraphicsItem):
         painter.setBrush(brush)
 
         # 同一侧横向排布
-        h_step = 13
+        h_step = 10
         n = len(items)
         if n:
             start_x = x_pos - (n - 1) * h_step / 2
@@ -551,8 +565,8 @@ class PortItem(QGraphicsItem):
                 sx = start_x + i * h_step
 
                 if kind == "tick":
-                    outer_r = 6
-                    inner_r = 2.5
+                    outer_r = 4
+                    inner_r = 1.6
                     path = QPainterPath()
                     for j in range(10):
                         angle_deg = -90 + j * 36
@@ -569,17 +583,17 @@ class PortItem(QGraphicsItem):
                     painter.fillPath(path, brush)
 
                 elif kind == "circle":
-                    painter.drawEllipse(sx - 4, y_base - 4, 8, 8)
+                    painter.drawEllipse(sx - 3, y_base - 3, 6, 6)
 
                 elif kind == "square":
-                    painter.drawRect(sx - 4, y_base - 4, 8, 8)
+                    painter.drawRect(sx - 3, y_base - 3, 6, 6)
 
                 elif kind == "diamond":
                     pts = [
-                        QPointF(sx, y_base - 6),
-                        QPointF(sx + 6, y_base),
-                        QPointF(sx, y_base + 6),
-                        QPointF(sx - 6, y_base),
+                        QPointF(sx, y_base - 4),
+                        QPointF(sx + 4, y_base),
+                        QPointF(sx, y_base + 4),
+                        QPointF(sx - 4, y_base),
                     ]
                     path = QPainterPath()
                     path.moveTo(pts[0])
@@ -595,7 +609,7 @@ class PortItem(QGraphicsItem):
             start_x = x_pos - (n_u - 1) * h_step / 2
             for i, _k in enumerate(unknown):
                 sx = start_x + i * h_step
-                pts = [QPointF(sx, y_base - 5), QPointF(sx - 5, y_base + 3), QPointF(sx + 5, y_base + 3)]
+                pts = [QPointF(sx, y_base - 4), QPointF(sx - 4, y_base + 2.4), QPointF(sx + 4, y_base + 2.4)]
                 path = QPainterPath()
                 path.moveTo(pts[0])
                 path.lineTo(pts[1])
@@ -751,6 +765,8 @@ class NodeItem(QGraphicsItem):
             special_dig.exec()
 
     def _create_ports(self):
+        self._apply_adaptive_size()
+
         if self.num_inputs > 0:
             port_spacing_in = self.height / (self.num_inputs + 1)
         if self.num_outputs > 0:
@@ -770,6 +786,26 @@ class NodeItem(QGraphicsItem):
 
     def boundingRect(self):
         return QRectF(-self.width/2, -self.height/2, self.width, self.height)
+
+    def _apply_adaptive_size(self):
+        max_ports = max(int(self.num_inputs), int(self.num_outputs))
+
+        # 按 max(输入, 输出) 分档，整体尺寸较之前更紧凑。
+        if max_ports <= 1:
+            self.width = 128
+            self.height = 84
+        elif max_ports == 2:
+            self.width = 128
+            self.height = 108
+        elif max_ports == 3:
+            self.width = 128
+            self.height = 132
+        elif max_ports == 4:
+            self.width = 128
+            self.height = 156
+        else:
+            self.width = 128
+            self.height = 180
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemPositionHasChanged:
@@ -1440,7 +1476,7 @@ class ModuleLinerTransformer(NodeItem):
 
 class ModulePDHFSM(NodeItem):
     def __init__(self, component_name, index,position, num_inputs = 2, num_outputs = 3):
-        name = "PDH"
+        name = "PDHS"
         super().__init__(name, component_name, index, position, num_inputs, num_outputs)
         self.name = name
         self.height = 180
@@ -1758,12 +1794,63 @@ class ModuleSCLOFSM(NodeItem):
             self._params[key] = value
         self._notify_param_change(params)
 
+
+class ModuleConstantBool(NodeItem):
+    def __init__(self, component_name, index, position, num_inputs=0, num_outputs=1):
+        base_name = "HIGH" if component_name == "布尔值：是" else "LOW"
+        name = base_name
+        super().__init__(name, component_name, index, position, 0, 1)
+        self.name = name
+        self.component_name = component_name
+        self.display_name = "布尔值：是" if base_name == "HIGH" else "布尔值：否"
+        self.index = index
+        self.num_inputs = 0
+        self.num_outputs = 1
+        self.inputs = []
+        self.outputs = [base_name]
+        self.inputs_display_name = []
+        self.outputs_display_name = [self.display_name]
+        self.inputs_signals = []
+        self.outputs_signals = [["bool"]]
+        self.maxm = -1
+        self.free_mode = True
+        self.setPos(position)
+
+        self.setFlag(QGraphicsItem.ItemIsFocusable)
+        self.setFlag(QGraphicsItem.ItemIsMovable)
+        self.setFlag(QGraphicsItem.ItemIsSelectable)
+        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)
+
+        self._create_ports()
+
+    def _apply_adaptive_size(self):
+        self.width = 74
+        self.height = 52
+
+    def paint(self, painter, option, widget):
+        rect = self.boundingRect()
+        painter.setBrush(QBrush(QColor("#2C3E50")))
+        painter.setPen(QPen(Qt.white, 2))
+        painter.drawRoundedRect(rect, 8, 8)
+
+        painter.setPen(Qt.white)
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(9)
+        painter.setFont(font)
+        painter.drawText(rect, Qt.AlignCenter, self.display_name)
+
+    def getmaxm(self):
+        return self.maxm
+
 class CompositeModule:
 
     sub_modules = []
+    auto_edges = []
 
     @classmethod
-    def create_sub_modules(cls, scene, position, alloc_index_func):
+    def create_sub_modules(cls, scene, position, alloc_index_func, connect_func=None):
+        created_nodes = []
         for sub_name, offset in cls.sub_modules:
             module_cls = module_factory.get(sub_name)
             if module_cls:
@@ -1774,14 +1861,49 @@ class CompositeModule:
                 sub_position = position + offset
                 node = module_cls(sub_name, idx, sub_position)
                 scene.addItem(node)
+                created_nodes.append(node)
                 if hasattr(node, "free_mode"):
                     node.free_mode = not getattr(scene, "developer_mode", False)
+
+        if connect_func and created_nodes and cls.auto_edges:
+            for edge_spec in cls.auto_edges:
+                if not isinstance(edge_spec, (tuple, list)) or len(edge_spec) != 4:
+                    print(f"⚠️ 跳过无效自动连线配置: {edge_spec}")
+                    continue
+
+                src_node_idx, src_out_idx, dst_node_idx, dst_in_idx = edge_spec
+
+                if not (0 <= src_node_idx < len(created_nodes)) or not (0 <= dst_node_idx < len(created_nodes)):
+                    print(f"⚠️ 自动连线节点索引越界: {edge_spec}")
+                    continue
+
+                src_node = created_nodes[src_node_idx]
+                dst_node = created_nodes[dst_node_idx]
+
+                if not (0 <= src_out_idx < len(src_node.out_ports)):
+                    print(f"⚠️ 自动连线输出端口索引越界: {edge_spec}")
+                    continue
+
+                if not (0 <= dst_in_idx < len(dst_node.in_ports)):
+                    print(f"⚠️ 自动连线输入端口索引越界: {edge_spec}")
+                    continue
+
+                src_port = src_node.out_ports[src_out_idx]
+                dst_port = dst_node.in_ports[dst_in_idx]
+                if not connect_func(src_port, dst_port):
+                    print(f"⚠️ 自动连线失败: {src_node.name}.Out{src_out_idx + 1} -> {dst_node.name}.In{dst_in_idx + 1}")
+
+        return created_nodes
 
 class SINGenerator(CompositeModule):
 
     sub_modules = [
         ("累加器", QPointF(0, 0)),
         ("三角函数运算器", QPointF(200, 0)),
+    ]
+    auto_edges = [
+        # 累加器默认输出 -> 三角函数运算器相位输入
+        (0, 1, 1, 0),
     ]
 
 class DigitalControlledOscillator(CompositeModule):
@@ -1795,6 +1917,8 @@ class DigitalControlledOscillator(CompositeModule):
 module_factory = {
     "PID控制器": ModulePID,
     "累加器": ModuleAccumulator,
+    "布尔值：是": ModuleConstantBool,
+    "布尔值：否": ModuleConstantBool,
     "三角函数运算器": ModuleBase,
     "反三角函数运算器": ModuleBase,
     "线性缩放器": ModuleScaler,
@@ -1810,6 +1934,8 @@ module_factory = {
 module_maxm = {
     "PID控制器": 2,
     "累加器": 2,
+    "布尔值：是": -1,
+    "布尔值：否": -1,
     "三角函数运算器": 4,
     "反三角函数运算器": 2,
     "线性缩放器": 4,

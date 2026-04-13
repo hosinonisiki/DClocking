@@ -217,7 +217,7 @@ begin
 
             pause_in        =>  ctrl_bank_out(5),
             lf_reset_in     =>  ctrl_bank_out(7),
-            auto_reset_in   =>  ctrl_bank_out(7)
+            auto_reset_in   =>  ctrl_bank_out(9)
         );
     end block module_3_block;
 

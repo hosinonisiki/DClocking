@@ -335,6 +335,197 @@ class MainWindow(QMainWindow):
             return node.in_ports[port_idx]
         return None
 
+    def _optimize_grid_layout(self, required_nodes, internal_edges):
+        if not required_nodes:
+            return {}
+
+        adjacency = {name: set() for name in required_nodes}
+        predecessors = {name: set() for name in required_nodes}
+        for src_name, dst_name in internal_edges:
+            if src_name in required_nodes and dst_name in required_nodes and dst_name not in adjacency[src_name]:
+                adjacency[src_name].add(dst_name)
+                predecessors[dst_name].add(src_name)
+
+        index = 0
+        stack = []
+        on_stack = set()
+        indices = {}
+        lowlink = {}
+        components = []
+
+        def strong_connect(node_name):
+            nonlocal index
+            indices[node_name] = index
+            lowlink[node_name] = index
+            index += 1
+            stack.append(node_name)
+            on_stack.add(node_name)
+
+            for nxt in adjacency[node_name]:
+                if nxt not in indices:
+                    strong_connect(nxt)
+                    lowlink[node_name] = min(lowlink[node_name], lowlink[nxt])
+                elif nxt in on_stack:
+                    lowlink[node_name] = min(lowlink[node_name], indices[nxt])
+
+            if lowlink[node_name] == indices[node_name]:
+                comp = []
+                while stack:
+                    w = stack.pop()
+                    on_stack.remove(w)
+                    comp.append(w)
+                    if w == node_name:
+                        break
+                components.append(sorted(comp))
+
+        for name in sorted(required_nodes):
+            if name not in indices:
+                strong_connect(name)
+
+        node_to_comp = {}
+        for cid, comp_nodes in enumerate(components):
+            for n in comp_nodes:
+                node_to_comp[n] = cid
+
+        comp_adj = {cid: set() for cid in range(len(components))}
+        comp_in_degree = {cid: 0 for cid in range(len(components))}
+        for src_name, dst_name in internal_edges:
+            if src_name not in node_to_comp or dst_name not in node_to_comp:
+                continue
+            c_src = node_to_comp[src_name]
+            c_dst = node_to_comp[dst_name]
+            if c_src != c_dst and c_dst not in comp_adj[c_src]:
+                comp_adj[c_src].add(c_dst)
+                comp_in_degree[c_dst] += 1
+
+        comp_layer = {cid: 0 for cid in comp_adj}
+        queue = deque(sorted([cid for cid, deg in comp_in_degree.items() if deg == 0]))
+        while queue:
+            cid = queue.popleft()
+            for nxt in sorted(comp_adj[cid]):
+                comp_layer[nxt] = max(comp_layer[nxt], comp_layer[cid] + 1)
+                comp_in_degree[nxt] -= 1
+                if comp_in_degree[nxt] == 0:
+                    queue.append(nxt)
+
+        node_layer = {n: comp_layer[node_to_comp[n]] for n in required_nodes}
+        layers = {}
+        for n in sorted(required_nodes):
+            layers.setdefault(node_layer[n], []).append(n)
+
+        ordered_layers = {lv: list(sorted(names)) for lv, names in layers.items()}
+        layer_keys = sorted(ordered_layers.keys())
+
+        def _build_rank(order_map):
+            rank = {}
+            for lv in layer_keys:
+                for i, n in enumerate(order_map.get(lv, [])):
+                    rank[n] = i
+            return rank
+
+        def _barycenter(values):
+            if not values:
+                return None
+            return sum(values) / len(values)
+
+        for _ in range(10):
+            changed = False
+
+            rank = _build_rank(ordered_layers)
+            for lv in layer_keys[1:]:
+                names = ordered_layers.get(lv, [])
+                base_pos = {n: i for i, n in enumerate(names)}
+
+                def _key_forward(n):
+                    vals = [rank[p] for p in predecessors.get(n, set()) if p in rank]
+                    b = _barycenter(vals)
+                    if b is None:
+                        return (10**9, base_pos.get(n, 10**9), n)
+                    return (b, base_pos.get(n, 10**9), n)
+
+                new_names = sorted(names, key=_key_forward)
+                if new_names != names:
+                    changed = True
+                    ordered_layers[lv] = new_names
+                rank = _build_rank(ordered_layers)
+
+            rank = _build_rank(ordered_layers)
+            for lv in reversed(layer_keys[:-1]):
+                names = ordered_layers.get(lv, [])
+                base_pos = {n: i for i, n in enumerate(names)}
+
+                def _key_backward(n):
+                    vals = [rank[s] for s in adjacency.get(n, set()) if s in rank]
+                    b = _barycenter(vals)
+                    if b is None:
+                        return (10**9, base_pos.get(n, 10**9), n)
+                    return (b, base_pos.get(n, 10**9), n)
+
+                new_names = sorted(names, key=_key_backward)
+                if new_names != names:
+                    changed = True
+                    ordered_layers[lv] = new_names
+                rank = _build_rank(ordered_layers)
+
+            if not changed:
+                break
+
+        def _objective(order_map):
+            rank = _build_rank(order_map)
+            local_layer = {}
+            for lv, names in order_map.items():
+                for n in names:
+                    local_layer[n] = lv
+
+            crossings = 0
+            for idx, lv in enumerate(layer_keys[:-1]):
+                nxt = layer_keys[idx + 1]
+                pair_edges = []
+                for src_name, dst_name in internal_edges:
+                    if src_name in rank and dst_name in rank and local_layer.get(src_name) == lv and local_layer.get(dst_name) == nxt:
+                        pair_edges.append((rank[src_name], rank[dst_name]))
+
+                for i in range(len(pair_edges)):
+                    a1, b1 = pair_edges[i]
+                    for j in range(i + 1, len(pair_edges)):
+                        a2, b2 = pair_edges[j]
+                        if (a1 - a2) * (b1 - b2) < 0:
+                            crossings += 1
+
+            span = 0
+            vertical = 0
+            for src_name, dst_name in internal_edges:
+                if src_name not in rank or dst_name not in rank:
+                    continue
+                span += abs(local_layer[src_name] - local_layer[dst_name])
+                vertical += abs(rank[src_name] - rank[dst_name])
+
+            max_rows = max((len(v) for v in order_map.values()), default=1)
+            area = max_rows * max(1, len(order_map))
+            return crossings * 3000 + span * 90 + vertical * 12 + area
+
+        best_score = _objective(ordered_layers)
+        for _ in range(12):
+            improved = False
+            for lv in layer_keys:
+                names = ordered_layers.get(lv, [])
+                if len(names) < 2:
+                    continue
+                i = 0
+                while i < len(names) - 1:
+                    names[i], names[i + 1] = names[i + 1], names[i]
+                    new_score = _objective(ordered_layers)
+                    if new_score < best_score:
+                        best_score = new_score
+                        improved = True
+                    else:
+                        names[i], names[i + 1] = names[i + 1], names[i]
+                    i += 1
+            if not improved:
+                break
+
+        return ordered_layers
+
     def sync_from_device(self):
         if not self.port_ctrl.is_open():
             return
@@ -345,6 +536,8 @@ class MainWindow(QMainWindow):
         device_edges = []
         required_nodes = set()
         unresolved_route_count = 0
+        unresolved_samples = []
+        partial_mapped_route_count = 0
         unknown_node_count = 0
         missing_port_ref_count = 0
         param_fail_count = 0
@@ -352,59 +545,38 @@ class MainWindow(QMainWindow):
         for route in routes:
             src_name, src_idx = resolve_node_port_from_number(route["src_port"], "out")
             dst_name, dst_idx = resolve_node_port_from_number(route["dst_port"], "in")
-            if src_name is None or dst_name is None:
-                unresolved_route_count += 1
-                continue
-            device_edges.append((src_name, src_idx, dst_name, dst_idx))
-            if not src_name.startswith("Border_"):
+
+            if src_name is not None and not src_name.startswith("Border_"):
                 required_nodes.add(src_name)
-            if not dst_name.startswith("Border_"):
+            if dst_name is not None and not dst_name.startswith("Border_"):
                 required_nodes.add(dst_name)
 
+            if src_name is None or dst_name is None:
+                unresolved_route_count += 1
+                if src_name is not None or dst_name is not None:
+                    partial_mapped_route_count += 1
+                if len(unresolved_samples) < 12:
+                    unresolved_samples.append((route.get("src_port"), route.get("dst_port")))
+                continue
+
+            device_edges.append((src_name, src_idx, dst_name, dst_idx))
+
         self._clear_canvas()
-        ordered_names = sorted(required_nodes)
 
         internal_edges = []
         for src_name, _src_idx, dst_name, _dst_idx in device_edges:
             if src_name in required_nodes and dst_name in required_nodes:
                 internal_edges.append((src_name, dst_name))
-
-        adjacency = {name: set() for name in required_nodes}
-        indegree = {name: 0 for name in required_nodes}
-        for src_name, dst_name in internal_edges:
-            if dst_name not in adjacency[src_name]:
-                adjacency[src_name].add(dst_name)
-                indegree[dst_name] += 1
-
-        layer = {name: 0 for name in required_nodes}
-        queue = deque(sorted([name for name in required_nodes if indegree[name] == 0]))
-        visited = 0
-        while queue:
-            node_name = queue.popleft()
-            visited += 1
-            for nxt in adjacency[node_name]:
-                layer[nxt] = max(layer[nxt], layer[node_name] + 1)
-                indegree[nxt] -= 1
-                if indegree[nxt] == 0:
-                    queue.append(nxt)
-
-        if visited < len(required_nodes):
-            max_layer = max(layer.values()) if layer else 0
-            for name in sorted(required_nodes):
-                if indegree[name] > 0:
-                    max_layer += 1
-                    layer[name] = max_layer
-
-        layers = {}
-        for name in ordered_names:
-            lv = layer.get(name, 0)
-            layers.setdefault(lv, []).append(name)
+        ordered_layers = self._optimize_grid_layout(required_nodes, internal_edges)
 
         node_map = {}
-        x0, y0 = 280.0, 170.0
-        dx, dy = 280.0, 190.0
-        for lv in sorted(layers.keys()):
-            names_in_layer = sorted(layers[lv])
+        x0 = 260
+        y_center = 520
+        grid_x = 260
+        grid_y = 150
+        for lv in sorted(ordered_layers.keys()):
+            names_in_layer = ordered_layers[lv]
+            start_y = y_center - ((len(names_in_layer) - 1) * grid_y) / 2.0
             for row, name in enumerate(names_in_layer):
                 component_name, index = node_name_to_component(name)
                 if component_name is None:
@@ -415,7 +587,9 @@ class MainWindow(QMainWindow):
                     unknown_node_count += 1
                     continue
 
-                pos = QPointF(x0 + lv * dx, y0 + row * dy)
+                x = int(x0 + lv * grid_x)
+                y = int(start_y + row * grid_y)
+                pos = QPointF(x, y)
                 node = cls(component_name, index, pos)
                 self.view._used_indices.setdefault(component_name, set()).add(index)
                 self.view._apply_mode_to_node(node)
@@ -463,29 +637,71 @@ class MainWindow(QMainWindow):
             f"已识别连线: {len(device_edges)}\n"
             f"已生成节点: {len(node_map)}\n"
             f"未识别端口连线: {unresolved_route_count}\n"
+            f"部分端点可识别但连线缺失: {partial_mapped_route_count}\n"
             f"端口映射失败连线: {missing_port_ref_count}\n"
             f"未知模块节点: {unknown_node_count}\n"
             f"参数读取失败模块: {param_fail_count}"
         )
+        if unresolved_samples:
+            sample_text = ", ".join([f"{s}->{d}" for s, d in unresolved_samples])
+            report += f"\n未识别样例(src->dst): {sample_text}"
         QMessageBox.information(self, "同步报告", report)
 
     def run_business_logic(self, src, src_port, dst, dst_port):
-        print(f"🔄 >> 执行业务逻辑: 数据从 {src}:Out{src_port+1} 传输到 {dst}:In{dst_port+1}...")
+        src_log = self._runtime_log_name(src, src_port, "out", dst, dst_port, "in")
+        dst_log = self._runtime_log_name(dst, dst_port, "in", src, src_port, "out")
+        print(f"🔄 >> 执行业务逻辑: 数据从 {src_log}:Out{src_port+1} 传输到 {dst_log}:In{dst_port+1}...")
         src_port_num = resolve_port_number(src, src_port, "out")
         dst_port_num = resolve_port_number(dst, dst_port, "in")
         if src_port_num is None or dst_port_num is None:
             print(f"[route] skip: unresolved port mapping src={src}:{src_port} dst={dst}:{dst_port}")
             return
-        self._apply_routing(dst_port_num, src_port_num, f"{src}:Out{src_port+1} -> {dst}:In{dst_port+1}")
+        self._apply_routing(dst_port_num, src_port_num, f"{src_log}:Out{src_port+1} -> {dst_log}:In{dst_port+1}")
 
     def handle_connection_removed(self, src, src_port, dst, dst_port):
-        print(f"🧹 >> 清理业务逻辑: 断开 {src}:Out{src_port+1} 到 {dst}:In{dst_port+1} 的数据流...")
+        src_log = self._runtime_log_name(src, src_port, "out", dst, dst_port, "in")
+        dst_log = self._runtime_log_name(dst, dst_port, "in", src, src_port, "out")
+        print(f"🧹 >> 清理业务逻辑: 断开 {src_log}:Out{src_port+1} 到 {dst_log}:In{dst_port+1} 的数据流...")
         dst_port_num = resolve_port_number(dst, dst_port, "in")
         if dst_port_num is None:
             print(f"[route] skip: unresolved port mapping dst={dst}:{dst_port}")
             return
         src_port_num = pn.VOID_BOOL if dst_port_num >= 64 else pn.VOID
-        self._apply_routing(dst_port_num, src_port_num, f"{dst}:In{dst_port+1} cleared")
+        self._apply_routing(dst_port_num, src_port_num, f"{dst_log}:In{dst_port+1} cleared")
+
+    def _runtime_log_name(self, node_name, port_idx, role, peer_name=None, peer_port_idx=None, peer_role=None):
+        if node_name not in ("HIGH", "LOW"):
+            return node_name
+
+        candidates = []
+        for item in self.scene.items():
+            if not isinstance(item, NodeItem):
+                continue
+            if getattr(item, "name", None) == node_name:
+                candidates.append(item)
+
+        if not candidates:
+            return f"{node_name}[?]"
+
+        if peer_name is not None and peer_port_idx is not None and peer_role is not None:
+            for node in candidates:
+                ports = node.out_ports if role == "out" else node.in_ports
+                if not (0 <= port_idx < len(ports)):
+                    continue
+                for edge in ports[port_idx].connections:
+                    peer_port = edge.end_port if role == "out" else edge.start_port
+                    peer_parent = peer_port.parent_node if hasattr(peer_port, "parent_node") and peer_port.parent_node else None
+                    if peer_parent is None:
+                        continue
+                    if getattr(peer_parent, "name", None) != peer_name:
+                        continue
+                    if int(peer_port.index) != int(peer_port_idx):
+                        continue
+                    return f"{node_name}[{int(getattr(node, 'index', 0))}]"
+
+        if len(candidates) == 1:
+            return f"{node_name}[{int(getattr(candidates[0], 'index', 0))}]"
+        return f"{node_name}[?]"
 
     def _ensure_router(self):
         if not self.port_ctrl.is_open():
@@ -542,7 +758,7 @@ class MainWindow(QMainWindow):
         if isinstance(node, ModuleLinerTransformer):
             return "LTRN", node.index
         if isinstance(node, ModulePDHFSM):
-            return "PDH", node.index
+            return "PDHS", node.index
         if isinstance(node, ModuleSCLOFSM):
             return "SCLO", node.index
         return None, None
@@ -602,9 +818,14 @@ class MainWindow(QMainWindow):
         parent = getattr(port, "parent_node", None)
         if parent is None:
             return None
+        module_index = int(getattr(parent, "index", -1))
+        component_name = getattr(parent, "component_name", None)
         return {
             "kind": "node",
             "node_name": parent.name,
+            "component_name": component_name,
+            "module_index": module_index,
+            "node_key": f"{component_name}@{module_index}",
             "port_type": port.port_type,
             "index": int(port.index),
         }
@@ -633,8 +854,29 @@ class MainWindow(QMainWindow):
             return None
 
         if kind == "node":
-            node_name = ref.get("node_name")
-            node = node_map.get(node_name)
+            node = None
+
+            node_key = ref.get("node_key")
+            if isinstance(node_key, str):
+                node = node_map.get(node_key)
+
+            component_name = ref.get("component_name")
+            module_index = ref.get("module_index", None)
+            if node is None and component_name is not None and module_index is not None:
+                try:
+                    node = node_map.get(f"{component_name}@{int(module_index)}")
+                except Exception:
+                    node = None
+
+            if node is None:
+                node_name = ref.get("node_name")
+                node = node_map.get(node_name)
+                if node is None and isinstance(node_name, str) and node_name in ("HIGH", "LOW") and module_index is not None:
+                    try:
+                        node = node_map.get(f"{node_name}{int(module_index) + 1}")
+                    except Exception:
+                        node = None
+
             if node is None:
                 return None
             if port_type == "out" and 0 <= idx < len(node.out_ports):
@@ -790,7 +1032,10 @@ class MainWindow(QMainWindow):
         for node_cfg in nodes_cfg:
             node = self._create_node_from_config(node_cfg)
             if node is not None:
-                node_map[node.name] = node
+                node_map.setdefault(node.name, node)
+                node_map[f"{node.component_name}@{int(node.index)}"] = node
+                if node.component_name in ("布尔值：是", "布尔值：否"):
+                    node_map[f"{node.component_name}{int(node.index) + 1}"] = node
 
         self._restore_edges(edges_cfg, node_map)
         self.view.update_border_ports()
