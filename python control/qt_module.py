@@ -1476,7 +1476,7 @@ class ModuleLinerTransformer(NodeItem):
 
 class ModulePDHFSM(NodeItem):
     def __init__(self, component_name, index,position, num_inputs = 2, num_outputs = 3):
-        name = "PDH"
+        name = "PDHS"
         super().__init__(name, component_name, index, position, num_inputs, num_outputs)
         self.name = name
         self.height = 180

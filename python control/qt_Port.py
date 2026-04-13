@@ -250,7 +250,7 @@ class Port(QObject):
                 return self.hw_controller.iir4
         if module_type == "LTRN":
             return self.hw_controller.ltrn if module_index == 0 else self.hw_controller.ltrn2
-        if module_type == "PDH":
+        if module_type == "PDHS":
             return self.hw_controller.pdhfsm
         if module_type == "SCLO":
             return self.hw_controller.sclofsm if module_index == 0 else self.hw_controller.sclofsm2

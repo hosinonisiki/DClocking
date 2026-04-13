@@ -758,7 +758,7 @@ class MainWindow(QMainWindow):
         if isinstance(node, ModuleLinerTransformer):
             return "LTRN", node.index
         if isinstance(node, ModulePDHFSM):
-            return "PDH", node.index
+            return "PDHS", node.index
         if isinstance(node, ModuleSCLOFSM):
             return "SCLO", node.index
         return None, None

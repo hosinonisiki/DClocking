@@ -64,81 +64,105 @@ def resolve_port_number(node_name, port_index, role):
         outputs = [pn.OUTPUT_A, pn.OUTPUT_B, pn.OUTPUT_C, pn.OUTPUT_D, pn.OUTPUT_E, pn.OUTPUT_F, pn.OUTPUT_G, pn.OUTPUT_H]
         return outputs[border_in_idx] if 0 <= border_in_idx < len(outputs) and role == "in" else None
 
-    if node_name in ("PIDC", "PID"):
-        inputs = [pn.PID_RESET, pn.PID_IN]
-        outputs = [pn.PID_OUT]
-    elif node_name.startswith("PID"):
-        inputs = [pn.PID2_RESET, pn.PID2_IN]
-        outputs = [pn.PID2_OUT]
-    elif node_name == "ACCM":
-        inputs = {0: pn.ACC_ERROR_IN, 1: pn.ACC_BIAS_IN, 2: pn.ACC_RESET, 3: pn.ACC_PAUSE, 4: pn.ACC_LF_RESET}
-        outputs = {0: pn.ACC_SLOW_OUT, 1: pn.ACC_FAST_OUT}
-    elif node_name.startswith("ACC"):
-        inputs = {0: pn.ACC2_ERROR_IN, 1: pn.ACC2_BIAS_IN, 2: pn.ACC2_RESET, 3: pn.ACC2_PAUSE, 4: pn.ACC2_LF_RESET}
-        outputs = {0: pn.ACC2_SLOW_OUT, 1: pn.ACC2_FAST_OUT}
-    elif node_name == "SCLR":
-        inputs = [pn.SCALER_IN]
-        outputs = [pn.SCALER_OUT]
-    elif node_name.startswith("SCL"):
-        suffix = node_name[3:]
-        base = f"SCALER{suffix}"
-        inputs = [getattr(pn, f"{base}_IN", None)]
-        outputs = [getattr(pn, f"{base}_OUT", None)]
-    elif node_name == "FIRF":
-        inputs = [pn.FIR_IN]
-        outputs = [pn.FIR_OUT]
-    elif node_name.startswith("FIR"):
-        base = node_name
-        inputs = [getattr(pn, f"{base}_IN", None)]
-        outputs = [getattr(pn, f"{base}_OUT", None)]
-    elif node_name == "IIRF":
-        inputs = [pn.IIR_IN]
-        outputs = [pn.IIR_OUT]
-    elif node_name.startswith("IIR"):
-        suffix = node_name[3:]
-        base = f"IIR{suffix}"
-        inputs = [getattr(pn, f"{base}_IN", None)]
-        outputs = [getattr(pn, f"{base}_OUT", None)]
-    elif node_name == "MIXR":
-        inputs = [pn.MIXER_IN_A, pn.MIXER_IN_B]
-        outputs = [pn.MIXER_OUT]
-    elif node_name.startswith("MIX"):
-        suffix = node_name[3:]
-        base = f"MIXER{suffix}"
-        inputs = [getattr(pn, f"{base}_IN_A", None), getattr(pn, f"{base}_IN_B", None)]
-        outputs = [getattr(pn, f"{base}_OUT", None)]
-    elif node_name == "TRIG":
-        inputs = [pn.TRI_IN]
-        outputs = [pn.TRI_SIN, pn.TRI_COS]
-    elif node_name == "TRI2":
-        inputs = [pn.TRI2_IN]
-        outputs = [pn.TRI2_SIN, pn.TRI2_COS]
-    elif node_name == "ATAN":
-        inputs = [pn.ATAN_IN_SIN, pn.ATAN_IN_COS]
-        outputs = [pn.ATAN_OUT]
-    elif node_name == "ATA2":
-        inputs = [pn.ATAN2_IN_SIN, pn.ATAN2_IN_COS]
-        outputs = [pn.ATAN2_OUT]
-    elif node_name == "UNWR":
-        inputs = [pn.UNWRAPPER_IN]
-        outputs = [pn.UNWRAPPER_OUT]
-    elif node_name == "LTRN":
-        inputs = [pn.LN_TRANSFORMER_IN_A, pn.LN_TRANSFORMER_IN_B]
-        outputs = [pn.LN_TRANSFORMER_OUT_A, pn.LN_TRANSFORMER_OUT_B]
-    elif node_name == "LTR2":
-        inputs = [pn.LN_TRANSFORMER2_IN_A, pn.LN_TRANSFORMER2_IN_B]
-        outputs = [pn.LN_TRANSFORMER2_OUT_A, pn.LN_TRANSFORMER2_OUT_B]
-    elif node_name == "PDH":
-        inputs = [pn.PDHFSM_IN_POWER, pn.PDHFSM_IN_SCAN]
-        outputs = [pn.PDHFSM_PID_RESET_CTRL, pn.PDHFSM_MIXER_RESET_CTRL, pn.PDHFSM_SCAN_RESET_CTRL]
-    elif node_name == "SCLO":
-        inputs = [pn.SCLOFSM_PHASE_IN]
-        outputs = [pn.SCLOFSM_BIAS_OUT, pn.SCLOFSM_PID_RESET_CTRL]
-    elif node_name == "SLO2":
-        inputs = [pn.SCLOFSM2_PHASE_IN]
-        outputs = [pn.SCLOFSM2_BIAS_OUT, pn.SCLOFSM2_PID_RESET_CTRL]
-    else:
-        return None
+    match node_name:
+        case "PIDC" | "PID":
+            inputs = [pn.PID_RESET, pn.PID_IN]
+            outputs = [pn.PID_OUT]
+        case "PID2":
+            inputs = [pn.PID2_RESET, pn.PID2_IN]
+            outputs = [pn.PID2_OUT]
+        case "ACCM":
+            inputs = {0: pn.ACC_ERROR_IN, 1: pn.ACC_BIAS_IN, 2: pn.ACC_RESET, 3: pn.ACC_PAUSE, 4: pn.ACC_LF_RESET}
+            outputs = {0: pn.ACC_SLOW_OUT, 1: pn.ACC_FAST_OUT}
+        case "ACC2":
+            inputs = {0: pn.ACC2_ERROR_IN, 1: pn.ACC2_BIAS_IN, 2: pn.ACC2_RESET, 3: pn.ACC2_PAUSE, 4: pn.ACC2_LF_RESET}
+            outputs = {0: pn.ACC2_SLOW_OUT, 1: pn.ACC2_FAST_OUT}
+        case "SCLR":
+            inputs = [pn.SCALER_IN]
+            outputs = [pn.SCALER_OUT]
+        case "SCL2":
+            inputs = [pn.SCALER2_IN]
+            outputs = [pn.SCALER2_OUT]
+        case "SCL3":
+            inputs = [pn.SCALER3_IN]
+            outputs = [pn.SCALER3_OUT]
+        case "SCL4":
+            inputs = [pn.SCALER4_IN]
+            outputs = [pn.SCALER4_OUT]
+        case "FIRF":
+            inputs = [pn.FIR_IN]
+            outputs = [pn.FIR_OUT]
+        case "FIR2":
+            inputs = [pn.FIR2_IN]
+            outputs = [pn.FIR2_OUT]
+        case "FIR3":
+            inputs = [pn.FIR3_IN]
+            outputs = [pn.FIR3_OUT]
+        case "FIR4":
+            inputs = [pn.FIR4_IN]
+            outputs = [pn.FIR4_OUT]
+        case "IIRF":
+            inputs = [pn.IIR_IN]
+            outputs = [pn.IIR_OUT]
+        case "IIR2":
+            inputs = [pn.IIR2_IN]
+            outputs = [pn.IIR2_OUT]
+        case "IIR3":
+            inputs = [pn.IIR3_IN]
+            outputs = [pn.IIR3_OUT]
+        case "IIR4":
+            inputs = [pn.IIR4_IN]
+            outputs = [pn.IIR4_OUT]
+        case "MIXR":
+            inputs = [pn.MIXER_IN_A, pn.MIXER_IN_B]
+            outputs = [pn.MIXER_OUT]
+        case "MIX2":
+            inputs = [pn.MIXER2_IN_A, pn.MIXER2_IN_B]
+            outputs = [pn.MIXER2_OUT]
+        case "MIX3":
+            inputs = [pn.MIXER3_IN_A, pn.MIXER3_IN_B]
+            outputs = [pn.MIXER3_OUT]
+        case "MIX4":
+            inputs = [pn.MIXER4_IN_A, pn.MIXER4_IN_B]
+            outputs = [pn.MIXER4_OUT]
+        case "TRIG":
+            inputs = [pn.TRI_IN]
+            outputs = [pn.TRI_SIN, pn.TRI_COS]
+        case "TRI2":
+            inputs = [pn.TRI2_IN]
+            outputs = [pn.TRI2_SIN, pn.TRI2_COS]
+        case "TRI3":
+            inputs = [pn.TRI3_IN]
+            outputs = [pn.TRI3_SIN, pn.TRI3_COS]
+        case "TRI4":
+            inputs = [pn.TRI4_IN]
+            outputs = [pn.TRI4_SIN, pn.TRI4_COS]
+        case "ATAN":
+            inputs = [pn.ATAN_IN_SIN, pn.ATAN_IN_COS]
+            outputs = [pn.ATAN_OUT]
+        case "ATA2":
+            inputs = [pn.ATAN2_IN_SIN, pn.ATAN2_IN_COS]
+            outputs = [pn.ATAN2_OUT]
+        case "UNWR":
+            inputs = [pn.UNWRAPPER_IN]
+            outputs = [pn.UNWRAPPER_OUT]
+        case "LTRN":
+            inputs = [pn.LN_TRANSFORMER_IN_A, pn.LN_TRANSFORMER_IN_B]
+            outputs = [pn.LN_TRANSFORMER_OUT_A, pn.LN_TRANSFORMER_OUT_B]
+        case "LTR2":
+            inputs = [pn.LN_TRANSFORMER2_IN_A, pn.LN_TRANSFORMER2_IN_B]
+            outputs = [pn.LN_TRANSFORMER2_OUT_A, pn.LN_TRANSFORMER2_OUT_B]
+        case "PDHS":
+            inputs = [pn.PDHFSM_IN_POWER, pn.PDHFSM_IN_SCAN]
+            outputs = [pn.PDHFSM_PID_RESET_CTRL, pn.PDHFSM_MIXER_RESET_CTRL, pn.PDHFSM_SCAN_RESET_CTRL]
+        case "SCLO":
+            inputs = [pn.SCLOFSM_PHASE_IN]
+            outputs = [pn.SCLOFSM_BIAS_OUT, pn.SCLOFSM_PID_RESET_CTRL]
+        case "SLO2":
+            inputs = [pn.SCLOFSM2_PHASE_IN]
+            outputs = [pn.SCLOFSM2_BIAS_OUT, pn.SCLOFSM2_PID_RESET_CTRL]
+        case _:
+            return None
 
     if isinstance(inputs, dict):
         return inputs.get(port_index) if role == "in" else outputs.get(port_index)
@@ -156,7 +180,7 @@ def candidate_node_names():
     names.extend(["PIDC", "PID2", "ACCM", "ACC2", "SCLR", "SCL2", "SCL3", "SCL4"])
     names.extend(["FIRF", "FIR2", "FIR3", "FIR4", "IIRF", "IIR2", "IIR3", "IIR4"])
     names.extend(["TRIG", "TRI2", "TRI3", "TRI4", "ATAN", "ATA2"])
-    names.extend(["MIXR", "MIX2", "MIX3", "MIX4", "UNWR", "LTRN", "LTR2", "PDH", "SCLO", "SLO2"])
+    names.extend(["MIXR", "MIX2", "MIX3", "MIX4", "UNWR", "LTRN", "LTR2", "PDHS", "SCLO", "SLO2"])
     return names
 
 
@@ -222,7 +246,7 @@ def node_name_to_component(node_name):
         return "线性变换器", 0
     if node_name == "LTR2":
         return "线性变换器", 1
-    if node_name == "PDH":
+    if node_name == "PDHS":
         return "PDH状态机", 0
     if node_name == "SCLO":
         return "LO自动校准状态机", 0

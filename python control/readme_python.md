@@ -527,7 +527,7 @@ fir.design_lowpass(1e6, 10e6, 250e6) # 设计一个通带截止频率为1MHz，�
 端口名：
 |标识符|透射光强信号输入|锯齿波扫描输入|PID复位信号|混频器复位信号|扫描复位信号|
 |----|----|----|----|----|----|
-|PDH|PDHFSM_IN_POWER|PDHFSM_IN_SCAN|PDHFSM_PID_RESET_CTRL|PDH_FSM_MIXER_RESET_CTRL|PDHFSM_SCAN_RESET_CTRL|
+|PDHS|PDHFSM_IN_POWER|PDHFSM_IN_SCAN|PDHFSM_PID_RESET_CTRL|PDH_FSM_MIXER_RESET_CTRL|PDHFSM_SCAN_RESET_CTRL|
 
 ### 直接参数
 
@@ -573,6 +573,7 @@ fir.design_lowpass(1e6, 10e6, 250e6) # 设计一个通带截止频率为1MHz，�
 |标识符|剩余相位输入|相位校准值输出|PID复位信号|
 |----|----|----|----|
 |SCLO|SCLOFSM_PHASE_IN|SCLOFSM_BIAS_OUT|SCLOFSM_PID_RESET_CTRL|
+|SLO2|SCLOFSM_PHASE_IN|SCLOFSM_BIAS_OUT|SCLOFSM_PID_RESET_CTRL|
 
 ### 直接参数
 
