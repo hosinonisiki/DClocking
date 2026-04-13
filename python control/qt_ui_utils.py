@@ -200,13 +200,13 @@ def node_name_to_component(node_name):
     if node_name.startswith("HIGH"):
         suffix = node_name[4:]
         if suffix.isdigit():
-            return "HIGH", int(suffix) - 1
-        return "HIGH", 0
+            return "布尔值：是", int(suffix) - 1
+        return "布尔值：是", 0
     if node_name.startswith("LOW"):
         suffix = node_name[3:]
         if suffix.isdigit():
-            return "LOW", int(suffix) - 1
-        return "LOW", 0
+            return "布尔值：否", int(suffix) - 1
+        return "布尔值：否", 0
 
     if node_name in ("PIDC", "PID"):
         return "PID控制器", 0

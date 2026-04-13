@@ -674,8 +674,8 @@ class DiagramView(QGraphicsView):
     module_factory = {
         "PID控制器": ModulePID,
         "累加器": ModuleAccumulator,
-        "HIGH": ModuleConstantBool,
-        "LOW": ModuleConstantBool,
+        "布尔值：是": ModuleConstantBool,
+        "布尔值：否": ModuleConstantBool,
         "三角函数运算器": ModuleBase,
         "反三角函数运算器": ModuleBase,
         "线性缩放器": ModuleScaler,
@@ -1053,8 +1053,8 @@ class ComponentPalette(QListWidget):
         normal_items = [
             "PID控制器",
             "累加器",
-            "HIGH",
-            "LOW",
+            "布尔值：是",
+            "布尔值：否",
             "三角函数运算器",
             "反三角函数运算器",
             "线性缩放器",

@@ -1034,7 +1034,7 @@ class MainWindow(QMainWindow):
             if node is not None:
                 node_map.setdefault(node.name, node)
                 node_map[f"{node.component_name}@{int(node.index)}"] = node
-                if node.component_name in ("HIGH", "LOW"):
+                if node.component_name in ("布尔值：是", "布尔值：否"):
                     node_map[f"{node.component_name}{int(node.index) + 1}"] = node
 
         self._restore_edges(edges_cfg, node_map)

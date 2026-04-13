@@ -1797,19 +1797,19 @@ class ModuleSCLOFSM(NodeItem):
 
 class ModuleConstantBool(NodeItem):
     def __init__(self, component_name, index, position, num_inputs=0, num_outputs=1):
-        base_name = "HIGH" if component_name == "HIGH" else "LOW"
+        base_name = "HIGH" if component_name == "布尔值：是" else "LOW"
         name = base_name
         super().__init__(name, component_name, index, position, 0, 1)
         self.name = name
         self.component_name = component_name
-        self.display_name = base_name
+        self.display_name = "布尔值：是" if base_name == "HIGH" else "布尔值：否"
         self.index = index
         self.num_inputs = 0
         self.num_outputs = 1
         self.inputs = []
         self.outputs = [base_name]
         self.inputs_display_name = []
-        self.outputs_display_name = [base_name]
+        self.outputs_display_name = [self.display_name]
         self.inputs_signals = []
         self.outputs_signals = [["bool"]]
         self.maxm = -1
@@ -1917,8 +1917,8 @@ class DigitalControlledOscillator(CompositeModule):
 module_factory = {
     "PID控制器": ModulePID,
     "累加器": ModuleAccumulator,
-    "HIGH": ModuleConstantBool,
-    "LOW": ModuleConstantBool,
+    "布尔值：是": ModuleConstantBool,
+    "布尔值：否": ModuleConstantBool,
     "三角函数运算器": ModuleBase,
     "反三角函数运算器": ModuleBase,
     "线性缩放器": ModuleScaler,
@@ -1934,8 +1934,8 @@ module_factory = {
 module_maxm = {
     "PID控制器": 2,
     "累加器": 2,
-    "HIGH": -1,
-    "LOW": -1,
+    "布尔值：是": -1,
+    "布尔值：否": -1,
     "三角函数运算器": 4,
     "反三角函数运算器": 2,
     "线性缩放器": 4,
