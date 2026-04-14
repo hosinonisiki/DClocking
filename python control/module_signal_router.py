@@ -1,3 +1,5 @@
+# 默认模式彻底弃用，下位机与上位机均终止维护，后续将逐步删除有关代码，以后只使用全连接（full connection）
+
 import module
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
@@ -187,7 +189,7 @@ class ModuleSignalRouter(module.ModuleBase):
     def disable(self, port):
         self.port_enable[port] = 0
 
-    def encode(self):
+    def encode(self, hold_output = False):
         """
         将路由配置编码为位序列
         
@@ -210,7 +212,10 @@ class ModuleSignalRouter(module.ModuleBase):
             for i in range(self.port_count + self.port_count):
                 bits = bin(self.port_config[i])[2:].zfill(6) + bits
                 bits = str(self.port_enable[i]) + bits
-                bits = "0" + bits
+                if hold_output:
+                    bits = "1" + bits
+                else:
+                    bits = "0" + bits
             bits = bits.zfill(1024)
         else:
             # 非全连接模式：根据内部路由配置编码
@@ -254,13 +259,13 @@ class ModuleSignalRouter(module.ModuleBase):
         self.disable(OUTPUT_G)
         self.disable(OUTPUT_H)
         self.implement_routing()
-        self.encode()
+        self.encode(hold_output = True)
         self._upload()
         time.sleep(0.05) # Avoid unstable circuit responses
         self.port_config = temp_config
         self.port_enable = temp_enable
         self.implement_routing()
-        self.encode()
+        self.encode(hold_output = False)
         self._upload()
 
     def plot(self):
