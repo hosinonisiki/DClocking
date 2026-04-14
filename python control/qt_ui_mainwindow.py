@@ -96,6 +96,8 @@ class MainWindow(QMainWindow):
         self.save_cfg_btn.setFixedWidth(90)
         self.load_cfg_btn = QPushButton("加载配置")
         self.load_cfg_btn.setFixedWidth(90)
+        self.clear_btn = QPushButton("清空画布")
+        self.clear_btn.setFixedWidth(90)
 
         serial_bar = QWidget()
         serial_bar.setFixedHeight(40)
@@ -108,6 +110,7 @@ class MainWindow(QMainWindow):
         serial_layout.addWidget(self.init_btn)
         serial_layout.addWidget(self.save_cfg_btn)
         serial_layout.addWidget(self.load_cfg_btn)
+        serial_layout.addWidget(self.clear_btn)
         serial_layout.addStretch()
 
         self.serial_port = QSerialPort(self)
@@ -131,6 +134,7 @@ class MainWindow(QMainWindow):
 
         self.save_cfg_btn.clicked.connect(self.save_configuration)
         self.load_cfg_btn.clicked.connect(self.load_configuration)
+        self.clear_btn.clicked.connect(self.confirm_clear_canvas)
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(self.view)
@@ -899,6 +903,12 @@ class MainWindow(QMainWindow):
 
         for key in self.view._used_indices:
             self.view._used_indices[key].clear()
+
+    def confirm_clear_canvas(self):
+        reply = QMessageBox.question(self, '清空画布', '确定要清空所有模块和连线吗？', 
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self._clear_canvas()
 
     def _build_config_dict(self):
         nodes = []
