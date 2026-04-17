@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QSpinBox, QDoubleSpinBox, QLineEdit,
                                QCheckBox, QPushButton, QToolTip, QComboBox, QMessageBox, QLabel)
 # 导入PySide6的QtCore模块中的相关类
-from PySide6.QtCore import Qt, QMimeData, QPointF, QRectF, Signal, QObject, QByteArray, QPoint
+from PySide6.QtCore import Qt, QMimeData, QPointF, QRectF, Signal, QObject, QByteArray, QPoint, QEvent
 # 导入PySide6.QtGui模块中的相关类
 from PySide6.QtGui import QDrag, QPainter, QPen, QBrush, QPainterPath, QColor, QFont, QPixmap, QImage, QCursor
 import math
@@ -143,6 +143,9 @@ class ParamDialog(QDialog):
         self._fields = {}
         self._batch_keys = []
         self._apply_callback = apply_callback
+        self._committed_values = {}
+        self._enter_committed_keys = set()
+        self._focus_revert_keys = {}
 
         layout = QFormLayout(self)
 
@@ -174,10 +177,13 @@ class ParamDialog(QDialog):
             if ftype == "int":
                 value = int(values.get(key, field.get("default", 0)))
                 edit = QuantityLineEdit(value=value, unit=field.get("unit", ""), decimals=0)
+                self._bind_line_edit_events(key, edit)
                 prefix_box = QComboBox()
                 for p in ["", "m", "u", "n", "p", "f", "a", "k", "M", "G", "T"]:
                     prefix_box.addItem(p if p else "(base)", p)
                 prefix_box.setCurrentIndex(0)
+                self._focus_revert_keys[prefix_box] = key
+                prefix_box.installEventFilter(self)
                 unit_text = field.get("unit", "")
                 unit_label = QLabel(unit_text)
                 unit_label.setMinimumWidth(36)
@@ -190,10 +196,13 @@ class ParamDialog(QDialog):
             elif ftype == "float":
                 value = float(values.get(key, field.get("default", 0.0)))
                 edit = QuantityLineEdit(value=value, unit=field.get("unit", ""), decimals=field.get("decimals", 6))
+                self._bind_line_edit_events(key, edit)
                 prefix_box = QComboBox()
                 for p in ["", "m", "u", "n", "p", "f", "a", "k", "M", "G", "T"]:
                     prefix_box.addItem(p if p else "(base)", p)
                 prefix_box.setCurrentIndex(0)
+                self._focus_revert_keys[prefix_box] = key
+                prefix_box.installEventFilter(self)
                 unit_text = field.get("unit", "")
                 unit_label = QLabel(unit_text)
                 unit_label.setMinimumWidth(36)
@@ -206,9 +215,11 @@ class ParamDialog(QDialog):
             elif ftype == "bool":
                 w = QCheckBox()
                 w.setChecked(bool(values.get(key, field.get("default", False))))
+                w.toggled.connect(lambda _checked=False, k=key: self._apply_field(k))
             else:
                 w = QLineEdit()
                 w.setText(str(values.get(key, field.get("default", ""))))
+                self._bind_line_edit_events(key, w)
             
             if ftype == "int":
                 self._editors[key] = ("int_qty", (edit, prefix_box))
@@ -219,10 +230,85 @@ class ParamDialog(QDialog):
             self._batch_keys.append(key)
             layout.addRow(label, w)
 
+        for key in self._editors.keys():
+            try:
+                self._committed_values[key] = self._value_from_editor(key)
+            except Exception:
+                continue
+
         if self._batch_keys:
-            self._confirm_all_btn = QPushButton("确认本模块参数")
+            self._confirm_all_btn = QPushButton("确认本模块参数（全部）")
             self._confirm_all_btn.clicked.connect(self._apply_all_fields)
             layout.addRow("", self._confirm_all_btn)
+
+    def _bind_line_edit_events(self, key: str, widget: QLineEdit) -> None:
+        widget.returnPressed.connect(lambda k=key: self._apply_field_on_enter(k))
+        widget.editingFinished.connect(lambda k=key: self._revert_if_not_committed(k))
+
+    def _apply_field_on_enter(self, key: str) -> None:
+        if self._apply_field(key):
+            self._enter_committed_keys.add(key)
+            return
+        self._restore_committed_value(key)
+
+    def _revert_if_not_committed(self, key: str) -> None:
+        if key in self._enter_committed_keys:
+            self._enter_committed_keys.discard(key)
+            return
+        self._restore_committed_value(key)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.FocusOut and obj in self._focus_revert_keys:
+            key = self._focus_revert_keys.get(obj)
+            if key and key not in self._enter_committed_keys:
+                self._restore_committed_value(key)
+        return super().eventFilter(obj, event)
+
+    def _restore_committed_value(self, key: str) -> None:
+        if key not in self._committed_values or key not in self._editors:
+            return
+
+        value = self._committed_values[key]
+        ftype, w = self._editors[key]
+
+        if ftype == "int_qty":
+            edit, prefix_box = w
+            edit.setText(edit._format_display(Decimal(str(value))))
+            base_idx = prefix_box.findData("")
+            prefix_box.setCurrentIndex(base_idx if base_idx >= 0 else 0)
+            return
+
+        if ftype == "float_qty":
+            edit, prefix_box = w
+            edit.setText(edit._format_display(Decimal(str(value))))
+            base_idx = prefix_box.findData("")
+            prefix_box.setCurrentIndex(base_idx if base_idx >= 0 else 0)
+            return
+
+        if ftype == "bool":
+            w.blockSignals(True)
+            w.setChecked(bool(value))
+            w.blockSignals(False)
+            return
+
+        if ftype == "flip_toggle":
+            checked = bool(value)
+            w.blockSignals(True)
+            w.setChecked(checked)
+            w.blockSignals(False)
+            label = self._fields.get(key, {}).get("label", key)
+            self._set_toggle_button_text(w, label, checked)
+            return
+
+        if ftype == "int":
+            w.setValue(int(value))
+            return
+
+        if ftype == "float":
+            w.setValue(float(value))
+            return
+
+        w.setText("" if value is None else str(value))
 
     def _value_from_editor(self, key: str):
         ftype, w = self._editors[key]
@@ -281,6 +367,7 @@ class ParamDialog(QDialog):
         if not self._apply_callback:
             return
         self._apply_callback({key: bool(checked)})
+        self._committed_values[key] = bool(checked)
 
     def _apply_pulse_field(self, key: str):
         if not self._apply_callback:
@@ -288,14 +375,17 @@ class ParamDialog(QDialog):
         # Pulse style: click triggers a one-shot action.
         self._apply_callback({key: None})
 
-    def _apply_field(self, key: str) -> None:
+    def _apply_field(self, key: str) -> bool:
         if not self._apply_callback:
-            return
+            return False
         try:
             value = self._value_from_editor(key)
             self._apply_callback({key: value})
+            self._committed_values[key] = value
+            return True
         except Exception as exc:
             QMessageBox.warning(self, "参数错误", str(exc))
+            return False
 
     def _apply_all_fields(self) -> None:
         if not self._apply_callback:
@@ -306,6 +396,7 @@ class ParamDialog(QDialog):
                 payload[key] = self._value_from_editor(key)
             if payload:
                 self._apply_callback(payload)
+                self._committed_values.update(payload)
         except Exception as exc:
             QMessageBox.warning(self, "参数错误", str(exc))
 
