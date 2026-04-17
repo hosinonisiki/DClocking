@@ -5,6 +5,12 @@ import IIR
 # Defines methods for module manipulation
 
 # Base class of all modules
+
+def default_sign(x):
+    if x == 0:
+        return 1
+    else:
+        return np.sign(x)
 class ModuleBase():
     # Format: parameter_list[(int)address] = {"name": (str)name, "width": (int)width]
     parameter_list = {}
@@ -298,7 +304,7 @@ class ModuleScaler(ModuleBase):
         if data is not None:
             # Write, return address-data pairs
             current_scale = int.from_bytes(self.read("scale"), "big", signed = True)
-            target_scale = int(np.sign(current_scale) * round(2 ** 16 * 10 ** (data / 20)))
+            target_scale = int(default_sign(current_scale) * round(2 ** 16 * 10 ** (data / 20)))
             if target_scale >= 2 ** 23 or target_scale < -2 ** 23:
                 raise ValueError("Resulting scale is out of range")
             return [(0, target_scale)]

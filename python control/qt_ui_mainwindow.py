@@ -718,20 +718,10 @@ class MainWindow(QMainWindow):
         router = self._ensure_router()
         if router is None:
             return
-
-        router.port_config = [0] * 128
-        if not getattr(router, "port_enable", None) or len(router.port_enable) != 128:
-            router.port_enable = [1] * 128
-
-        for route in routes:
-            dst_port = route.get("dst_port")
-            src_port = route.get("src_port")
-            if dst_port is None or src_port is None:
-                continue
-            try:
-                router.set_routing(int(dst_port), int(src_port))
-            except Exception as exc:
-                print(f"[sync] skip cache prime route {src_port}->{dst_port}: {exc}")
+        try:
+            router.sync()
+        except Exception as exc:
+            print(f"[sync] skip cache prime route : {exc}")
 
     def _apply_routing(self, dst_port_num, src_port_num, label):
         router = self._ensure_router()
