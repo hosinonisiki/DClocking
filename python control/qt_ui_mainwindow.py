@@ -748,6 +748,25 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             print(f"[route] failed: {label}: {exc}")
 
+    def _clear_all_routes(self):
+        hw_controller = getattr(self.port_ctrl, "hw_controller", None)
+        router = getattr(hw_controller, "router", None) if hw_controller is not None else None
+        if router is None:
+            return
+
+        try:
+            for dst_port_num in range(128):
+                src_port_num = pn.VOID_BOOL if dst_port_num >= 64 else pn.VOID
+                router.set_routing(dst_port_num, src_port_num)
+
+            if self.port_ctrl.is_open():
+                router.upload()
+                print("[route] cleared all routes in hardware")
+            else:
+                print("[route] cleared all routes in local cache (serial not open)")
+        except Exception as exc:
+            print(f"[route] failed to clear all routes: {exc}")
+
     def _resolve_module_identity(self, node):
         if isinstance(node, ModulePID):
             return "PID", node.index
@@ -891,10 +910,30 @@ class MainWindow(QMainWindow):
 
     def _clear_canvas(self):
         self._clear_param_panels()
+        self._route_queue.clear()
+        self._route_sending = False
 
         for item in list(self.scene.items()):
             if isinstance(item, EdgeItem):
                 item.remove()
+
+        # Defensive cleanup: clear all remaining connection refs to avoid invisible ghost edges.
+        for item in list(self.scene.items()):
+            if not isinstance(item, NodeItem):
+                continue
+            for port in list(getattr(item, "in_ports", [])) + list(getattr(item, "out_ports", [])):
+                if hasattr(port, "connections") and isinstance(port.connections, list):
+                    port.connections.clear()
+            if hasattr(item, "edges") and isinstance(item.edges, list):
+                item.edges.clear()
+
+        for border_port in list(getattr(self.scene, "left_ports", [])) + list(getattr(self.scene, "right_ports", [])):
+            if hasattr(border_port, "connections") and isinstance(border_port.connections, list):
+                border_port.connections.clear()
+
+        for const_port in list(getattr(self.scene, "constant_out_ports", [])):
+            if hasattr(const_port, "connections") and isinstance(const_port.connections, list):
+                const_port.connections.clear()
 
         for item in list(self.scene.items()):
             if isinstance(item, NodeItem):
@@ -903,6 +942,8 @@ class MainWindow(QMainWindow):
 
         for key in self.view._used_indices:
             self.view._used_indices[key].clear()
+
+        self._clear_all_routes()
 
     def confirm_clear_canvas(self):
         reply = QMessageBox.question(self, '清空画布', '确定要清空所有模块和连线吗？', 
