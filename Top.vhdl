@@ -846,6 +846,24 @@ begin
         );
     end block module_34_block;
 
+    module_35_block : block
+        signal bus_en       :   std_logic;
+    begin
+        bus_en <= '1' when mbus = BUS_PLSG_ADDR else '0';
+        module_35 : entity work.module_pulse_pattern_generator port map(
+            clk             =>  clk,
+            rst             =>  mod_rst(35),
+            bus_en_in       =>  bus_en,
+            dbus_in         =>  dbus,
+            abus_in         =>  abus,
+            cbus_in         =>  cbus,
+            rsp_data_out    =>  rdbus(35),
+            rsp_stat_out    =>  rsbus(35),
+
+            sig_out         => sig_bank_in(49)
+        );
+    end block module_35_block;
+
 
     -- signal banks provided by the router
     -- Last 8 channels reserved for top adc and dac ports

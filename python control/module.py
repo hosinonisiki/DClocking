@@ -718,6 +718,213 @@ class ModuleSCLOFSM(ModuleBase):
         "clear": 1
     }
 
+class ModulePulsePatternGenerator(ModuleBase):
+    parameter_list = {
+        0: {"name": "start", "width": 1},
+        1: {"name": "stop", "width": 1},
+        2: {"name": "clear", "width": 1},
+        3: {"name": "repeat_count", "width": 32},
+        4: {"name": "segment_count", "width": 4},
+        5: {"name": "start_level", "width": 16},
+        6: {"name": "idle_level", "width": 16},
+        7: {"name": "hold_last_level", "width": 1},
+        8: {"name": "duration_0", "width": 32},
+        9: {"name": "delta_0", "width": 16},
+        10: {"name": "slope_0", "width": 32},
+        11: {"name": "duration_1", "width": 32},
+        12: {"name": "delta_1", "width": 16},
+        13: {"name": "slope_1", "width": 32},
+        14: {"name": "duration_2", "width": 32},
+        15: {"name": "delta_2", "width": 16},
+        16: {"name": "slope_2", "width": 32},
+        17: {"name": "duration_3", "width": 32},
+        18: {"name": "delta_3", "width": 16},
+        19: {"name": "slope_3", "width": 32},
+        20: {"name": "duration_4", "width": 32},
+        21: {"name": "delta_4", "width": 16},
+        22: {"name": "slope_4", "width": 32},
+        23: {"name": "duration_5", "width": 32},
+        24: {"name": "delta_5", "width": 16},
+        25: {"name": "slope_5", "width": 32},
+        26: {"name": "duration_6", "width": 32},
+        27: {"name": "delta_6", "width": 16},
+        28: {"name": "slope_6", "width": 32},
+        29: {"name": "duration_7", "width": 32},
+        30: {"name": "delta_7", "width": 16},
+        31: {"name": "slope_7", "width": 32}
+    }
+    alias_list = {
+        "start": 0, "start_cmd": 0, "run": 0,
+        "stop": 1, "stop_cmd": 1,
+        "clear": 2, "clear_cmd": 2,
+        "repeat_count": 3, "repeat": 3,
+        "segment_count": 4, "segments": 4,
+        "start_level": 5, "start_bias": 5,
+        "idle_level": 6, "idle_bias": 6,
+        "hold_last_level": 7, "hold_last": 7,
+        "duration_0": 8, "delta_0": 9, "slope_0": 10,
+        "duration_1": 11, "delta_1": 12, "slope_1": 13,
+        "duration_2": 14, "delta_2": 15, "slope_2": 16,
+        "duration_3": 17, "delta_3": 18, "slope_3": 19,
+        "duration_4": 20, "delta_4": 21, "slope_4": 22,
+        "duration_5": 23, "delta_5": 24, "slope_5": 25,
+        "duration_6": 26, "delta_6": 27, "slope_6": 28,
+        "duration_7": 29, "delta_7": 30, "slope_7": 31
+    }
+    deduced_parameter_list = {
+        "start_freq": lambda self: self.start_freq_func,
+        "idle_freq": lambda self: self.idle_freq_func
+    }
+
+    clock_frequency = 250000000.0
+    accumulator_bias_hz_per_lsb = clock_frequency / 2 ** 16
+
+    def frequency_to_bias(self, data):
+        target_code = int(round(float(data) / self.accumulator_bias_hz_per_lsb))
+        if target_code < -2 ** 15 or target_code >= 2 ** 15:
+            raise ValueError("Requested frequency offset exceeds the accumulator bias range")
+        return target_code
+
+    def bias_to_frequency(self, data):
+        return int(data) * self.accumulator_bias_hz_per_lsb
+
+    def start_freq_func(self, data = None):
+        if data is not None:
+            return [(5, self.frequency_to_bias(data))]
+        else:
+            address_list = [5]
+            def formula(data_list):
+                bias_code = int.from_bytes(data_list[0], "big", signed = True)
+                return self.bias_to_frequency(bias_code)
+            return address_list, formula
+
+    def idle_freq_func(self, data = None):
+        if data is not None:
+            return [(6, self.frequency_to_bias(data))]
+        else:
+            address_list = [6]
+            def formula(data_list):
+                bias_code = int.from_bytes(data_list[0], "big", signed = True)
+                return self.bias_to_frequency(bias_code)
+            return address_list, formula
+
+    def _time_to_cycles(self, elapsed_time, time_unit = "s", clk_freq = None):
+        if clk_freq is None:
+            clk_freq = self.clock_frequency
+        if elapsed_time < 0:
+            raise ValueError("Segment elapsed time must be non-negative")
+
+        if time_unit in ["cycle", "cycles", "clk", "clocks"]:
+            cycles = int(round(elapsed_time))
+        else:
+            scale_map = {
+                "s": 1.0,
+                "ms": 1e-3,
+                "us": 1e-6,
+                "ns": 1e-9
+            }
+            if time_unit not in scale_map:
+                raise ValueError("Unsupported time unit, use s / ms / us / ns / cycles")
+            cycles = int(round(float(elapsed_time) * scale_map[time_unit] * clk_freq))
+            if elapsed_time > 0 and cycles == 0:
+                cycles = 1
+
+        if cycles < 0 or cycles >= 2 ** 32:
+            raise ValueError("Segment duration is out of the 32-bit cycle range")
+        return cycles
+
+    def _normalize_segment(self, segment):
+        if isinstance(segment, dict):
+            elapsed_time = None
+            delta_frequency = None
+            for key in ["elapsed_time", "duration", "time"]:
+                if key in segment:
+                    elapsed_time = segment[key]
+                    break
+            for key in ["delta_frequency", "delta_freq", "frequency_delta", "df"]:
+                if key in segment:
+                    delta_frequency = segment[key]
+                    break
+            if elapsed_time is None or delta_frequency is None:
+                raise ValueError("Each segment dict must contain elapsed_time and delta_frequency")
+            return elapsed_time, delta_frequency
+
+        if isinstance(segment, (list, tuple)) and len(segment) == 2:
+            return segment[0], segment[1]
+
+        raise ValueError("Each segment must be a 2-item tuple/list or a dict")
+
+    def _encode_segment(self, elapsed_time, delta_frequency, time_unit = "s", clk_freq = None):
+        duration_cycles = self._time_to_cycles(elapsed_time, time_unit, clk_freq)
+        delta_code = self.frequency_to_bias(delta_frequency)
+        if duration_cycles == 0:
+            slope = 0
+        else:
+            slope = int(round(delta_code * 2 ** 16 / duration_cycles))
+        if slope < -2 ** 31 or slope >= 2 ** 31:
+            raise ValueError("Segment slope is out of the 32-bit fixed-point range")
+        return duration_cycles, delta_code, slope
+
+    def configure_pulse(self, segments, repeat_count = 1, start_frequency = 0.0, idle_frequency = 0.0, hold_last_level = False, clk_freq = None, time_unit = "s", repeat = None):
+        if clk_freq is None:
+            clk_freq = self.clock_frequency
+        if len(segments) == 0:
+            raise ValueError("At least 1 segment is required")
+        if len(segments) > 8:
+            raise ValueError("At most 8 segments are supported")
+
+        if repeat is not None:
+            repeat_count = repeat
+
+        if isinstance(repeat_count, str):
+            repeat_count = repeat_count.lower()
+
+        if repeat_count is None or repeat_count == 0 or repeat_count == "0" or repeat_count == "inf" or repeat_count == "infinite" or repeat_count == np.inf:
+            repeat_count_word = 0
+        else:
+            repeat_count_word = int(repeat_count)
+            if repeat_count_word < 1 or repeat_count_word >= 2 ** 32:
+                raise ValueError("repeat_count must be a positive 32-bit integer, or 0 / inf for infinite repetition")
+
+        segment_data = [self._encode_segment(*self._normalize_segment(segment), time_unit = time_unit, clk_freq = clk_freq) for segment in segments]
+
+        writes = [
+            (0, 0),
+            (1, 0),
+            (2, 0),
+            (3, repeat_count_word),
+            (4, len(segment_data)),
+            (5, self.frequency_to_bias(start_frequency)),
+            (6, self.frequency_to_bias(idle_frequency)),
+            (7, 1 if hold_last_level else 0)
+        ]
+
+        for index in range(8):
+            base_address = 8 + 3 * index
+            if index < len(segment_data):
+                duration_cycles, delta_code, slope = segment_data[index]
+            else:
+                duration_cycles, delta_code, slope = 0, 0, 0
+            writes.append((base_address, duration_cycles))
+            writes.append((base_address + 1, delta_code))
+            writes.append((base_address + 2, slope))
+
+        for address, data in writes[:-1]:
+            self.write(address, data, hold = True)
+        self.write(writes[-1][0], writes[-1][1], hold = False)
+
+    def configure_frequency_sweep(self, *args, **kwargs):
+        return self.configure_pulse(*args, **kwargs)
+
+    def start(self):
+        self.flip_on("start")
+
+    def stop(self):
+        self.flip_on("stop")
+
+    def clear(self):
+        self.flip_on("clear")
+
 class ModuleIIRFilter(ModuleBase):
     parameter_list = {
         0: {"name": "coef_bq1_b0", "width": 27},

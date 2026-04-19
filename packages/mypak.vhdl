@@ -21,7 +21,7 @@ package mypak is
 
     constant log_dbus_w :   integer := 5; -- Log2 of the data bus width.
 
-    constant module_count   : integer := 34; -- Number of modules connected to the bus.
+    constant module_count   : integer := 35; -- Number of modules connected to the bus.
     constant BUS_ROUT_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(1, mbus_w)); -- Address of the router module.
     constant BUS_TRIG_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(2, mbus_w)); -- Address of the trigonometric module.
     constant BUS_ACCM_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(3, mbus_w)); -- Address of the accumulator module.
@@ -56,6 +56,7 @@ package mypak is
     constant BUS_IIR2_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(32, mbus_w)); -- Address of the 2nd IIR filter module.
     constant BUS_IIR3_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(33, mbus_w)); -- Address of the 3rd IIR filter module.
     constant BUS_IIR4_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(34, mbus_w)); -- Address of the 4th IIR filter module.
+    constant BUS_PLSG_ADDR     : std_logic_vector(mbus_w - 1 downto 0) := std_logic_vector(to_unsigned(35, mbus_w)); -- Address of the pulse pattern generator module.
 
     -- Used in wrapper and central_control
     constant SPI_P1C1_ADDR      : integer := 0; -- Address of chip 1 on FMC Port 1.

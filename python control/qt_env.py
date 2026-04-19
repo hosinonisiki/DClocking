@@ -50,6 +50,7 @@ class HardwareController:
         self.iir2 = None
         self.iir3 = None
         self.iir4 = None
+        self.plsg = None
         
         
         if serial_instance is not None:
@@ -91,6 +92,7 @@ class HardwareController:
         self.iir2 = module.ModuleIIRFilter(self.bus_inst, "IIR2")
         self.iir3 = module.ModuleIIRFilter(self.bus_inst, "IIR3")
         self.iir4 = module.ModuleIIRFilter(self.bus_inst, "IIR4")
+        self.plsg = module.ModulePulsePatternGenerator(self.bus_inst, "PLSG")
         self.spi_inst = spi.Spi(self.ser)
         
 
@@ -127,6 +129,7 @@ class HardwareController:
             self.fir3.reset()
             self.fir4.reset()
             self.pdhfsm.reset()
+            self.plsg.reset()
 
             print("Configure converters")
             init_FL9627(self.spi_inst, 1)
@@ -162,6 +165,7 @@ class HardwareController:
             self.fir3.reset()
             self.fir4.reset()
             self.pdhfsm.reset()
+            self.plsg.reset()
 
             print("Configure converters")
             init_FL9627(self.spi_inst, 1)

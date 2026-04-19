@@ -42,6 +42,7 @@ iir = module.ModuleIIRFilter(bus_inst, "IIRF")
 iir2 = module.ModuleIIRFilter(bus_inst, "IIR2")
 iir3 = module.ModuleIIRFilter(bus_inst, "IIR3")
 iir4 = module.ModuleIIRFilter(bus_inst, "IIR4")
+plsg = module.ModulePulsePatternGenerator(bus_inst, "PLSG")
 spi_inst = spi.Spi(ser)
 
 def init():
@@ -74,6 +75,7 @@ def init():
         iir2.reset()
         iir3.reset()
         iir4.reset()
+        plsg.reset()
 
         print("Configure converters")
         init_FL9627(spi_inst, 1)
@@ -108,6 +110,7 @@ def init_no_ref():
         pdhfsm.reset()
         sclofsm.reset()
         sclofsm2.reset()
+        plsg.reset()
 
         print("Configure converters")
         init_FL9627(spi_inst, 1)
