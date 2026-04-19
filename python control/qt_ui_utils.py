@@ -113,6 +113,9 @@ def resolve_port_number(node_name, port_index, role):
         case "IIR4":
             inputs = [pn.IIR4_IN]
             outputs = [pn.IIR4_OUT]
+        case "PLSG":
+            inputs = []
+            outputs = [pn.PLSG_OUT]
         case "MIXR":
             inputs = [pn.MIXER_IN_A, pn.MIXER_IN_B]
             outputs = [pn.MIXER_OUT]
@@ -179,6 +182,7 @@ def candidate_node_names():
     names.extend(["Border_out_HIGH", "Border_out_LOW"])
     names.extend(["PIDC", "PID2", "ACCM", "ACC2", "SCLR", "SCL2", "SCL3", "SCL4"])
     names.extend(["FIRF", "FIR2", "FIR3", "FIR4", "IIRF", "IIR2", "IIR3", "IIR4"])
+    names.extend(["PLSG"])
     names.extend(["TRIG", "TRI2", "TRI3", "TRI4", "ATAN", "ATA2"])
     names.extend(["MIXR", "MIX2", "MIX3", "MIX4", "UNWR", "LTRN", "LTR2", "PDHS", "SCLO", "SLO2"])
     return names
@@ -228,6 +232,8 @@ def node_name_to_component(node_name):
         return "IIR滤波器", 0
     if node_name.startswith("IIR") and node_name[3:].isdigit():
         return "IIR滤波器", int(node_name[3:]) - 1
+    if node_name == "PLSG":
+        return "脉冲序列发生器", 0
     if node_name == "TRIG":
         return "三角函数运算器", 0
     if node_name.startswith("TRI") and node_name[3:].isdigit():

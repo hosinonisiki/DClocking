@@ -254,6 +254,8 @@ class Port(QObject):
             return self.hw_controller.pdhfsm
         if module_type == "SCLO":
             return self.hw_controller.sclofsm if module_index == 0 else self.hw_controller.sclofsm2
+        if module_type == "PLSG":
+            return self.hw_controller.plsg
         return None
 
     def send_param(self, module_type, module_index, params):

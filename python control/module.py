@@ -916,6 +916,34 @@ class ModulePulsePatternGenerator(ModuleBase):
     def configure_frequency_sweep(self, *args, **kwargs):
         return self.configure_pulse(*args, **kwargs)
 
+    def configure_qt_frequency_sweep(self, repeat_mode = "finite", repeat_count = 1, start_frequency = 0.0, idle_frequency = 0.0, hold_last_level = False, time_unit = "ms", segment_count = 1, **kwargs):
+        segment_count = int(segment_count)
+        if segment_count < 1 or segment_count > 8:
+            raise ValueError("segment_count must be between 1 and 8")
+
+        if repeat_mode == "infinite":
+            repeat_value = 0
+        else:
+            repeat_value = int(repeat_count)
+
+        segments = []
+        for i in range(segment_count):
+            seg_index = i + 1
+            time_key = f"segment_{seg_index}_time"
+            delta_key = f"segment_{seg_index}_delta_frequency"
+            elapsed_time = kwargs.get(time_key, 0.0)
+            delta_frequency = kwargs.get(delta_key, 0.0)
+            segments.append((elapsed_time, delta_frequency))
+
+        return self.configure_pulse(
+            segments = segments,
+            repeat_count = repeat_value,
+            start_frequency = start_frequency,
+            idle_frequency = idle_frequency,
+            hold_last_level = hold_last_level,
+            time_unit = time_unit,
+        )
+
     def start(self):
         self.flip_on("start")
 

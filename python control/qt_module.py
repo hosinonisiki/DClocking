@@ -11,7 +11,7 @@ from PySide6.QtGui import QDrag, QPainter, QPen, QBrush, QPainterPath, QColor, Q
 import math
 import re
 from decimal import Decimal, InvalidOperation
-from qt_module_schema import PID_SCHEMA, ACCM_SCHEMA, SCLR_SCHEMA, FIRF_SCHEMA, LTRN_SCHEMA, PDH_SCHEMA, SCLO_SCHEMA, IIR_SCHEMA
+from qt_module_schema import PID_SCHEMA, ACCM_SCHEMA, SCLR_SCHEMA, FIRF_SCHEMA, LTRN_SCHEMA, PDH_SCHEMA, SCLO_SCHEMA, IIR_SCHEMA, PLSG_SCHEMA
 
 _PARAM_APPLY_HANDLER = None
 _PARAM_OPEN_HANDLER = None
@@ -1690,7 +1690,146 @@ class ModuleIIRFilter(NodeItem):
                 ],
             }
         ]
-        
+
+class ModulePulsePatternGenerator(NodeItem):
+    def __init__(self, component_name, index, position, num_inputs = 0, num_outputs = 1):
+        name = "PLSG"
+        super().__init__(name, component_name, index, position, num_inputs, num_outputs)
+        self.name = name
+        self.height = 140
+        self.width = 170
+        self.component_name = component_name
+        self.display_name = self.component_name
+        self.index = index
+        self.num_inputs = num_inputs
+        self.num_outputs = num_outputs
+        self.inputs = []
+        self.outputs = ["OUT"]
+        self.inputs_display_name = []
+        self.outputs_display_name = ["频率偏置"]
+        self.inputs_signals = []
+        self.outputs_signals = [["differential"]]
+        self.maxm = 1
+        self.setPos(position)
+        self.schema = PLSG_SCHEMA
+        self.free_mode = True
+        self._params = {}
+        self._init_params()
+
+        self.setFlag(QGraphicsItem.ItemIsFocusable)
+        self.setFlag(QGraphicsItem.ItemIsMovable)
+        self.setFlag(QGraphicsItem.ItemIsSelectable)
+        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)
+
+        self._create_ports()
+
+    def getmaxm(self):
+        return self.maxm
+
+    def param_schema(self):
+        if self.free_mode:
+            return [f for f in self.schema if f.get("free", True)]
+        return self.schema
+
+    def _default_for_field(self, field: dict):
+        if "default" in field:
+            return field["default"]
+        ftype = field.get("type", "str")
+        if ftype == "int":
+            return 0
+        if ftype == "float":
+            return 0.0
+        if ftype == "bool":
+            return False
+        return ""
+
+    def _init_params(self):
+        for field in self.schema:
+            key = field.get("key")
+            if key not in self._params:
+                self._params[key] = self._default_for_field(field)
+
+    def get_params(self):
+        params = {}
+        for field in self.param_schema():
+            key = field.get("key")
+            params[key] = self._params.get(key, self._default_for_field(field))
+        return params
+
+    def set_params(self, params: dict) -> None:
+        if not params:
+            return
+        for key, value in params.items():
+            self._params[key] = value
+        self._notify_param_change(params)
+
+    def special_methods_schema(self):
+        params = [
+            {
+                "key": "repeat_mode",
+                "label": "重复模式",
+                "type": "choice",
+                "default": "finite",
+                "options": [
+                    {"label": "有限次", "value": "finite"},
+                    {"label": "无限循环", "value": "infinite"},
+                ],
+            },
+            {"key": "repeat_count", "label": "重复次数", "type": "int", "min": 1, "max": 2**31 - 1, "default": 1},
+            {"key": "start_frequency", "label": "起始频偏(Hz)", "type": "float", "min": -1e9, "max": 1e9, "default": 0.0, "decimals": 3},
+            {"key": "idle_frequency", "label": "空闲频偏(Hz)", "type": "float", "min": -1e9, "max": 1e9, "default": 0.0, "decimals": 3},
+            {
+                "key": "hold_last_level",
+                "label": "结束行为",
+                "type": "choice",
+                "default": False,
+                "options": [
+                    {"label": "回到空闲值", "value": False},
+                    {"label": "保持末值", "value": True},
+                ],
+            },
+            {
+                "key": "time_unit",
+                "label": "时间单位",
+                "type": "choice",
+                "default": "ms",
+                "options": ["s", "ms", "us", "ns", "cycles"],
+            },
+            {"key": "segment_count", "label": "有效段数", "type": "int", "min": 1, "max": 8, "default": 2},
+        ]
+
+        for i in range(1, 9):
+            params.append(
+                {
+                    "key": f"segment_{i}_time",
+                    "label": f"第{i}段时间",
+                    "type": "float",
+                    "min": 0.0,
+                    "max": 1e12,
+                    "default": 0.0 if i > 2 else 1.0,
+                    "decimals": 6,
+                }
+            )
+            params.append(
+                {
+                    "key": f"segment_{i}_delta_frequency",
+                    "label": f"第{i}段频偏变化(Hz)",
+                    "type": "float",
+                    "min": -1e9,
+                    "max": 1e9,
+                    "default": 0.0,
+                    "decimals": 3,
+                }
+            )
+
+        return [
+            {
+                "name": "configure_qt_frequency_sweep",
+                "label": "配置扫频脉冲",
+                "params": params,
+            }
+        ]
+
 class ModuleSCLOFSM(NodeItem):
     def __init__(self, component_name, index, position, num_inputs = 1, num_outputs = 2):
         if index:
@@ -1929,6 +2068,7 @@ module_factory = {
     "解卷绕器": ModuleBase,
     "PDH状态机": ModulePDHFSM,
     "LO自动校准状态机": ModuleSCLOFSM,
+    "脉冲序列发生器": ModulePulsePatternGenerator,
 }
 
 module_maxm = {
@@ -1946,6 +2086,7 @@ module_maxm = {
     "解卷绕器": 1,
     "PDH状态机": 1,
     "LO自动校准状态机": 2,
+    "脉冲序列发生器": 1,
 }
 
 composite_modules = {

@@ -17,6 +17,17 @@ PID_SCHEMA = [
     {"key" : "saturation_turning_frequency", "label" : "饱和拐点频率", "type" : "float", "min" : 0, "max" : 1e9, "unit" : "Hz", "mode" : "indirect", "free" : True, "note" : "调节泄漏系数，使得积分通道在设定频率处饱和。若饱和频率过小或为0，则设定为无饱和。若饱和频率过大，则设定为最大泄漏"},
 ]
 
+PLSG_SCHEMA = [
+    {"key": "start", "label": "启动", "type": "bool", "mode": "direct", "free": True, "ui_control": "flip_pulse", "flip_on": "start", "note": "触发一次启动脉冲"},
+    {"key": "stop", "label": "停止", "type": "bool", "mode": "direct", "free": True, "ui_control": "flip_pulse", "flip_on": "stop", "note": "触发一次停止脉冲并回到空闲值"},
+    {"key": "clear", "label": "清零", "type": "bool", "mode": "direct", "free": True, "ui_control": "flip_pulse", "flip_on": "clear", "note": "触发一次清零脉冲并回到空闲值"},
+    {"key": "repeat_count", "label": "重复次数", "type": "int", "min": 0, "max": 2**31 - 1, "mode": "direct", "free": True, "note": "0 表示无限重复"},
+    {"key": "segment_count", "label": "段数", "type": "int", "min": 0, "max": 8, "mode": "direct", "free": False, "note": "由波形配置方法自动写入"},
+    {"key": "hold_last_level", "label": "结束后保持末值", "type": "bool", "mode": "direct", "free": True, "note": "关闭时回到空闲频偏"},
+    {"key": "start_freq", "label": "起始频偏", "type": "float", "min": -1e9, "max": 1e9, "unit": "Hz", "mode": "indirect", "free": True, "note": "以累加器 bias 输入等效频率表示"},
+    {"key": "idle_freq", "label": "空闲频偏", "type": "float", "min": -1e9, "max": 1e9, "unit": "Hz", "mode": "indirect", "free": True, "note": "停止或清零后的输出频偏"},
+]
+
 ACCM_SCHEMA = [
     # 直接参数
     {"key" : "low", "label" : "每周期慢变累加值低32位", "mode" : "direct", "free" : False, "note" : "与high组成64位累加值"},

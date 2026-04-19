@@ -29,6 +29,7 @@ from qt_module import (
     ModuleScaler,
     ModuleFIRFilter,
     ModuleIIRFilter,
+    ModulePulsePatternGenerator,
     ModuleSCLOFSM,
     ModulePDHFSM,
     ModuleLinerTransformer,
@@ -745,6 +746,8 @@ class MainWindow(QMainWindow):
             return "FIR", node.index
         if isinstance(node, ModuleIIRFilter):
             return "IIR", node.index
+        if isinstance(node, ModulePulsePatternGenerator):
+            return "PLSG", node.index
         if isinstance(node, ModuleLinerTransformer):
             return "LTRN", node.index
         if isinstance(node, ModulePDHFSM):
@@ -904,6 +907,7 @@ class MainWindow(QMainWindow):
                         "index": int(item.index),
                         "pos": {"x": float(item.pos().x()), "y": float(item.pos().y())},
                         "params": params,
+                        "special_methods": dict(getattr(item, "_special_method_args", {})),
                     }
                 )
 
@@ -961,6 +965,14 @@ class MainWindow(QMainWindow):
                 node.set_params(params)
             except Exception as exc:
                 print(f"[config] apply params failed for {node.name}: {exc}")
+
+        special_methods = node_cfg.get("special_methods", {})
+        if isinstance(special_methods, dict) and special_methods:
+            for method_name, args in special_methods.items():
+                try:
+                    node.apply_special_method(method_name, args if isinstance(args, dict) else {})
+                except Exception as exc:
+                    print(f"[config] apply special method failed for {node.name}.{method_name}: {exc}")
 
         return node
 
