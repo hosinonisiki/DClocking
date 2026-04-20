@@ -767,6 +767,10 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             print(f"[route] failed to clear all routes: {exc}")
 
+    def _disconnect_all_connections(self):
+        # 仅负责断开底层连线（硬件/缓存路由），避免与画布清理耦合。
+        self._clear_all_routes()
+
     def _resolve_module_identity(self, node):
         if isinstance(node, ModulePID):
             return "PID", node.index
@@ -908,14 +912,25 @@ class MainWindow(QMainWindow):
                 return node.in_ports[idx]
         return None
 
-    def _clear_canvas(self):
+    def _clear_canvas(self, emit_connection_removed: bool = False):
         self._clear_param_panels()
         self._route_queue.clear()
         self._route_sending = False
 
-        for item in list(self.scene.items()):
-            if isinstance(item, EdgeItem):
-                item.remove()
+        existing_edges = [item for item in list(self.scene.items()) if isinstance(item, EdgeItem)]
+
+        if emit_connection_removed:
+            for edge in existing_edges:
+                start_port = getattr(edge, "start_port", None)
+                end_port = getattr(edge, "end_port", None)
+                if start_port is None or end_port is None:
+                    continue
+                src_name = start_port.parent_node.name if hasattr(start_port, "parent_node") and start_port.parent_node else start_port.name
+                dst_name = end_port.parent_node.name if hasattr(end_port, "parent_node") and end_port.parent_node else end_port.name
+                self.signals.connection_removed.emit(src_name, int(start_port.index), dst_name, int(end_port.index))
+
+        for edge in existing_edges:
+            edge.remove()
 
         # Defensive cleanup: clear all remaining connection refs to avoid invisible ghost edges.
         for item in list(self.scene.items()):
@@ -943,13 +958,12 @@ class MainWindow(QMainWindow):
         for key in self.view._used_indices:
             self.view._used_indices[key].clear()
 
-        self._clear_all_routes()
-
     def confirm_clear_canvas(self):
         reply = QMessageBox.question(self, '清空画布', '确定要清空所有模块和连线吗？', 
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
-            self._clear_canvas()
+            self._disconnect_all_connections()
+            self._clear_canvas(emit_connection_removed=True)
 
     def _build_config_dict(self):
         nodes = []
@@ -1073,7 +1087,8 @@ class MainWindow(QMainWindow):
             print("[config] invalid format: nodes/edges must be list")
             return
 
-        self._clear_canvas()
+        self._disconnect_all_connections()
+        self._clear_canvas(emit_connection_removed=True)
 
         mode = config.get("mode")
         if isinstance(mode, str) and mode in ["Free Mode", "Developer Mode"]:
