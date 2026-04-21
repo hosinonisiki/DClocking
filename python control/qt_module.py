@@ -55,12 +55,16 @@ class QuantityLineEdit(QLineEdit):
     }
     PREFIX_UNITS = {"Hz", "V", "s", "A", "W"}
 
-    def __init__(self, value=0, field=None, parent=None):
+    def __init__(self, value=0, field=None, parent=None, report_callback=None):
         super().__init__(parent)
         self._field = dict(field or {})
         self._syncing = False
+        self._report_callback = report_callback
         self._format = self._build_format(self._field)
-        self.core = QuantityEntryCore(formater=self._format)
+        self.core = QuantityEntryCore(
+            formater=self._format,
+            report=self._report_quantity_change if report_callback else None,
+        )
 
         self.textEdited.connect(self._sync_core_from_widget)
         self._set_initial_value(value)
@@ -166,13 +170,22 @@ class QuantityLineEdit(QLineEdit):
             start, end = selected
             self.setSelection(start, max(0, end - start))
 
-    def quantity_value(self):
+    def _report_quantity_change(self, *_args) -> None:
+        if self._report_callback:
+            self._report_callback()
+
+    def quantity_value(self, preserve_roll=False):
         if self.core.state == self.core.CHANGED:
             if not self.core.store():
                 return None
         elif self.core.state == self.core.ROLLING:
-            if not self.core.exit_roll(report=False):
-                return None
+            if preserve_roll:
+                self.core.result, self.core.value, self.core.formalized = self._format.match(self.core.get_text())
+                if self.core.result is None:
+                    return None
+            else:
+                if not self.core.exit_roll(report=False):
+                    return None
         self._refresh_view()
         return self.core.get_value()
 
@@ -197,7 +210,8 @@ class QuantityLineEdit(QLineEdit):
 
     def focusOutEvent(self, event):
         if self.core.state == self.core.CHANGED:
-            self.core.store()
+            self.core.set_text(self.core.stored, mark_changed=False)
+            self.core.refresh_state()
         elif self.core.state == self.core.ROLLING:
             self.core.exit_roll(report=False)
         self._refresh_view()
@@ -242,10 +256,18 @@ class ParamDialog(QDialog):
                 continue
 
             if ftype == "int":
-                w = QuantityLineEdit(value=int(values.get(key, field.get("default", 0))), field=field)
+                w = QuantityLineEdit(
+                    value=int(values.get(key, field.get("default", 0))),
+                    field=field,
+                    report_callback=lambda k=key: self._apply_field(k, preserve_roll=True),
+                )
                 self._editors[key] = ("int_qty", w)
             elif ftype == "float":
-                w = QuantityLineEdit(value=float(values.get(key, field.get("default", 0.0))), field=field)
+                w = QuantityLineEdit(
+                    value=float(values.get(key, field.get("default", 0.0))),
+                    field=field,
+                    report_callback=lambda k=key: self._apply_field(k, preserve_roll=True),
+                )
                 self._editors[key] = ("float_qty", w)
             elif ftype == "bool":
                 w = QCheckBox()
@@ -318,14 +340,14 @@ class ParamDialog(QDialog):
 
         widget.setText("" if value is None else str(value))
 
-    def _value_from_editor(self, key: str):
+    def _value_from_editor(self, key: str, preserve_roll: bool = False):
         ftype, w = self._editors[key]
         field = self._fields.get(key, {})
         min_v = field.get("min", None)
         max_v = field.get("max", None)
 
         if ftype == "int_qty":
-            si = w.quantity_value()
+            si = w.quantity_value(preserve_roll=preserve_roll)
             if si is None:
                 raise ValueError("Invalid quantity input")
             integer_value = Decimal(str(si))
@@ -339,7 +361,7 @@ class ParamDialog(QDialog):
             return value
 
         if ftype == "float_qty":
-            si = w.quantity_value()
+            si = w.quantity_value(preserve_roll=preserve_roll)
             if si is None:
                 raise ValueError("Invalid quantity input")
             value = float(si)
@@ -373,11 +395,11 @@ class ParamDialog(QDialog):
             return
         self._apply_callback({key: None})
 
-    def _apply_field(self, key: str) -> bool:
+    def _apply_field(self, key: str, preserve_roll: bool = False) -> bool:
         if not self._apply_callback:
             return False
         try:
-            value = self._value_from_editor(key)
+            value = self._value_from_editor(key, preserve_roll=preserve_roll)
             self._apply_callback({key: value})
             self._committed_values[key] = value
             return True
