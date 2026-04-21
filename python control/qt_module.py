@@ -10,8 +10,9 @@ from PySide6.QtCore import Qt, QMimeData, QPointF, QRectF, Signal, QObject, QByt
 from PySide6.QtGui import QDrag, QPainter, QPen, QBrush, QPainterPath, QColor, QFont, QPixmap, QImage, QCursor
 import math
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from qt_module_schema import PID_SCHEMA, ACCM_SCHEMA, SCLR_SCHEMA, FIRF_SCHEMA, LTRN_SCHEMA, PDH_SCHEMA, SCLO_SCHEMA, IIR_SCHEMA
+from quantity_entry_core import QuantityEntryCore, QuantityFormat
 
 _PARAM_APPLY_HANDLER = None
 _PARAM_OPEN_HANDLER = None
@@ -38,102 +39,169 @@ def _dispatch_param_open(node):
 
 
 class QuantityLineEdit(QLineEdit):
-    PREFIX_MAP = {
-        "": Decimal("1"),
-        "m": Decimal("1e-3"),
-        "u": Decimal("1e-6"),
-        "n": Decimal("1e-9"),
-        "p": Decimal("1e-12"),
-        "f": Decimal("1e-15"),
-        "a": Decimal("1e-18"),
-        "k": Decimal("1e3"),
-        "M": Decimal("1e6"),
-        "G": Decimal("1e9"),
-        "T": Decimal("1e12"),
+    STATE_STYLE = {
+        "unchanged": "",
+        "changed": "QLineEdit { background-color: #fff2a8; }",
+        "rolling": "",
+        "disabled": "QLineEdit { background-color: #d9d9d9; color: #606060; }",
     }
+    KEY_MAP = {
+        Qt.Key_Return: "Return",
+        Qt.Key_Enter: "Return",
+        Qt.Key_Left: "Left",
+        Qt.Key_Right: "Right",
+        Qt.Key_Up: "Up",
+        Qt.Key_Down: "Down",
+    }
+    PREFIX_UNITS = {"Hz", "V", "s", "A", "W"}
 
-    def __init__(self, value=0, unit="", decimals=6, parent=None):
+    def __init__(self, value=0, field=None, parent=None):
         super().__init__(parent)
-        self.unit = unit or ""
-        self.decimals = int(max(0, decimals))
-        self._re = re.compile(r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*$")
-        self.setText(self._format_display(Decimal(str(value))))
+        self._field = dict(field or {})
+        self._syncing = False
+        self._format = self._build_format(self._field)
+        self.core = QuantityEntryCore(formater=self._format)
 
-    def _format_display(self, value: Decimal):
-        s = f"{value:.{self.decimals}f}".rstrip("0").rstrip(".")
-        if s in ("", "-", "+"):
-            s = "0"
-        return s
+        self.textEdited.connect(self._sync_core_from_widget)
+        self._set_initial_value(value)
+        self._refresh_view()
 
-    def _parse_text(self):
-        text = self.text().strip()
-        m = self._re.match(text)
-        if not m:
-            return None
-        num_str = m.group(1)
+    @staticmethod
+    def _field_unit(field: dict) -> str:
+        unit = field.get("unit", "")
+        if unit:
+            return unit
+        label = str(field.get("label", ""))
+        match = re.search(r"\(([^()]+)\)\s*$", label)
+        return match.group(1) if match else ""
+
+    @classmethod
+    def _prefix_map_for_field(cls, field: dict) -> dict[str, float]:
+        prefix = field.get("prefix")
+        if isinstance(prefix, dict):
+            return dict(prefix)
+        if prefix is True:
+            return dict(QuantityFormat.default_prefix)
+        if prefix is False:
+            return {}
+        if cls._field_unit(field) in cls.PREFIX_UNITS:
+            return dict(QuantityFormat.default_prefix)
+        return {}
+
+    @staticmethod
+    def _integer_digits_for_value(value) -> int:
+        magnitude = abs(Decimal(str(value)))
+        if magnitude < 1:
+            return 1
+        return magnitude.adjusted() + 1
+
+    @classmethod
+    def _build_format(cls, field: dict) -> QuantityFormat:
+        unit = cls._field_unit(field)
+        digits_limit = field.get("digits_limit")
+        if digits_limit is not None:
+            int_limit, frac_limit, min_frac = digits_limit
+            return QuantityFormat(
+                digits_limit=(int(int_limit), int(frac_limit), int(min_frac)),
+                prefix=cls._prefix_map_for_field(field),
+                unit=unit,
+            )
+
+        ftype = field.get("type", "str")
+        frac_limit = 0 if ftype == "int" else int(max(0, field.get("decimals", 6)))
+        min_frac = 0 if ftype == "int" else int(max(0, field.get("min_decimals", 0)))
+        int_limit = int(max(1, field.get("int_digits", 1))) if "int_digits" in field else 1
+
+        if "int_digits" not in field:
+            for key in ("min", "max", "default"):
+                value = field.get(key)
+                if isinstance(value, bool) or value is None:
+                    continue
+                if isinstance(value, (int, float)):
+                    int_limit = max(int_limit, cls._integer_digits_for_value(value))
+
+        return QuantityFormat(
+            digits_limit=(int_limit, frac_limit, min_frac),
+            prefix=cls._prefix_map_for_field(field),
+            unit=unit,
+        )
+
+    def _format_numeric_text(self, value) -> str:
+        number = Decimal(str(value))
+        text = format(number, "f")
+        if "." in text:
+            text = text.rstrip("0").rstrip(".")
+        if text in {"", "-0"}:
+            text = "0"
+        return text + self._format.unit
+
+    def _set_initial_value(self, value) -> None:
+        self.core.set_text(self._format_numeric_text(value), mark_changed=False)
+        self.core.store()
+
+    def _set_widget_text(self, text: str) -> None:
+        self._syncing = True
         try:
-            base = Decimal(num_str)
-        except InvalidOperation:
-            return None
-        return {
-            "num": base,
-            "num_str": num_str,
-            "value": base,
-        }
+            self.setText(text)
+        finally:
+            self._syncing = False
 
-    def value_si(self):
-        parsed = self._parse_text()
-        return parsed["value"] if parsed else None
+    def _sync_core_from_widget(self) -> None:
+        if self._syncing or self.core.state == self.core.ROLLING:
+            return
+        self.core.set_text(self.text())
+        self._refresh_view()
+
+    def _refresh_view(self) -> None:
+        text = self.core.get_text()
+        if self.text() != text:
+            self._set_widget_text(text)
+
+        self.setStyleSheet(self.STATE_STYLE.get(self.core.visual_state, ""))
+
+        selected = self.core.selected_range
+        if selected is None:
+            self.deselect()
+        else:
+            start, end = selected
+            self.setSelection(start, max(0, end - start))
+
+    def quantity_value(self):
+        if self.core.state == self.core.CHANGED:
+            if not self.core.store():
+                return None
+        elif self.core.state == self.core.ROLLING:
+            if not self.core.exit_roll(report=False):
+                return None
+        self._refresh_view()
+        return self.core.get_value()
+
+    def setEnabled(self, enabled):
+        self.core.set_enabled(bool(enabled))
+        super().setEnabled(enabled)
+        self._refresh_view()
 
     def keyPressEvent(self, event):
-        if event.key() not in (Qt.Key_Up, Qt.Key_Down):
-            super().keyPressEvent(event)
+        key_name = self.KEY_MAP.get(event.key())
+        if key_name is not None and self.core.handle_key(key_name):
+            self._refresh_view()
+            event.accept()
             return
+        super().keyPressEvent(event)
 
-        parsed = self._parse_text()
-        if not parsed:
-            super().keyPressEvent(event)
-            return
+    def mousePressEvent(self, event):
+        handled = self.core.handle_click()
+        super().mousePressEvent(event)
+        if handled:
+            self._refresh_view()
 
-        full_text = self.text()
-        num_str = parsed["num_str"]
-        sign_offset = 1 if num_str.startswith(("-", "+")) else 0
-        digits = num_str[sign_offset:]
-        dot_idx = digits.find(".")
-
-        start_idx = full_text.find(num_str)
-        if start_idx < 0:
-            super().keyPressEvent(event)
-            return
-        cursor = self.cursorPosition()
-        rel = max(0, min(len(num_str) - 1, cursor - start_idx))
-
-        if num_str[rel] in "+-":
-            rel = min(len(num_str) - 1, rel + 1)
-        if num_str[rel] == ".":
-            rel = min(len(num_str) - 1, rel + 1)
-
-        rel_no_sign = max(0, rel - sign_offset)
-        if dot_idx >= 0:
-            if rel_no_sign < dot_idx:
-                power = dot_idx - rel_no_sign - 1
-            elif rel_no_sign > dot_idx:
-                power = -(rel_no_sign - dot_idx)
-            else:
-                power = 0
-        else:
-            power = len(digits) - rel_no_sign - 1
-
-        step = Decimal(10) ** Decimal(power)
-        if event.key() == Qt.Key_Down:
-            step = -step
-
-        new_num = parsed["num"] + step
-        display = self._format_display(new_num)
-        self.setText(display)
-        self.setCursorPosition(max(0, min(len(display), cursor)))
-
-        event.accept()
+    def focusOutEvent(self, event):
+        if self.core.state == self.core.CHANGED:
+            self.core.store()
+        elif self.core.state == self.core.ROLLING:
+            self.core.exit_roll(report=False)
+        self._refresh_view()
+        super().focusOutEvent(event)
 
 class ParamDialog(QDialog):
     def __init__(self, schema: list[dict], values: dict, parent = None, apply_callback = None):
@@ -172,50 +240,20 @@ class ParamDialog(QDialog):
                 continue
 
             if ftype == "int":
-                value = int(values.get(key, field.get("default", 0)))
-                edit = QuantityLineEdit(value=value, unit=field.get("unit", ""), decimals=0)
-                prefix_box = QComboBox()
-                for p in ["", "m", "u", "n", "p", "f", "a", "k", "M", "G", "T"]:
-                    prefix_box.addItem(p if p else "(base)", p)
-                prefix_box.setCurrentIndex(0)
-                unit_text = field.get("unit", "")
-                unit_label = QLabel(unit_text)
-                unit_label.setMinimumWidth(36)
-                w = QWidget()
-                w_layout = QHBoxLayout(w)
-                w_layout.setContentsMargins(0, 0, 0, 0)
-                w_layout.addWidget(edit)
-                w_layout.addWidget(prefix_box)
-                w_layout.addWidget(unit_label)
+                w = QuantityLineEdit(value=int(values.get(key, field.get("default", 0))), field=field)
+                self._editors[key] = ("int_qty", w)
             elif ftype == "float":
-                value = float(values.get(key, field.get("default", 0.0)))
-                edit = QuantityLineEdit(value=value, unit=field.get("unit", ""), decimals=field.get("decimals", 6))
-                prefix_box = QComboBox()
-                for p in ["", "m", "u", "n", "p", "f", "a", "k", "M", "G", "T"]:
-                    prefix_box.addItem(p if p else "(base)", p)
-                prefix_box.setCurrentIndex(0)
-                unit_text = field.get("unit", "")
-                unit_label = QLabel(unit_text)
-                unit_label.setMinimumWidth(36)
-                w = QWidget()
-                w_layout = QHBoxLayout(w)
-                w_layout.setContentsMargins(0, 0, 0, 0)
-                w_layout.addWidget(edit)
-                w_layout.addWidget(prefix_box)
-                w_layout.addWidget(unit_label)
+                w = QuantityLineEdit(value=float(values.get(key, field.get("default", 0.0))), field=field)
+                self._editors[key] = ("float_qty", w)
             elif ftype == "bool":
                 w = QCheckBox()
                 w.setChecked(bool(values.get(key, field.get("default", False))))
+                self._editors[key] = (ftype, w)
             else:
                 w = QLineEdit()
                 w.setText(str(values.get(key, field.get("default", ""))))
-            
-            if ftype == "int":
-                self._editors[key] = ("int_qty", (edit, prefix_box))
-            elif ftype == "float":
-                self._editors[key] = ("float_qty", (edit, prefix_box))
-            else:
                 self._editors[key] = (ftype, w)
+
             self._batch_keys.append(key)
             layout.addRow(label, w)
 
@@ -231,33 +269,28 @@ class ParamDialog(QDialog):
         max_v = field.get("max", None)
 
         if ftype == "int_qty":
-            edit, prefix_box = w
-            si = edit.value_si()
+            si = w.quantity_value()
             if si is None:
-                raise ValueError("输入格式无效，请使用数字+可选前缀（m/u/n/p/f/a/k/M/G/T）")
-            prefix = prefix_box.currentData() if isinstance(prefix_box.currentData(), str) else ""
-            si = si * QuantityLineEdit.PREFIX_MAP.get(prefix, Decimal("1"))
-            if si != si.to_integral_value():
-                raise ValueError("整型参数经单位换算后必须是整数，请调整数值或前缀")
-            value = int(si)
+                raise ValueError("Invalid quantity input")
+            integer_value = Decimal(str(si))
+            if integer_value != integer_value.to_integral_value():
+                raise ValueError("Integer parameter requires an integer value")
+            value = int(integer_value)
             if min_v is not None and value < min_v:
-                raise ValueError(f"参数值小于最小值 {min_v}")
+                raise ValueError(f"Value is below minimum {min_v}")
             if max_v is not None and value > max_v:
-                raise ValueError(f"参数值大于最大值 {max_v}")
+                raise ValueError(f"Value is above maximum {max_v}")
             return value
 
         if ftype == "float_qty":
-            edit, prefix_box = w
-            si = edit.value_si()
+            si = w.quantity_value()
             if si is None:
-                raise ValueError("输入格式无效，请使用数字+可选前缀（m/u/n/p/f/a/k/M/G/T）")
-            prefix = prefix_box.currentData() if isinstance(prefix_box.currentData(), str) else ""
-            si = si * QuantityLineEdit.PREFIX_MAP.get(prefix, Decimal("1"))
+                raise ValueError("Invalid quantity input")
             value = float(si)
             if min_v is not None and value < min_v:
-                raise ValueError(f"参数值小于最小值 {min_v}")
+                raise ValueError(f"Value is below minimum {min_v}")
             if max_v is not None and value > max_v:
-                raise ValueError(f"参数值大于最大值 {max_v}")
+                raise ValueError(f"Value is above maximum {max_v}")
             return value
 
         if ftype == "bool":
@@ -266,10 +299,6 @@ class ParamDialog(QDialog):
             return bool(w.isChecked())
         if ftype == "flip_pulse":
             return None
-        if ftype == "int":
-            return int(w.value())
-        if ftype == "float":
-            return float(w.value())
         return w.text()
 
     def _set_toggle_button_text(self, button: QPushButton, label: str, checked: bool):
@@ -285,7 +314,6 @@ class ParamDialog(QDialog):
     def _apply_pulse_field(self, key: str):
         if not self._apply_callback:
             return
-        # Pulse style: click triggers a one-shot action.
         self._apply_callback({key: None})
 
     def _apply_field(self, key: str) -> None:
@@ -317,7 +345,6 @@ class ParamDialog(QDialog):
             except Exception:
                 continue
         return out
-
 
 class SpecialMethodDialog(QDialog):
     def __init__(self, methods: list[dict], parent=None, apply_callback=None, initial_values=None):
@@ -374,14 +401,9 @@ class SpecialMethodDialog(QDialog):
             init_value = method_initials.get(key, field.get("default"))
 
             if ftype == "int":
-                w = QSpinBox()
-                w.setRange(field.get("min", -10**9), field.get("max", 10**9))
-                w.setValue(int(init_value if init_value is not None else 0))
+                w = QuantityLineEdit(value=int(init_value if init_value is not None else 0), field=field)
             elif ftype == "float":
-                w = QDoubleSpinBox()
-                w.setDecimals(field.get("decimals", 6))
-                w.setRange(field.get("min", -1e18), field.get("max", 1e18))
-                w.setValue(float(init_value if init_value is not None else 0.0))
+                w = QuantityLineEdit(value=float(init_value if init_value is not None else 0.0), field=field)
             elif ftype == "choice":
                 w = QComboBox()
                 for option in field.get("options", []):
@@ -405,9 +427,18 @@ class SpecialMethodDialog(QDialog):
         args = {}
         for key, (ftype, w) in self._param_editors.items():
             if ftype == "int":
-                args[key] = int(w.value())
+                si = w.quantity_value()
+                if si is None:
+                    raise ValueError(f"Invalid value for {key}")
+                integer_value = Decimal(str(si))
+                if integer_value != integer_value.to_integral_value():
+                    raise ValueError(f"Integer parameter {key} requires an integer value")
+                args[key] = int(integer_value)
             elif ftype == "float":
-                args[key] = float(w.value())
+                si = w.quantity_value()
+                if si is None:
+                    raise ValueError(f"Invalid value for {key}")
+                args[key] = float(si)
             elif ftype == "choice":
                 args[key] = w.currentData()
             else:
@@ -1362,9 +1393,9 @@ class ModuleFIRFilter(NodeItem):
                 "name": "design_lowpass",
                 "label": "低通滤波器设计",
                 "params": [
-                    {"key": "freq_pass", "label": "通带截止频率(Hz)", "type": "float", "min": 0.0, "max": 1e12, "default": 1e6, "decimals": 3},
-                    {"key": "freq_stop", "label": "阻带截止频率(Hz)", "type": "float", "min": 0.0, "max": 1e12, "default": 10e6, "decimals": 3},
-                    {"key": "freq_sample", "label": "采样频率(Hz)", "type": "float", "min": 1.0, "max": 1e12, "default": 250e6, "decimals": 3},
+                    {"key": "freq_pass", "label": "通带截止频率(Hz)", "type": "float", "min": 0.0, "max": 1e12, "default": 1e6, "decimals": 3, "unit": "Hz"},
+                    {"key": "freq_stop", "label": "阻带截止频率(Hz)", "type": "float", "min": 0.0, "max": 1e12, "default": 10e6, "decimals": 3, "unit": "Hz"},
+                    {"key": "freq_sample", "label": "采样频率(Hz)", "type": "float", "min": 1.0, "max": 1e12, "default": 250e6, "decimals": 3, "unit": "Hz"},
                     {"key": "weight", "label": "阻带权重", "type": "float", "min": 1e-6, "max": 1e6, "default": 1.0, "decimals": 6},
                     {"key": "taps", "label": "抽头数", "type": "choice", "default": 64, "options": [16, 32, 64]},
                 ],
@@ -1685,8 +1716,8 @@ class ModuleIIRFilter(NodeItem):
                 "label": "低通滤波器设计",
                 "params": [
                     {"key": "filter_type", "label": "滤波器类型", "type": "choice", "default": "butter", "options": ["butter", "ellip", "cheby1", "cheby2", "bessel"]},
-                    {"key": "freq_pass", "label": "通带截止频率(Hz)", "type": "float", "min": 0.0, "max": 1e12, "default": 1e6, "decimals": 3},
-                    {"key": "freq_sample", "label": "采样频率(Hz)", "type": "float", "min": 1.0, "max": 1e12, "default": 250e6, "decimals": 3},
+                    {"key": "freq_pass", "label": "通带截止频率(Hz)", "type": "float", "min": 0.0, "max": 1e12, "default": 1e6, "decimals": 3, "unit": "Hz"},
+                    {"key": "freq_sample", "label": "采样频率(Hz)", "type": "float", "min": 1.0, "max": 1e12, "default": 250e6, "decimals": 3, "unit": "Hz"},
                 ],
             }
         ]

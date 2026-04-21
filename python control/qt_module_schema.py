@@ -27,7 +27,7 @@ ACCM_SCHEMA = [
     {"key" : "enable_auto_reset", "label" : "自动控制使能", "type" : "bool", "mode" : "direct", "free" : False, "note" : "设为1时，模块接受其它状态机模块的开关指令。设为0时，开关指令被忽略"},
 
     # 间接参数
-    {"key" : "freq", "label" : "频率", "type" : "float", "min" : 0, "max" : 1e9, "mode" : "indirect", "free" : True, "note" : "调节慢变累加器的频率，使得快变累加器输出指定频率的锯齿波"},
+    {"key" : "freq", "label" : "频率", "type" : "float", "min" : 0, "max" : 1e9, "unit" : "Hz", "mode" : "indirect", "free" : True, "note" : "调节慢变累加器的频率，使得快变累加器输出指定频率的锯齿波"},
     {"key" : "ratio", "label" : "频率比", "type" : "int", "min" : 2**0, "max" : 2**15, "mode" : "indirect", "free" : True, "note" : "同时调节慢变累加器的频率和divisor，使得在快变累加器频率不变的前提下达到指定频率比"},
 ]
 
@@ -40,7 +40,7 @@ SCLR_SCHEMA = [
     {"key" : "enable_wrapping", "label" : "环绕使能", "type" : "bool", "mode" : "direct", "free" : True, "note" : "设为1时，输出信号无视上下限，并在达到16位物理信号最大表示范围时环绕。设为0时，输出信号受上下限限制"},
 
     # 间接参数
-    {"key" : "gain", "label" : "增益", "type" : "float", "min" : -1e6, "max" : 1e6, "mode" : "indirect", "free" : True, "note" : "调节缩放系数。若所要求系数超出范围则报错"},
+    {"key" : "gain", "label" : "增益", "type" : "float", "min" : -1e6, "max" : 1e6, "unit" : "dB", "mode" : "indirect", "free" : True, "note" : "调节缩放系数。若所要求系数超出范围则报错"},
 ]
 
 FIRF_SCHEMA = [
@@ -135,8 +135,8 @@ PDH_SCHEMA = [
     {"key" : "pc_cmd", "label" : "工作模式指令", "type" : "int", "min" : 0, "max" : 3, "mode" : "direct", "free" : True, "note" : "00:空闲/复位, 01:手动扫描, 10:自动校准, 11:自动锁定退出"},
     {"key" : "threshold_signal_locking", "label" : "手动锁定阈值", "type" : "int", "min" : -32768, "max" : 32767, "mode" : "direct", "free" : True, "note" : "物理信号。退出锁定状态的振幅阈值"},
     {"key" : "threshold_signal_scanning", "label" : "手动扫描阈值", "type" : "int", "min" : -32768, "max" : 32767, "mode" : "direct", "free" : True, "note" : "物理信号。从扫描状态切换为锁定状态的振幅阈值"},
-    {"key" : "time_duration_scanning", "label" : "手动扫描确认时间", "type" : "int", "min" : 0, "max" : 2**31 - 1, "mode" : "direct", "free" : True, "note" : "单位为时钟周期。从扫描状态切换为锁定状态的时间阈值"},
-    {"key" : "time_duration_locking", "label" : "手动锁定超时时间", "type" : "int", "min" : 0, "max" : 2**31 - 1, "mode" : "direct", "free" : True, "note" : "单位为时钟周期。退出锁定状态的时间阈值"},
+    {"key" : "time_duration_scanning", "label" : "手动扫描确认时间", "type" : "int", "min" : 0, "max" : 2**31 - 1, "unit" : "clk", "prefix" : False, "mode" : "direct", "free" : True, "note" : "单位为时钟周期。从扫描状态切换为锁定状态的时间阈值"},
+    {"key" : "time_duration_locking", "label" : "手动锁定超时时间", "type" : "int", "min" : 0, "max" : 2**31 - 1, "unit" : "clk", "prefix" : False, "mode" : "direct", "free" : True, "note" : "单位为时钟周期。退出锁定状态的时间阈值"},
     {"key" : "coef_scan", "label" : "自动扫描系数", "type" : "int", "min" : -32768, "max" : 32767, "mode" : "direct", "free" : True, "note" : "	Q1.15格式定点数。用于自动计算扫描阈值比例，32767为1.0，16384为0.5"},
     {"key" : "coef_lock", "label" : "自动锁定系数", "type" : "int", "min" : -32768, "max" : 32767, "mode" : "direct", "free" : True, "note" : "	Q1.15格式定点数。用于自动计算锁定阈值比例，同上"}    
 ]
