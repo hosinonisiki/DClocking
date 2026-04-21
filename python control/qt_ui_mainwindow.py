@@ -1,5 +1,6 @@
 import json
 import sys
+import math
 from collections import deque
 from datetime import datetime
 
@@ -790,17 +791,103 @@ class MainWindow(QMainWindow):
             return "SCLO", node.index
         return None, None
 
+    def _compute_linked_params_local(self, module_type, current_params, delta_params):
+        merged = dict(current_params or {})
+        merged.update(delta_params or {})
+
+        if module_type == "SCLR":
+            if "gain" in (delta_params or {}):
+                current_scale = int(merged.get("scale", 0))
+                sign = -1 if current_scale < 0 else 1
+                target_scale = int(sign * round((2 ** 16) * (10 ** (float(merged["gain"]) / 20.0))))
+                merged["scale"] = target_scale
+
+            scale = int(merged.get("scale", 0))
+            merged["gain"] = float("-inf") if scale == 0 else 20.0 * math.log10(abs(scale) / (2 ** 16))
+            return merged
+
+        if module_type == "PID":
+            fs_i = 125000000.0
+            fs_d = 250000000.0
+
+            if "overall_gain" in (delta_params or {}):
+                target_gain_p = int(round((2 ** 16) * (10 ** (float(merged["overall_gain"]) / 20.0))))
+                current_gain_p = int(merged.get("gain_p", 0))
+                current_gain_i = int(merged.get("gain_i", 0))
+                current_gain_d = int(merged.get("gain_d", 0))
+                merged["gain_p"] = target_gain_p
+                if current_gain_p != 0:
+                    scale_factor = abs(target_gain_p / current_gain_p)
+                    merged["gain_i"] = int(round(current_gain_i * scale_factor))
+                    merged["gain_d"] = int(round(current_gain_d * scale_factor))
+
+            if "pi_corner" in (delta_params or {}):
+                gain_p = int(merged.get("gain_p", 0))
+                merged["gain_i"] = int(round(gain_p * float(merged["pi_corner"]) * 2.0 * math.pi / fs_i * (2 ** 16)))
+
+            if "pd_corner" in (delta_params or {}):
+                pd_corner = float(merged.get("pd_corner", 0.0))
+                if pd_corner != 0.0:
+                    gain_p = int(merged.get("gain_p", 0))
+                    merged["gain_d"] = int(round(gain_p * fs_d / (pd_corner * 2.0 * math.pi)))
+
+            if "saturation_gain" in (delta_params or {}):
+                gain_i = int(merged.get("gain_i", 0))
+                if gain_i != 0:
+                    log_target = int(round(math.log2((10 ** (float(merged["saturation_gain"]) / 20.0)) * (2 ** 32) / (abs(gain_i) * 256.0))))
+                    if log_target <= -1:
+                        merged["leak_digit"] = 1
+                    elif log_target >= 32:
+                        merged["leak_digit"] = 0
+                    else:
+                        merged["leak_digit"] = 2 ** log_target
+
+            if "saturation_turning_frequency" in (delta_params or {}):
+                turning = float(merged.get("saturation_turning_frequency", 0.0))
+                if turning == 0.0:
+                    merged["leak_digit"] = 0
+                else:
+                    log_target = int(round(math.log2(fs_i / (turning * 2.0 * math.pi * 256.0))))
+                    if log_target <= -1:
+                        merged["leak_digit"] = 1
+                    elif log_target >= 32:
+                        merged["leak_digit"] = 0
+                    else:
+                        merged["leak_digit"] = 2 ** log_target
+
+            gain_p = int(merged.get("gain_p", 0))
+            gain_i = int(merged.get("gain_i", 0))
+            gain_d = int(merged.get("gain_d", 0))
+            leak_digit = int(merged.get("leak_digit", 0))
+
+            merged["overall_gain"] = float("-inf") if gain_p == 0 else 20.0 * math.log10(abs(gain_p) / (2 ** 16))
+            merged["pi_corner"] = float("inf") if gain_p == 0 else abs(gain_i / gain_p) * fs_i / (2.0 * math.pi * (2 ** 16))
+            merged["pd_corner"] = float("inf") if gain_d == 0 else abs(gain_p / gain_d) * fs_d / (2.0 * math.pi)
+
+            if gain_i != 0:
+                merged["saturation_gain"] = float("inf") if leak_digit == 0 else 20.0 * math.log10(abs(gain_i) * leak_digit * 256.0 / (2 ** 32))
+            merged["saturation_turning_frequency"] = 0.0 if leak_digit == 0 else fs_i / (leak_digit * 256.0 * 2.0 * math.pi)
+
+            return merged
+
+        return merged
+
     def _apply_param_to_hardware(self, node, params):
         module_type, module_index = self._resolve_module_identity(node)
         if module_type is None:
-            return
+            return None
+        local_linked = self._compute_linked_params_local(
+            module_type,
+            node.get_params() if hasattr(node, "get_params") else {},
+            params,
+        )
         try:
             if isinstance(params, dict) and "__special_method__" in params:
                 method_name = params.get("__special_method__")
                 method_args = params.get("args", {})
                 self.port_ctrl.send_special_method(module_type, module_index, method_name, method_args)
                 print(f"[method] sent {node.name}.{method_name}({method_args})")
-                return
+                return None
 
             schema_fields = node.param_schema() if hasattr(node, "param_schema") else []
             schema_map = {field.get("key"): field for field in schema_fields if isinstance(field, dict) and field.get("key")}
@@ -830,8 +917,20 @@ class MainWindow(QMainWindow):
                 self.port_ctrl.send_param(module_type, module_index, regular_params)
                 for key, value in regular_params.items():
                     print(f"[param] sent {node.name}.{key} = {value}")
+
+            # Read back all schema fields so linked direct/indirect params stay in sync in UI.
+            schema_fields = node.param_schema() if hasattr(node, "param_schema") else []
+            refreshed_params = self.port_ctrl.query_module_params(module_type, module_index, schema_fields)
+            merged_params = dict(local_linked)
+            merged_params.update(refreshed_params)
+            if hasattr(node, "_params") and isinstance(node._params, dict):
+                node._params.update(merged_params)
+            return merged_params
         except Exception as exc:
             print(f"[param] failed {node.name}: {exc}")
+            if hasattr(node, "_params") and isinstance(node._params, dict):
+                node._params.update(local_linked)
+            return local_linked
 
     def _port_to_ref(self, port):
         if isinstance(port, BorderPort):

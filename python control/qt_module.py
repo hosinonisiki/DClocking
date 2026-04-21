@@ -26,7 +26,8 @@ def set_param_open_handler(handler):
 
 def _dispatch_param_apply(node, params):
     if _PARAM_APPLY_HANDLER:
-        _PARAM_APPLY_HANDLER(node, params)
+        return _PARAM_APPLY_HANDLER(node, params)
+    return None
 
 def _dispatch_param_open(node):
     if _PARAM_OPEN_HANDLER:
@@ -268,7 +269,12 @@ class ParamDialog(QDialog):
         if key not in self._committed_values or key not in self._editors:
             return
 
-        value = self._committed_values[key]
+        self._set_editor_value(key, self._committed_values[key])
+
+    def _set_editor_value(self, key: str, value) -> None:
+        if key not in self._editors:
+            return
+
         ftype, w = self._editors[key]
 
         if ftype == "int_qty":
@@ -309,6 +315,15 @@ class ParamDialog(QDialog):
             return
 
         w.setText("" if value is None else str(value))
+
+    def _sync_from_applied_values(self, values: dict) -> None:
+        if not isinstance(values, dict):
+            return
+        for key, value in values.items():
+            if key not in self._editors:
+                continue
+            self._committed_values[key] = value
+            self._set_editor_value(key, value)
 
     def _value_from_editor(self, key: str):
         ftype, w = self._editors[key]
@@ -366,22 +381,25 @@ class ParamDialog(QDialog):
         self._set_toggle_button_text(button, label, checked)
         if not self._apply_callback:
             return
-        self._apply_callback({key: bool(checked)})
+        applied_values = self._apply_callback({key: bool(checked)})
         self._committed_values[key] = bool(checked)
+        self._sync_from_applied_values(applied_values)
 
     def _apply_pulse_field(self, key: str):
         if not self._apply_callback:
             return
         # Pulse style: click triggers a one-shot action.
-        self._apply_callback({key: None})
+        applied_values = self._apply_callback({key: None})
+        self._sync_from_applied_values(applied_values)
 
     def _apply_field(self, key: str) -> bool:
         if not self._apply_callback:
             return False
         try:
             value = self._value_from_editor(key)
-            self._apply_callback({key: value})
+            applied_values = self._apply_callback({key: value})
             self._committed_values[key] = value
+            self._sync_from_applied_values(applied_values)
             return True
         except Exception as exc:
             QMessageBox.warning(self, "参数错误", str(exc))
@@ -395,8 +413,9 @@ class ParamDialog(QDialog):
             for key in self._batch_keys:
                 payload[key] = self._value_from_editor(key)
             if payload:
-                self._apply_callback(payload)
+                applied_values = self._apply_callback(payload)
                 self._committed_values.update(payload)
+                self._sync_from_applied_values(applied_values)
         except Exception as exc:
             QMessageBox.warning(self, "参数错误", str(exc))
 
@@ -831,9 +850,10 @@ class NodeItem(QGraphicsItem):
             self._special_method_args[method_name] = dict(args or {})
         self._notify_param_change({"__special_method__": method_name, "args": args})
 
-    def _notify_param_change(self, params: dict) -> None:
+    def _notify_param_change(self, params: dict):
         if params:
-            _dispatch_param_apply(self, params)
+            return _dispatch_param_apply(self, params)
+        return None
 
     def open_param_dialog(self):
         schema = self.param_schema()
@@ -1007,12 +1027,15 @@ class ModulePID(NodeItem):
             params[key] = self._params.get(key, self._default_for_field(field))
         return params
 
-    def set_params(self, params: dict) -> None:
+    def set_params(self, params: dict) -> dict:
         if not params:
-            return
+            return self.get_params()
         for key, value in params.items():
             self._params[key] = value
-        self._notify_param_change(params)
+        applied_values = self._notify_param_change(params)
+        if isinstance(applied_values, dict):
+            self._params.update(applied_values)
+        return self.get_params()
 
 class ModuleAccumulator(NodeItem):
     def __init__(self, component_name, index, position, num_inputs = 5, num_outputs = 2):
@@ -1337,12 +1360,15 @@ class ModuleScaler(NodeItem):
             params[key] = self._params.get(key, self._default_for_field(field))
         return params
 
-    def set_params(self, params: dict) -> None:
+    def set_params(self, params: dict) -> dict:
         if not params:
-            return
+            return self.get_params()
         for key, value in params.items():
             self._params[key] = value
-        self._notify_param_change(params)
+        applied_values = self._notify_param_change(params)
+        if isinstance(applied_values, dict):
+            self._params.update(applied_values)
+        return self.get_params()
 
 class ModuleFIRFilter(NodeItem):
     def __init__(self, component_name, index, position, num_inputs = 1, num_outputs = 1):
