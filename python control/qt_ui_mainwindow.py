@@ -738,6 +738,29 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             print(f"[route] failed: {label}: {exc}")
 
+    def _clear_all_routes(self):
+        hw_controller = getattr(self.port_ctrl, "hw_controller", None)
+        router = getattr(hw_controller, "router", None) if hw_controller is not None else None
+        if router is None:
+            return
+
+        try:
+            for dst_port_num in range(128):
+                src_port_num = pn.VOID_BOOL if dst_port_num >= 64 else pn.VOID
+                router.set_routing(dst_port_num, src_port_num)
+
+            if self.port_ctrl.is_open():
+                router.upload()
+                print("[route] cleared all routes in hardware")
+            else:
+                print("[route] cleared all routes in local cache (serial not open)")
+        except Exception as exc:
+            print(f"[route] failed to clear all routes: {exc}")
+
+    def _disconnect_all_connections(self):
+        # 仅负责断开底层连线（硬件/缓存路由），避免与画布清理耦合。
+        self._clear_all_routes()
+
     def _resolve_module_identity(self, node):
         if isinstance(node, ModulePID):
             return "PID", node.index
@@ -879,12 +902,43 @@ class MainWindow(QMainWindow):
                 return node.in_ports[idx]
         return None
 
-    def _clear_canvas(self):
+    def _clear_canvas(self, emit_connection_removed: bool = False):
         self._clear_param_panels()
+        self._route_queue.clear()
+        self._route_sending = False
 
+        existing_edges = [item for item in list(self.scene.items()) if isinstance(item, EdgeItem)]
+
+        if emit_connection_removed:
+            for edge in existing_edges:
+                start_port = getattr(edge, "start_port", None)
+                end_port = getattr(edge, "end_port", None)
+                if start_port is None or end_port is None:
+                    continue
+                src_name = start_port.parent_node.name if hasattr(start_port, "parent_node") and start_port.parent_node else start_port.name
+                dst_name = end_port.parent_node.name if hasattr(end_port, "parent_node") and end_port.parent_node else end_port.name
+                self.signals.connection_removed.emit(src_name, int(start_port.index), dst_name, int(end_port.index))
+
+        for edge in existing_edges:
+            edge.remove()
+
+        # Defensive cleanup: clear all remaining connection refs to avoid invisible ghost edges.
         for item in list(self.scene.items()):
-            if isinstance(item, EdgeItem):
-                item.remove()
+            if not isinstance(item, NodeItem):
+                continue
+            for port in list(getattr(item, "in_ports", [])) + list(getattr(item, "out_ports", [])):
+                if hasattr(port, "connections") and isinstance(port.connections, list):
+                    port.connections.clear()
+            if hasattr(item, "edges") and isinstance(item.edges, list):
+                item.edges.clear()
+
+        for border_port in list(getattr(self.scene, "left_ports", [])) + list(getattr(self.scene, "right_ports", [])):
+            if hasattr(border_port, "connections") and isinstance(border_port.connections, list):
+                border_port.connections.clear()
+
+        for const_port in list(getattr(self.scene, "constant_out_ports", [])):
+            if hasattr(const_port, "connections") and isinstance(const_port.connections, list):
+                const_port.connections.clear()
 
         for item in list(self.scene.items()):
             if isinstance(item, NodeItem):
@@ -898,7 +952,8 @@ class MainWindow(QMainWindow):
         reply = QMessageBox.question(self, '清空画布', '确定要清空所有模块和连线吗？', 
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
-            self._clear_canvas()
+            self._disconnect_all_connections()
+            self._clear_canvas(emit_connection_removed=True)
 
     def _build_config_dict(self):
         nodes = []
@@ -1022,7 +1077,8 @@ class MainWindow(QMainWindow):
             print("[config] invalid format: nodes/edges must be list")
             return
 
-        self._clear_canvas()
+        self._disconnect_all_connections()
+        self._clear_canvas(emit_connection_removed=True)
 
         mode = config.get("mode")
         if isinstance(mode, str) and mode in ["Free Mode", "Developer Mode"]:
