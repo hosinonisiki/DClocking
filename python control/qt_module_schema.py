@@ -3,9 +3,9 @@ PID_SCHEMA = [
     {"key" : "gain_p", "label" : "P通道增益系数", "type" : "int", "min" : -(2**23), "max" : 2**23 - 1, "mode" : "direct", "free" : True, "note" : "线性增益系数。取对数后才可转换为分贝值。可通过间接参数直接设定分贝值"},
     {"key" : "gain_i", "label" : "I通道增益系数", "type" : "int", "min" : -(2**23), "max" : 2**23 - 1, "mode" : "direct", "free" : True, "note" : "线性增益系数。取对数后才可转换为分贝值。可通过间接参数直接设定分贝值"},
     {"key" : "gain_d", "label" : "D通道增益系数", "type" : "int", "min" : -(2**23), "max" : 2**23 - 1, "mode" : "direct", "free" : True, "note" : "线性增益系数。取对数后才可转换为分贝值。可通过间接参数直接设定分贝值"},
-    {"key" : "setpoint", "label" : "设定值", "type" : "int", "min" : -32768, "max" : 32767, "mode" : "direct", "free" : True, "note" : "物理信号"},
-    {"key" : "limit_integral", "label" : "积分限幅值", "type" : "int", "min" : 0, "max" : 32767, "mode" : "direct", "free" : True, "note" : "物理信号"},
-    {"key" : "limit_sum", "label" : "输出限幅值", "type" : "int", "min" : 0, "max" : 32767, "mode" : "direct", "free" : True, "note" : "物理信号"},
+    {"key" : "setpoint", "label" : "设定值", "type" : "int", "min" : -32768, "max" : 32767, "display_voltage" : True, "mode" : "direct", "free" : True, "note" : "物理信号"},
+    {"key" : "limit_integral", "label" : "积分限幅值", "type" : "int", "min" : 0, "max" : 32767, "display_voltage" : True, "mode" : "direct", "free" : True, "note" : "物理信号"},
+    {"key" : "limit_sum", "label" : "输出限幅值", "type" : "int", "min" : 0, "max" : 32767, "display_voltage" : True, "mode" : "direct", "free" : True, "note" : "物理信号"},
     {"key" : "leak_digit", "label" : "积分泄露控制参数", "type" : "int", "min" : 0, "max" : 2**23, "mode" : "direct", "free" : False, "note" : "仅推荐通过间接参数修改"},
     {"key" : "enable_auto_reset", "label" : "自动控制使能", "type" : "bool", "mode" : "direct", "free" : True, "note" : "设为1时，模块接受其它状态机模块的开关指令。设为0时，开关指令被忽略"},
 
@@ -20,7 +20,7 @@ PID_SCHEMA = [
 ACCM_SCHEMA = [
     # 直接参数
     {"key" : "low", "label" : "每周期慢变累加值低32位", "mode" : "direct", "free" : False, "note" : "与high组成64位累加值"},
-    {"key" : "hign", "label" : "每周期慢变累加值高32位", "mode" : "direct", "free" : False, "note" : "仅推荐通过间接参数修改"},
+    {"key" : "high", "label" : "每周期慢变累加值高32位", "mode" : "direct", "free" : False, "note" : "仅推荐通过间接参数修改"},
     {"key" : "divisor", "label" : "快变累加值与慢变累加值的频率之比", "mode" : "direct", "free" : False, "note" : "仅接受2的幂次，从高位起依次检测每位是否为1。仅推荐通过间接参数修改"},
     {"key" : "lf_kp", "label" : "环路滤波器P通道增益系数", "type" : "int", "min" : -(2**23), "max" : 2**23 - 1, "mode" : "direct", "free" : False, "note" : "线性增益系数。取对数后才可转换为分贝值。涉及锁相环性能，不推荐修改"},
     {"key" : "lf_ki", "label" : "环路滤波器I通道增益系数", "type" : "int", "min" : -(2**23), "max" : 2**23 - 1, "mode" : "direct", "free" : False, "note" : "线性增益系数。取对数后才可转换为分贝值。涉及锁相环性能，不推荐修改"},
@@ -34,9 +34,9 @@ ACCM_SCHEMA = [
 SCLR_SCHEMA = [
     # 直接参数
     {"key" : "scale", "label" : "缩放系数", "type" : "int", "min" : -(2**23), "max" : 2**23 - 1, "mode" : "direct", "free" : True, "note" : "线性增益系数。取对数后才可转换为分贝值。可通过间接参数直接设定分贝值"},
-    {"key" : "bias", "label" : "偏置量", "type" : "int", "min" : -32768, "max" : 32767, "mode" : "direct", "free" : True, "note" : "物理信号"},
-    {"key" : "upper_limit", "label" : "输出上限", "type" : "int", "min" : -32768, "max" : 32767, "mode" : "direct", "free" : True, "note" : "物理信号"},
-    {"key" : "lower_limit", "label" : "输出下限", "type" : "int", "min" : -32768, "max" : 32767, "mode" : "direct", "free" : True, "note" : "物理信号"},
+    {"key" : "bias", "label" : "偏置量", "type" : "int", "min" : -32768, "max" : 32767, "display_voltage" : True, "mode" : "direct", "free" : True, "note" : "物理信号"},
+    {"key" : "upper_limit", "label" : "输出上限", "type" : "int", "min" : -32768, "max" : 32767, "display_voltage" : True, "mode" : "direct", "free" : True, "note" : "物理信号"},
+    {"key" : "lower_limit", "label" : "输出下限", "type" : "int", "min" : -32768, "max" : 32767, "display_voltage" : True, "mode" : "direct", "free" : True, "note" : "物理信号"},
     {"key" : "enable_wrapping", "label" : "环绕使能", "type" : "bool", "mode" : "direct", "free" : True, "note" : "设为1时，输出信号无视上下限，并在达到16位物理信号最大表示范围时环绕。设为0时，输出信号受上下限限制"},
 
     # 间接参数
@@ -133,10 +133,10 @@ LTRN_SCHEMA = [
 PDH_SCHEMA = [
     # 直接参数
     {"key" : "pc_cmd", "label" : "工作模式指令", "type" : "int", "min" : 0, "max" : 3, "mode" : "direct", "free" : True, "note" : "00:空闲/复位, 01:手动扫描, 10:自动校准, 11:自动锁定退出"},
-    {"key" : "threshold_signal_locking", "label" : "手动锁定阈值", "type" : "int", "min" : -32768, "max" : 32767, "mode" : "direct", "free" : True, "note" : "物理信号。退出锁定状态的振幅阈值"},
-    {"key" : "threshold_signal_scanning", "label" : "手动扫描阈值", "type" : "int", "min" : -32768, "max" : 32767, "mode" : "direct", "free" : True, "note" : "物理信号。从扫描状态切换为锁定状态的振幅阈值"},
-    {"key" : "time_duration_scanning", "label" : "手动扫描确认时间", "type" : "int", "min" : 0, "max" : 2**31 - 1, "unit" : "clk", "prefix" : False, "mode" : "direct", "free" : True, "note" : "单位为时钟周期。从扫描状态切换为锁定状态的时间阈值"},
-    {"key" : "time_duration_locking", "label" : "手动锁定超时时间", "type" : "int", "min" : 0, "max" : 2**31 - 1, "unit" : "clk", "prefix" : False, "mode" : "direct", "free" : True, "note" : "单位为时钟周期。退出锁定状态的时间阈值"},
+    {"key" : "threshold_signal_lock", "label" : "手动锁定阈值", "type" : "int", "min" : -32768, "max" : 32767, "display_voltage" : True, "mode" : "direct", "free" : True, "note" : "物理信号。退出锁定状态的振幅阈值"},
+    {"key" : "threshold_signal_scan", "label" : "手动扫描阈值", "type" : "int", "min" : -32768, "max" : 32767, "display_voltage" : True, "mode" : "direct", "free" : True, "note" : "物理信号。从扫描状态切换为锁定状态的振幅阈值"},
+    {"key" : "time_scan", "label" : "手动扫描确认时间", "type" : "int", "min" : 0, "max" : 2**31 - 1, "unit" : "clk", "prefix" : False, "mode" : "direct", "free" : True, "note" : "单位为时钟周期。从扫描状态切换为锁定状态的时间阈值"},
+    {"key" : "time_lock", "label" : "手动锁定超时时间", "type" : "int", "min" : 0, "max" : 2**31 - 1, "unit" : "clk", "prefix" : False, "mode" : "direct", "free" : True, "note" : "单位为时钟周期。退出锁定状态的时间阈值"},
     {"key" : "coef_scan", "label" : "自动扫描系数", "type" : "int", "min" : -32768, "max" : 32767, "mode" : "direct", "free" : True, "note" : "	Q1.15格式定点数。用于自动计算扫描阈值比例，32767为1.0，16384为0.5"},
     {"key" : "coef_lock", "label" : "自动锁定系数", "type" : "int", "min" : -32768, "max" : 32767, "mode" : "direct", "free" : True, "note" : "	Q1.15格式定点数。用于自动计算锁定阈值比例，同上"}    
 ]

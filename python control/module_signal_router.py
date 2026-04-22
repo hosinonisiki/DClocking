@@ -71,7 +71,6 @@ class ModuleSignalRouter(module.ModuleBase):
         for i in range(31, 0, -1):
             # if True:
             if self.bits[i * 32: (i + 1) * 32] != self.last_bits[i * 32: (i + 1) * 32]:
-                print(f"diff {i}, old: {self.last_bits[i * 32: (i + 1) * 32]}, new: {self.bits[i * 32: (i + 1) * 32]}")
                 self.write((31 - i), int(self.bits[i * 32: (i + 1) * 32], 2), hold = True)
         self.write(31, int(self.bits[0:32], 2), hold = False) # Flush at the end
         self.last_bits = self.bits

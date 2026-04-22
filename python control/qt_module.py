@@ -10,12 +10,13 @@ from PySide6.QtCore import Qt, QMimeData, QPointF, QRectF, Signal, QObject, QByt
 from PySide6.QtGui import QDrag, QPainter, QPen, QBrush, QPainterPath, QColor, QFont, QPixmap, QImage, QCursor
 import math
 import re
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
 from qt_module_schema import PID_SCHEMA, ACCM_SCHEMA, SCLR_SCHEMA, FIRF_SCHEMA, LTRN_SCHEMA, PDH_SCHEMA, SCLO_SCHEMA, IIR_SCHEMA
 from quantity_entry_core import QuantityEntryCore, QuantityFormat
 
 _PARAM_APPLY_HANDLER = None
 _PARAM_OPEN_HANDLER = None
+_CACHE_MISSING = object()
 
 def set_param_apply_handler(handler):
     global _PARAM_APPLY_HANDLER
@@ -54,12 +55,16 @@ class QuantityLineEdit(QLineEdit):
         Qt.Key_Down: "Down",
     }
     PREFIX_UNITS = {"Hz", "V", "s", "A", "W"}
+    SIGNED_16BIT_FULL_SCALE = Decimal("32768")
+    SIGNED_16BIT_DISPLAY_FULL_SCALE = Decimal("5")
 
-    def __init__(self, value=0, field=None, parent=None, report_callback=None):
+    def __init__(self, value=0, field=None, parent=None, report_callback=None, roll_finished_callback=None):
         super().__init__(parent)
         self._field = dict(field or {})
         self._syncing = False
         self._report_callback = report_callback
+        self._roll_finished_callback = roll_finished_callback
+        self._deferred_external_value = None
         self._format = self._build_format(self._field)
         self.core = QuantityEntryCore(
             formater=self._format,
@@ -72,6 +77,8 @@ class QuantityLineEdit(QLineEdit):
 
     @staticmethod
     def _field_unit(field: dict) -> str:
+        if QuantityLineEdit._uses_voltage_display(field):
+            return "V"
         unit = field.get("unit", "")
         if unit:
             return unit
@@ -79,8 +86,14 @@ class QuantityLineEdit(QLineEdit):
         match = re.search(r"\(([^()]+)\)\s*$", label)
         return match.group(1) if match else ""
 
+    @staticmethod
+    def _uses_voltage_display(field: dict) -> bool:
+        return bool(field.get("display_voltage"))
+
     @classmethod
     def _prefix_map_for_field(cls, field: dict) -> dict[str, float]:
+        if cls._uses_voltage_display(field):
+            return {}
         prefix = field.get("prefix")
         if isinstance(prefix, dict):
             return dict(prefix)
@@ -102,6 +115,12 @@ class QuantityLineEdit(QLineEdit):
     @classmethod
     def _build_format(cls, field: dict) -> QuantityFormat:
         unit = cls._field_unit(field)
+        if cls._uses_voltage_display(field):
+            return QuantityFormat(
+                digits_limit=(1, 6, 0),
+                prefix={},
+                unit=unit,
+            )
         digits_limit = field.get("digits_limit")
         if digits_limit is not None:
             int_limit, frac_limit, min_frac = digits_limit
@@ -130,18 +149,145 @@ class QuantityLineEdit(QLineEdit):
             unit=unit,
         )
 
+    @classmethod
+    def _raw_signed_16bit_to_display_voltage(cls, value) -> Decimal:
+        raw = Decimal(str(value))
+        return raw * cls.SIGNED_16BIT_DISPLAY_FULL_SCALE / cls.SIGNED_16BIT_FULL_SCALE
+
+    @classmethod
+    def _display_voltage_to_raw_signed_16bit(cls, value) -> int:
+        raw = Decimal(str(value)) * cls.SIGNED_16BIT_FULL_SCALE / cls.SIGNED_16BIT_DISPLAY_FULL_SCALE
+        raw = raw.to_integral_value(rounding=ROUND_HALF_UP)
+        if raw < Decimal("-32768"):
+            raw = Decimal("-32768")
+        if raw > Decimal("32767"):
+            raw = Decimal("32767")
+        return int(raw)
+
+    def _display_value_from_raw(self, value):
+        if self._uses_voltage_display(self._field):
+            return self._raw_signed_16bit_to_display_voltage(value)
+        return value
+
+    def _raw_value_from_display(self, value):
+        if self._uses_voltage_display(self._field):
+            return self._display_voltage_to_raw_signed_16bit(value)
+        return value
+
     def _format_numeric_text(self, value) -> str:
-        number = Decimal(str(value))
+        frac_limit = int(self._format.digits_limit[1])
+        min_frac = int(self._format.digits_limit[2])
+
+        try:
+            number = Decimal(str(self._display_value_from_raw(value)))
+        except Exception:
+            raise ValueError(f"Invalid numeric value: {value!r}")
+
+        if not number.is_finite():
+            if number.is_nan():
+                raise ValueError("NaN is not a supported parameter value")
+            if number.is_signed():
+                return "-inf" + self._format.unit
+            return "inf" + self._format.unit
+
+        frac_limit = int(self._format.digits_limit[1])
+
+        try:
+            with localcontext() as ctx:
+                ctx.prec = max(len(number.as_tuple().digits) + frac_limit + 4, 32)
+                if frac_limit == 0:
+                    number = number.quantize(Decimal("1"))
+                else:
+                    number = number.quantize(Decimal(1).scaleb(-frac_limit))
+        except InvalidOperation:
+            raise ValueError(f"Unable to format numeric value: {value!r}")
+
+        if number == 0:
+            number = Decimal("0")
+
         text = format(number, "f")
         if "." in text:
-            text = text.rstrip("0").rstrip(".")
+            integer, fraction = text.split(".", 1)
+            fraction = fraction.rstrip("0")
+            if len(fraction) < min_frac:
+                fraction = fraction + ("0" * (min_frac - len(fraction)))
+            if fraction:
+                text = integer + "." + fraction
+            else:
+                text = integer
+        elif min_frac > 0:
+            text = text + "." + ("0" * min_frac)
+
         if text in {"", "-0"}:
-            text = "0"
+            text = "0" if min_frac == 0 else "0." + ("0" * min_frac)
         return text + self._format.unit
 
+    def _set_nonfinite_display(self, text: str, value: float) -> None:
+        self.core.text = text
+        self.core.stored = text
+        self.core.state = self.core.UNCHANGED
+        self.core.result = None
+        self.core.value = value
+        self.core.formalized = text
+        self.core.selected = None
+
     def _set_initial_value(self, value) -> None:
-        self.core.set_text(self._format_numeric_text(value), mark_changed=False)
+        text = self._format_numeric_text(value)
+        if text in {"inf" + self._format.unit, "-inf" + self._format.unit}:
+            self._set_nonfinite_display(text, float(value))
+            return
+        self.core.set_text(text, mark_changed=False)
         self.core.store()
+
+    def set_quantity_value(self, value) -> None:
+        self._deferred_external_value = None
+        self._set_initial_value(value)
+        self._refresh_view()
+
+    def defer_external_value(self, value) -> None:
+        self._deferred_external_value = value
+
+    def apply_deferred_external_value(self) -> bool:
+        if self._deferred_external_value is None:
+            return False
+        value = self._deferred_external_value
+        self._deferred_external_value = None
+        self.set_quantity_value(value)
+        return True
+
+    def should_defer_external_update(self, value) -> bool:
+        if self.core.state != self.core.ROLLING:
+            return False
+
+        current_value = self.core.get_value()
+        result = self.core.result
+        if current_value is None or result is None:
+            result, current_value, _formalized = self._format.match(self.core.get_text())
+            if result is None:
+                return False
+
+        try:
+            current_text = self._format_numeric_text(current_value)
+            external_text = self._format_numeric_text(value)
+        except Exception:
+            return False
+        if current_text == external_text:
+            return True
+
+        try:
+            prefix = result.group("prefix") or ""
+            prefix_scale = Decimal(str(self._format.prefix.get(prefix, 1)))
+            step = abs(self.core._selected_place_step() * prefix_scale)
+            tolerance = step * Decimal("0.1")
+            current_decimal = Decimal(str(current_value))
+            external_decimal = Decimal(str(self._display_value_from_raw(value)))
+        except Exception:
+            return False
+
+        if not current_decimal.is_finite() or not external_decimal.is_finite():
+            return False
+
+        return abs(external_decimal - current_decimal) <= tolerance
 
     def _set_widget_text(self, text: str) -> None:
         self._syncing = True
@@ -187,7 +333,7 @@ class QuantityLineEdit(QLineEdit):
                 if not self.core.exit_roll(report=False):
                     return None
         self._refresh_view()
-        return self.core.get_value()
+        return self._raw_value_from_display(self.core.get_value())
 
     def setEnabled(self, enabled):
         self.core.set_enabled(bool(enabled))
@@ -214,6 +360,9 @@ class QuantityLineEdit(QLineEdit):
             self.core.refresh_state()
         elif self.core.state == self.core.ROLLING:
             self.core.exit_roll(report=False)
+            applied = self.apply_deferred_external_value()
+            if self._roll_finished_callback and not applied:
+                self._roll_finished_callback()
         self._refresh_view()
         super().focusOutEvent(event)
 
@@ -223,7 +372,6 @@ class ParamDialog(QDialog):
         self.setWindowTitle("参数修改")
         self._editors = {}
         self._fields = {}
-        self._batch_keys = []
         self._apply_callback = apply_callback
         self._committed_values = {}
         self._enter_committed_keys = set()
@@ -260,6 +408,7 @@ class ParamDialog(QDialog):
                     value=int(values.get(key, field.get("default", 0))),
                     field=field,
                     report_callback=lambda k=key: self._apply_field(k, preserve_roll=True),
+                    roll_finished_callback=lambda k=key: self._apply_field(k),
                 )
                 self._editors[key] = ("int_qty", w)
             elif ftype == "float":
@@ -267,6 +416,7 @@ class ParamDialog(QDialog):
                     value=float(values.get(key, field.get("default", 0.0))),
                     field=field,
                     report_callback=lambda k=key: self._apply_field(k, preserve_roll=True),
+                    roll_finished_callback=lambda k=key: self._apply_field(k),
                 )
                 self._editors[key] = ("float_qty", w)
             elif ftype == "bool":
@@ -280,7 +430,6 @@ class ParamDialog(QDialog):
                 self._bind_text_events(key, w)
                 self._editors[key] = (ftype, w)
 
-            self._batch_keys.append(key)
             layout.addRow(label, w)
 
         for key in self._editors.keys():
@@ -288,11 +437,6 @@ class ParamDialog(QDialog):
                 self._committed_values[key] = self._value_from_editor(key)
             except Exception:
                 continue
-
-        if self._batch_keys:
-            self._confirm_all_btn = QPushButton("确认本模块参数（全部）")
-            self._confirm_all_btn.clicked.connect(self._apply_all_fields)
-            layout.addRow("", self._confirm_all_btn)
 
     def _bind_text_events(self, key: str, widget: QLineEdit) -> None:
         widget.returnPressed.connect(lambda k=key: self._apply_field_on_enter(k))
@@ -428,6 +572,42 @@ class ParamDialog(QDialog):
             except Exception:
                 continue
         return out
+
+    def set_values(self, values: dict) -> None:
+        if not isinstance(values, dict):
+            return
+
+        for key, value in values.items():
+            editor = self._editors.get(key)
+            if editor is None:
+                continue
+
+            ftype, widget = editor
+            if ftype == "bool":
+                widget.blockSignals(True)
+                widget.setChecked(bool(value))
+                widget.blockSignals(False)
+            elif ftype == "flip_toggle":
+                checked = bool(value)
+                widget.blockSignals(True)
+                widget.setChecked(checked)
+                widget.blockSignals(False)
+                label = self._fields.get(key, {}).get("label", key)
+                self._set_toggle_button_text(widget, label, checked)
+            elif ftype == "flip_pulse":
+                pass
+            elif ftype in {"int_qty", "float_qty"}:
+                if widget.should_defer_external_update(value):
+                    widget.defer_external_value(value)
+                    self._committed_values[key] = value
+                    continue
+                widget.set_quantity_value(0 if value is None else value)
+            else:
+                widget.setText("" if value is None else str(value))
+
+            self._committed_values[key] = value
+
+        self._enter_committed_keys.clear()
 
 class SpecialMethodDialog(QDialog):
     def __init__(self, methods: list[dict], parent=None, apply_callback=None, initial_values=None):
@@ -826,6 +1006,7 @@ class NodeItem(QGraphicsItem):
         self.out_ports = []
         self.edges = []
         self._special_method_args = {}
+        self._pending_cache_state = None
 
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -849,9 +1030,58 @@ class NodeItem(QGraphicsItem):
     def special_methods_schema(self) -> list[dict]:
         return []
 
+    def _stage_param_cache_update(self, params: dict) -> None:
+        if not isinstance(params, dict) or not params:
+            self._pending_cache_state = None
+            return
+        previous = {}
+        current = getattr(self, "_params", None)
+        if not isinstance(current, dict):
+            self._pending_cache_state = None
+            return
+        for key, value in params.items():
+            previous[key] = current.get(key, _CACHE_MISSING)
+            current[key] = value
+        self._pending_cache_state = ("params", previous)
+
+    def _stage_special_method_cache_update(self, method_name: str, args: dict) -> None:
+        if not method_name:
+            self._pending_cache_state = None
+            return
+        previous = self._special_method_args.get(method_name, _CACHE_MISSING)
+        self._special_method_args[method_name] = dict(args or {})
+        self._pending_cache_state = ("special_method", method_name, previous)
+
+    def _commit_pending_cache_update(self) -> None:
+        self._pending_cache_state = None
+
+    def _rollback_pending_cache_update(self) -> None:
+        pending = self._pending_cache_state
+        self._pending_cache_state = None
+        if not pending:
+            return
+        kind = pending[0]
+        if kind == "params":
+            previous = pending[1]
+            current = getattr(self, "_params", None)
+            if not isinstance(current, dict):
+                return
+            for key, old_value in previous.items():
+                if old_value is _CACHE_MISSING:
+                    current.pop(key, None)
+                else:
+                    current[key] = old_value
+            return
+        if kind == "special_method":
+            method_name = pending[1]
+            old_value = pending[2]
+            if old_value is _CACHE_MISSING:
+                self._special_method_args.pop(method_name, None)
+            else:
+                self._special_method_args[method_name] = old_value
+
     def apply_special_method(self, method_name: str, args: dict) -> None:
-        if method_name:
-            self._special_method_args[method_name] = dict(args or {})
+        self._stage_special_method_cache_update(method_name, args)
         self._notify_param_change({"__special_method__": method_name, "args": args})
 
     def _notify_param_change(self, params: dict) -> None:
@@ -1033,8 +1263,7 @@ class ModulePID(NodeItem):
     def set_params(self, params: dict) -> None:
         if not params:
             return
-        for key, value in params.items():
-            self._params[key] = value
+        self._stage_param_cache_update(params)
         self._notify_param_change(params)
 
 class ModuleAccumulator(NodeItem):
@@ -1136,8 +1365,7 @@ class ModuleAccumulator(NodeItem):
     def set_params(self, params: dict) -> None:
         if not params:
             return
-        for key, value in params.items():
-            self._params[key] = value
+        self._stage_param_cache_update(params)
         self._notify_param_change(params)
 
 class ModuleBase(NodeItem):
@@ -1363,8 +1591,7 @@ class ModuleScaler(NodeItem):
     def set_params(self, params: dict) -> None:
         if not params:
             return
-        for key, value in params.items():
-            self._params[key] = value
+        self._stage_param_cache_update(params)
         self._notify_param_change(params)
 
 class ModuleFIRFilter(NodeItem):
@@ -1466,8 +1693,7 @@ class ModuleFIRFilter(NodeItem):
     def set_params(self, params: dict) -> None:
         if not params:
             return
-        for key, value in params.items():
-            self._params[key] = value
+        self._stage_param_cache_update(params)
         self._notify_param_change(params)
 
     def special_methods_schema(self):
@@ -1584,8 +1810,7 @@ class ModuleLinerTransformer(NodeItem):
     def set_params(self, params: dict) -> None:
         if not params:
             return
-        for key, value in params.items():
-            self._params[key] = value
+        self._stage_param_cache_update(params)
         self._notify_param_change(params)
 
 class ModulePDHFSM(NodeItem):
@@ -1684,8 +1909,7 @@ class ModulePDHFSM(NodeItem):
     def set_params(self, params: dict) -> None:
         if not params:
             return
-        for key, value in params.items():
-            self._params[key] = value
+        self._stage_param_cache_update(params)
         self._notify_param_change(params)
 # 在 ModuleFIRFilter 类之后添加
 
@@ -1788,8 +2012,7 @@ class ModuleIIRFilter(NodeItem):
     def set_params(self, params: dict) -> None:
         if not params:
             return
-        for key, value in params.items():
-            self._params[key] = value
+        self._stage_param_cache_update(params)
         self._notify_param_change(params)
 
     def special_methods_schema(self):
@@ -1904,8 +2127,7 @@ class ModuleSCLOFSM(NodeItem):
     def set_params(self, params: dict) -> None:
         if not params:
             return
-        for key, value in params.items():
-            self._params[key] = value
+        self._stage_param_cache_update(params)
         self._notify_param_change(params)
 
 
