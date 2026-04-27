@@ -29,6 +29,7 @@ entity central_control is
         spi_txd_out     :   out std_logic_vector(31 downto 0);
         spi_rxd_in      :   in  std_logic_vector(31 downto 0);
         spi_val_in      :   in  std_logic;
+        spi_idle_in     :   in  std_logic;
         rsp_sel_out     :   out std_logic_vector(mbus_w - 1 downto 0);
         rsp_data_in     :   in  std_logic_vector(rdbus_w - 1 downto 0);
         rsp_stat_in     :   in  std_logic_vector(rsbus_w - 1 downto 0);
@@ -280,11 +281,13 @@ begin
                         end if;
                     when s_spi_transmit =>
                         bsr_i2_sl <= '0';
-                        spi_en_out <= '1';
-                        spi_ss_out <= spi_ss_buf;
-                        spi_control_out <= spi_control_buf;
-                        spi_txd_out <= spi_data_buf;
-                        state <= s_spi_listen;
+                        if spi_idle_in = '1' then
+                            spi_en_out <= '1';
+                            spi_ss_out <= spi_ss_buf;
+                            spi_control_out <= spi_control_buf;
+                            spi_txd_out <= spi_data_buf;
+                            state <= s_spi_listen;
+                        end if;
                     when s_spi_listen =>
                         spi_en_out <= '0';
                         if spi_val_in = '1' then

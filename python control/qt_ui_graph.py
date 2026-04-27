@@ -368,7 +368,7 @@ class DiagramScene(QGraphicsScene):
         self.developer_mode = False
 
         self.setBackgroundBrush(QBrush(QColor("#1E1E1E")))
-        self.setSceneRect(0, 0, 4800, 2700)
+        self.setSceneRect(-2400, -1350, 4800, 2700)
 
         self.left_ports = []
         self.right_ports = []
@@ -1014,7 +1014,7 @@ class DiagramView(QGraphicsView):
         self.sync_scene_to_viewport()
         self.update_border_ports()
 
-    def auto_fit_nodes(self, padding=80.0):
+    def auto_fit_nodes(self, padding_ratio=0.12, min_padding=70.0, max_padding=180.0, max_scale=1.15):
         scene = self.scene()
         if not scene:
             return
@@ -1031,12 +1031,48 @@ class DiagramView(QGraphicsView):
         for rect in node_rects[1:]:
             bounds = bounds.united(rect)
 
+        content_size = max(bounds.width(), bounds.height(), 1.0)
+        padding = max(min_padding, min(max_padding, content_size * padding_ratio))
         fit_rect = bounds.adjusted(-padding, -padding, padding, padding)
         if fit_rect.isEmpty():
             return
 
+        viewport_rect = self.viewport().rect()
+        view_margin_x = max(240.0, viewport_rect.width() * 0.75)
+        view_margin_y = max(180.0, viewport_rect.height() * 0.75)
+        scene.setSceneRect(fit_rect.adjusted(-view_margin_x, -view_margin_y, view_margin_x, view_margin_y))
+
+        self.resetTransform()
         self.fitInView(fit_rect, Qt.KeepAspectRatio)
-        self.scale_factor = self.transform().m11() if self.transform().m11() > 0 else 1.0
+        scale = self.transform().m11() if self.transform().m11() > 0 else 1.0
+        if scale > max_scale:
+            self.resetTransform()
+            self.scale(max_scale, max_scale)
+            scale = max_scale
+
+        self.centerOn(bounds.center())
+        self.scale_factor = scale
+        self.sync_scene_to_viewport()
+        self.update_border_ports()
+
+    def center_on_nodes(self, margin_ratio=0.5, min_margin=180.0):
+        scene = self.scene()
+        if not scene:
+            return
+
+        node_rects = [item.sceneBoundingRect() for item in scene.items() if isinstance(item, NodeItem)]
+        if not node_rects:
+            return
+
+        bounds = QRectF(node_rects[0])
+        for rect in node_rects[1:]:
+            bounds = bounds.united(rect)
+
+        viewport_rect = self.viewport().rect()
+        margin_x = max(min_margin, viewport_rect.width() * margin_ratio)
+        margin_y = max(min_margin, viewport_rect.height() * margin_ratio)
+        scene.setSceneRect(bounds.adjusted(-margin_x, -margin_y, margin_x, margin_y))
+        self.centerOn(bounds.center())
         self.sync_scene_to_viewport()
         self.update_border_ports()
 

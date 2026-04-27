@@ -256,6 +256,9 @@ class Port(QObject):
             return self.hw_controller.sclofsm if module_index == 0 else self.hw_controller.sclofsm2
         return None
 
+    def get_hw_module(self, module_type, module_index):
+        return self._resolve_hw_module(module_type, module_index)
+
     def send_param(self, module_type, module_index, params):
         hw_module = self._resolve_hw_module(module_type, module_index)
         if hw_module is None:

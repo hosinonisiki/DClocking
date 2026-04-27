@@ -1,8 +1,8 @@
 import json
 import sys
-import math
 from collections import deque
 from datetime import datetime
+import module as hw_module_defs
 
 from PySide6.QtCore import Qt, QPointF, QObject, Signal
 from PySide6.QtGui import QTextCursor
@@ -34,6 +34,7 @@ from qt_module import (
     ModulePDHFSM,
     ModuleLinerTransformer,
     ParamDialog,
+    PIDParamCanvas,
     SpecialMethodDialog,
     set_param_apply_handler,
     set_param_open_handler,
@@ -262,6 +263,11 @@ class MainWindow(QMainWindow):
         if node is None:
             return False
 
+        self._refresh_node_params_from_device(
+            node,
+            update_panel=not isinstance(node, (ModuleFIRFilter, ModuleIIRFilter)),
+        )
+
         schema = node.param_schema() if hasattr(node, "param_schema") else []
         special_methods = node.special_methods_schema() if hasattr(node, "special_methods_schema") else []
         if not schema and not special_methods:
@@ -270,6 +276,8 @@ class MainWindow(QMainWindow):
         panel_key = f"{node.name}@{node.component_name}:{node.index}"
         existing = self._param_panels.get(panel_key)
         if existing is not None:
+            if not isinstance(node, (ModuleFIRFilter, ModuleIIRFilter)):
+                self._update_panel_from_node(existing, node)
             self._scroll_to_panel(existing)
             return True
 
@@ -290,9 +298,20 @@ class MainWindow(QMainWindow):
         card_layout.addLayout(title_row)
 
         if schema:
-            param_widget = ParamDialog(schema, node.get_params(), parent=self, apply_callback=node.set_params)
+            companion_widget_factory = None
+            if isinstance(node, ModulePID):
+                companion_widget_factory = lambda dialog_parent: PIDParamCanvas(dialog_parent)
+
+            param_widget = ParamDialog(
+                schema,
+                node.get_params(),
+                parent=self,
+                apply_callback=node.set_params,
+                companion_widget_factory=companion_widget_factory,
+            )
             param_widget.setWindowFlags(Qt.Widget)
             card_layout.addWidget(param_widget)
+            card._param_widget = param_widget
 
         if special_methods:
             special_widget = SpecialMethodDialog(
@@ -303,11 +322,73 @@ class MainWindow(QMainWindow):
             )
             special_widget.setWindowFlags(Qt.Widget)
             card_layout.addWidget(special_widget)
+            card._special_widget = special_widget
 
         insert_pos = max(0, self.param_layout.count() - 1)
         self.param_layout.insertWidget(insert_pos, card)
         self._param_panels[panel_key] = card
         self._scroll_to_panel(card)
+        return True
+
+    def _update_panel_from_node(self, panel_card, node):
+        param_widget = getattr(panel_card, "_param_widget", None)
+        if param_widget is not None:
+            param_widget.set_values(node.get_params())
+
+    def _refresh_node_params_from_device(self, node, update_panel=True):
+        if node is None:
+            return False
+
+        module_type, module_index = self._resolve_module_identity(node)
+        if module_type is None:
+            return False
+
+        hw_module = self.port_ctrl.get_hw_module(module_type, module_index)
+        if hw_module is None:
+            return False
+
+        schema_fields = getattr(node, "schema", None) or []
+        field_map = self._schema_field_map(node)
+        refreshed = {}
+        read_errors = []
+
+        for key, width in self._direct_param_specs(module_type).items():
+            try:
+                value = hw_module.read(key)
+                refreshed[key] = self._decode_direct_value(value, width, field_map.get(key))
+            except Exception as exc:
+                read_errors.append(f"{key}: {exc}")
+
+        for field in schema_fields:
+            if not isinstance(field, dict):
+                continue
+            key = field.get("key")
+            if not key or key in refreshed:
+                continue
+
+            try:
+                value = hw_module.readv(key)
+                if field.get("type") == "bool" or field.get("ui_control") in {"flip_toggle", "flip_pulse"}:
+                    value = bool(value)
+                refreshed[key] = value
+            except Exception as exc:
+                read_errors.append(f"{key}: {exc}")
+
+        if not refreshed:
+            if read_errors:
+                print(f"[param] refresh skipped {node.name}: {read_errors[0]}")
+            return False
+
+        if hasattr(node, "_params"):
+            node._params.update(refreshed)
+
+        panel_key = f"{node.name}@{node.component_name}:{node.index}"
+        panel = self._param_panels.get(panel_key)
+        if update_panel and panel is not None:
+            self._update_panel_from_node(panel, node)
+
+        if read_errors:
+            print(f"[param] partial refresh {node.name}: {len(read_errors)} field(s) skipped")
         return True
 
     def _on_mode_changed(self, text):
@@ -531,6 +612,58 @@ class MainWindow(QMainWindow):
 
         return ordered_layers
 
+    def _position_synced_nodes(self, ordered_layers, node_map):
+        if not ordered_layers or not node_map:
+            return
+
+        layer_keys = sorted(ordered_layers.keys())
+        max_rows = max((len(ordered_layers.get(lv, [])) for lv in layer_keys), default=1)
+        layer_count = max(1, len(layer_keys))
+
+        vertical_gap = max(32.0, 76.0 - 6.0 * max(0, max_rows - 1))
+        horizontal_gap = max(120.0, 220.0 - 14.0 * max(0, layer_count - 1))
+
+        layer_widths = {}
+        layer_heights = {}
+        for lv in layer_keys:
+            nodes = [node_map[name] for name in ordered_layers.get(lv, []) if name in node_map]
+            if not nodes:
+                layer_widths[lv] = 0.0
+                layer_heights[lv] = 0.0
+                continue
+
+            max_width = max(float(getattr(node, "width", 128.0)) for node in nodes)
+            total_height = sum(float(getattr(node, "height", 108.0)) for node in nodes)
+            total_height += vertical_gap * max(0, len(nodes) - 1)
+
+            layer_widths[lv] = max_width
+            layer_heights[lv] = total_height
+
+        total_width = 0.0
+        for idx, lv in enumerate(layer_keys):
+            total_width += layer_widths[lv]
+            if idx < len(layer_keys) - 1:
+                total_width += horizontal_gap
+
+        current_x = -total_width / 2.0
+        for lv in layer_keys:
+            names_in_layer = [name for name in ordered_layers.get(lv, []) if name in node_map]
+            if not names_in_layer:
+                continue
+
+            layer_width = layer_widths[lv]
+            layer_height = layer_heights[lv]
+            layer_center_x = current_x + layer_width / 2.0
+            current_y = -layer_height / 2.0
+
+            for name in names_in_layer:
+                node = node_map[name]
+                node_height = float(getattr(node, "height", 108.0))
+                node.setPos(QPointF(layer_center_x, current_y + node_height / 2.0))
+                current_y += node_height + vertical_gap
+
+            current_x += layer_width + horizontal_gap
+
     def sync_from_device(self):
         if not self.port_ctrl.is_open():
             return
@@ -539,7 +672,6 @@ class MainWindow(QMainWindow):
         self._prime_router_cache_from_device_routes(routes)
 
         device_edges = []
-        required_nodes = set()
         unresolved_route_count = 0
         unresolved_samples = []
         partial_mapped_route_count = 0
@@ -551,11 +683,6 @@ class MainWindow(QMainWindow):
             src_name, src_idx = resolve_node_port_from_number(route["src_port"], "out")
             dst_name, dst_idx = resolve_node_port_from_number(route["dst_port"], "in")
 
-            if src_name is not None and not src_name.startswith("Border_"):
-                required_nodes.add(src_name)
-            if dst_name is not None and not dst_name.startswith("Border_"):
-                required_nodes.add(dst_name)
-
             if src_name is None or dst_name is None:
                 unresolved_route_count += 1
                 if src_name is not None or dst_name is not None:
@@ -566,23 +693,55 @@ class MainWindow(QMainWindow):
 
             device_edges.append((src_name, src_idx, dst_name, dst_idx))
 
+        def _is_physical_border(name):
+            if not isinstance(name, str):
+                return False
+            if name.startswith("Border_out_") and name not in ("Border_out_HIGH", "Border_out_LOW"):
+                return True
+            return name.startswith("Border_in_")
+
+        adjacency = {}
+        for src_name, _src_idx, dst_name, _dst_idx in device_edges:
+            adjacency.setdefault(src_name, set()).add(dst_name)
+            adjacency.setdefault(dst_name, set()).add(src_name)
+
+        connected_names = set()
+        search_queue = deque()
+        for name in adjacency.keys():
+            if _is_physical_border(name):
+                connected_names.add(name)
+                search_queue.append(name)
+
+        while search_queue:
+            current = search_queue.popleft()
+            for nxt in adjacency.get(current, ()):
+                if nxt in connected_names:
+                    continue
+                connected_names.add(nxt)
+                search_queue.append(nxt)
+
+        required_nodes = {
+            name for name in connected_names
+            if not name.startswith("Border_") and not name.startswith("HIGH") and not name.startswith("LOW")
+        }
+        visible_edges = [
+            (src_name, src_idx, dst_name, dst_idx)
+            for src_name, src_idx, dst_name, dst_idx in device_edges
+            if src_name in connected_names and dst_name in connected_names
+        ]
+
         self._clear_canvas()
 
         internal_edges = []
-        for src_name, _src_idx, dst_name, _dst_idx in device_edges:
+        for src_name, _src_idx, dst_name, _dst_idx in visible_edges:
             if src_name in required_nodes and dst_name in required_nodes:
                 internal_edges.append((src_name, dst_name))
         ordered_layers = self._optimize_grid_layout(required_nodes, internal_edges)
 
         node_map = {}
-        x0 = 260
-        y_center = 520
-        grid_x = 260
-        grid_y = 150
         for lv in sorted(ordered_layers.keys()):
             names_in_layer = ordered_layers[lv]
-            start_y = y_center - ((len(names_in_layer) - 1) * grid_y) / 2.0
-            for row, name in enumerate(names_in_layer):
+            for name in names_in_layer:
                 component_name, index = node_name_to_component(name)
                 if component_name is None:
                     unknown_node_count += 1
@@ -592,16 +751,16 @@ class MainWindow(QMainWindow):
                     unknown_node_count += 1
                     continue
 
-                x = int(x0 + lv * grid_x)
-                y = int(start_y + row * grid_y)
-                pos = QPointF(x, y)
+                pos = QPointF(0.0, 0.0)
                 node = cls(component_name, index, pos)
                 self.view._used_indices.setdefault(component_name, set()).add(index)
                 self.view._apply_mode_to_node(node)
                 self.scene.addItem(node)
                 node_map[name] = node
 
-        for src_name, src_idx, dst_name, dst_idx in device_edges:
+        self._position_synced_nodes(ordered_layers, node_map)
+
+        for src_name, src_idx, dst_name, dst_idx in visible_edges:
             src_port = self._port_ref_for_name_index(src_name, src_idx, "out", node_map)
             dst_port = self._port_ref_for_name_index(dst_name, dst_idx, "in", node_map)
             if src_port is None or dst_port is None:
@@ -622,24 +781,18 @@ class MainWindow(QMainWindow):
                 end_node.edges.append(edge)
 
         for node in node_map.values():
-            module_type, module_index = self._resolve_module_identity(node)
-            if module_type is None:
-                continue
             try:
-                schema = node.param_schema() if hasattr(node, "param_schema") else []
-                params = self.port_ctrl.query_module_params(module_type, module_index, schema)
-                if hasattr(node, "_params") and isinstance(node._params, dict):
-                    node._params.update(params)
+                self._refresh_node_params_from_device(node, update_panel=False)
             except Exception as exc:
                 param_fail_count += 1
                 print(f"[sync] param query failed for {node.name}: {exc}")
 
         self.view.auto_fit_nodes()
-        print(f"[sync] loaded {len(node_map)} nodes and {len(device_edges)} routes from device")
+        print(f"[sync] loaded {len(node_map)} nodes and {len(visible_edges)} visible routes from device")
 
         report = (
             f"同步完成\n"
-            f"已识别连线: {len(device_edges)}\n"
+            f"已识别连线: {len(visible_edges)}\n"
             f"已生成节点: {len(node_map)}\n"
             f"未识别端口连线: {unresolved_route_count}\n"
             f"部分端点可识别但连线缺失: {partial_mapped_route_count}\n"
@@ -723,29 +876,22 @@ class MainWindow(QMainWindow):
         router = self._ensure_router()
         if router is None:
             return
+        try:
+            router.sync()
+        except Exception as exc:
+            print(f"[sync] skip cache prime route : {exc}")
 
-        router.port_config = [0] * 128
-        if not getattr(router, "port_enable", None) or len(router.port_enable) != 128:
-            router.port_enable = [1] * 128
-
-        for route in routes:
-            dst_port = route.get("dst_port")
-            src_port = route.get("src_port")
-            if dst_port is None or src_port is None:
-                continue
-            try:
-                router.set_routing(int(dst_port), int(src_port))
-            except Exception as exc:
-                print(f"[sync] skip cache prime route {src_port}->{dst_port}: {exc}")
-
-    def _apply_routing(self, dst_port_num, src_port_num, label):
+    def _apply_routing(self, dst_port_num, src_port_num, label, upload_immediately=True):
         router = self._ensure_router()
         if router is None:
             return
         try:
             router.set_routing(dst_port_num, src_port_num)
-            router.upload()
-            print(f"[route] sent: {label} ({src_port_num} -> {dst_port_num})")
+            if upload_immediately:
+                router.upload()
+                print(f"[route] sent: {label} ({src_port_num} -> {dst_port_num})")
+            else:
+                print(f"[route] staged: {label} ({src_port_num} -> {dst_port_num})")
         except Exception as exc:
             print(f"[route] failed: {label}: {exc}")
 
@@ -791,105 +937,141 @@ class MainWindow(QMainWindow):
             return "SCLO", node.index
         return None, None
 
-    def _compute_linked_params_local(self, module_type, current_params, delta_params):
-        merged = dict(current_params or {})
-        merged.update(delta_params or {})
+    def _direct_param_specs(self, module_type):
+        module_class_map = {
+            "PID": hw_module_defs.ModulePID,
+            "ACC": hw_module_defs.ModuleAccumulator,
+            "SCLR": hw_module_defs.ModuleScaler,
+            "FIR": hw_module_defs.ModuleFIRFilter,
+            "IIR": hw_module_defs.ModuleIIRFilter,
+            "LTRN": hw_module_defs.ModuleLinearTransformer,
+            "PDHS": hw_module_defs.ModulePDHFSM,
+            "SCLO": hw_module_defs.ModuleSCLOFSM,
+        }
+        module_cls = module_class_map.get(module_type)
+        parameter_list = getattr(module_cls, "parameter_list", {}) if module_cls is not None else {}
+        specs = {}
+        for address in sorted(parameter_list.keys()):
+            info = parameter_list.get(address, {})
+            name = info.get("name")
+            width = int(info.get("width", 32))
+            if not name or name == "/":
+                continue
+            specs[name] = width
+        return specs
 
-        if module_type == "SCLR":
-            if "gain" in (delta_params or {}):
-                current_scale = int(merged.get("scale", 0))
-                sign = -1 if current_scale < 0 else 1
-                target_scale = int(sign * round((2 ** 16) * (10 ** (float(merged["gain"]) / 20.0))))
-                merged["scale"] = target_scale
+    def _schema_field_map(self, node):
+        field_map = {}
+        for field in self._node_schema_fields(node):
+            if not isinstance(field, dict):
+                continue
+            key = field.get("key")
+            if key:
+                field_map[key] = field
+        return field_map
 
-            scale = int(merged.get("scale", 0))
-            merged["gain"] = float("-inf") if scale == 0 else 20.0 * math.log10(abs(scale) / (2 ** 16))
-            return merged
+    def _decode_direct_value(self, raw_value, width, field=None):
+        if not isinstance(raw_value, (bytes, bytearray)):
+            return raw_value
 
-        if module_type == "PID":
-            fs_i = 125000000.0
-            fs_d = 250000000.0
+        intval = int.from_bytes(raw_value, "big", signed=False)
+        if width == 1:
+            return bool(intval & 0x1)
 
-            if "overall_gain" in (delta_params or {}):
-                target_gain_p = int(round((2 ** 16) * (10 ** (float(merged["overall_gain"]) / 20.0))))
-                current_gain_p = int(merged.get("gain_p", 0))
-                current_gain_i = int(merged.get("gain_i", 0))
-                current_gain_d = int(merged.get("gain_d", 0))
-                merged["gain_p"] = target_gain_p
-                if current_gain_p != 0:
-                    scale_factor = abs(target_gain_p / current_gain_p)
-                    merged["gain_i"] = int(round(current_gain_i * scale_factor))
-                    merged["gain_d"] = int(round(current_gain_d * scale_factor))
+        if isinstance(field, dict):
+            if field.get("type") == "bool" or field.get("ui_control") in {"flip_toggle", "flip_pulse"}:
+                return bool(intval & 0x1)
+            min_value = field.get("min")
+            if isinstance(min_value, (int, float)) and min_value >= 0:
+                return intval
 
-            if "pi_corner" in (delta_params or {}):
-                gain_p = int(merged.get("gain_p", 0))
-                merged["gain_i"] = int(round(gain_p * float(merged["pi_corner"]) * 2.0 * math.pi / fs_i * (2 ** 16)))
+        if intval >= (1 << (width - 1)):
+            intval -= (1 << width)
+        return intval
 
-            if "pd_corner" in (delta_params or {}):
-                pd_corner = float(merged.get("pd_corner", 0.0))
-                if pd_corner != 0.0:
-                    gain_p = int(merged.get("gain_p", 0))
-                    merged["gain_d"] = int(round(gain_p * fs_d / (pd_corner * 2.0 * math.pi)))
+    def _node_schema_fields(self, node):
+        fields = getattr(node, "schema", None)
+        if isinstance(fields, list):
+            return fields
+        if hasattr(node, "param_schema"):
+            fields = node.param_schema()
+            if isinstance(fields, list):
+                return fields
+        return []
 
-            if "saturation_gain" in (delta_params or {}):
-                gain_i = int(merged.get("gain_i", 0))
-                if gain_i != 0:
-                    log_target = int(round(math.log2((10 ** (float(merged["saturation_gain"]) / 20.0)) * (2 ** 32) / (abs(gain_i) * 256.0))))
-                    if log_target <= -1:
-                        merged["leak_digit"] = 1
-                    elif log_target >= 32:
-                        merged["leak_digit"] = 0
+    def _node_direct_params(self, node):
+        params = {}
+        node_params = getattr(node, "_params", None)
+        if not isinstance(node_params, dict):
+            return params
+
+        module_type, module_index = self._resolve_module_identity(node)
+        direct_specs = self._direct_param_specs(module_type)
+        field_map = self._schema_field_map(node)
+        hw_module = self.port_ctrl.get_hw_module(module_type, module_index) if module_type is not None else None
+        if hw_module is not None and direct_specs:
+            for key, width in direct_specs.items():
+                try:
+                    value = hw_module.read(key)
+                    params[key] = self._decode_direct_value(value, width, field_map.get(key))
+                except Exception:
+                    if key in node_params:
+                        params[key] = node_params[key]
                     else:
-                        merged["leak_digit"] = 2 ** log_target
+                        params[key] = False if width == 1 else 0
+            return params
 
-            if "saturation_turning_frequency" in (delta_params or {}):
-                turning = float(merged.get("saturation_turning_frequency", 0.0))
-                if turning == 0.0:
-                    merged["leak_digit"] = 0
+        if direct_specs:
+            for key, width in direct_specs.items():
+                if key in node_params:
+                    params[key] = node_params[key]
                 else:
-                    log_target = int(round(math.log2(fs_i / (turning * 2.0 * math.pi * 256.0))))
-                    if log_target <= -1:
-                        merged["leak_digit"] = 1
-                    elif log_target >= 32:
-                        merged["leak_digit"] = 0
-                    else:
-                        merged["leak_digit"] = 2 ** log_target
+                    params[key] = False if width == 1 else 0
 
-            gain_p = int(merged.get("gain_p", 0))
-            gain_i = int(merged.get("gain_i", 0))
-            gain_d = int(merged.get("gain_d", 0))
-            leak_digit = int(merged.get("leak_digit", 0))
+        for field in self._node_schema_fields(node):
+            if not isinstance(field, dict):
+                continue
+            if field.get("mode") != "direct":
+                continue
+            key = field.get("key")
+            if not key:
+                continue
+            if key in node_params:
+                params[key] = node_params[key]
+            elif hasattr(node, "_default_for_field"):
+                params[key] = node._default_for_field(field)
+        return params
 
-            merged["overall_gain"] = float("-inf") if gain_p == 0 else 20.0 * math.log10(abs(gain_p) / (2 ** 16))
-            merged["pi_corner"] = float("inf") if gain_p == 0 else abs(gain_i / gain_p) * fs_i / (2.0 * math.pi * (2 ** 16))
-            merged["pd_corner"] = float("inf") if gain_d == 0 else abs(gain_p / gain_d) * fs_d / (2.0 * math.pi)
-
-            if gain_i != 0:
-                merged["saturation_gain"] = float("inf") if leak_digit == 0 else 20.0 * math.log10(abs(gain_i) * leak_digit * 256.0 / (2 ** 32))
-            merged["saturation_turning_frequency"] = 0.0 if leak_digit == 0 else fs_i / (leak_digit * 256.0 * 2.0 * math.pi)
-
-            return merged
-
-        return merged
+    def _node_special_method_state(self, node):
+        raw = getattr(node, "_special_method_args", None)
+        if not isinstance(raw, dict):
+            return {}
+        stored = {}
+        for method_name, args in raw.items():
+            if not method_name:
+                continue
+            stored[method_name] = dict(args or {}) if isinstance(args, dict) else {}
+        return stored
 
     def _apply_param_to_hardware(self, node, params):
         module_type, module_index = self._resolve_module_identity(node)
         if module_type is None:
-            return None
-        local_linked = self._compute_linked_params_local(
-            module_type,
-            node.get_params() if hasattr(node, "get_params") else {},
-            params,
-        )
+            return
         try:
+            did_write = False
             if isinstance(params, dict) and "__special_method__" in params:
                 method_name = params.get("__special_method__")
                 method_args = params.get("args", {})
                 self.port_ctrl.send_special_method(module_type, module_index, method_name, method_args)
+                node._commit_pending_cache_update()
                 print(f"[method] sent {node.name}.{method_name}({method_args})")
-                return None
+                self._refresh_node_params_from_device(
+                    node,
+                    update_panel=not isinstance(node, (ModuleFIRFilter, ModuleIIRFilter)),
+                )
+                return
 
-            schema_fields = node.param_schema() if hasattr(node, "param_schema") else []
+            schema_fields = self._node_schema_fields(node)
             schema_map = {field.get("key"): field for field in schema_fields if isinstance(field, dict) and field.get("key")}
 
             regular_params = {}
@@ -903,12 +1085,14 @@ class MainWindow(QMainWindow):
                     checked = bool(value)
                     self.port_ctrl.send_flip_toggle(module_type, module_index, flip_on_key, flip_off_key, checked)
                     print(f"[param] flip_toggle {node.name}.{key} -> {'on' if checked else 'off'}")
+                    did_write = True
                     continue
 
                 if control_mode == "flip_pulse":
                     flip_on_key = field.get("flip_on", key)
                     self.port_ctrl.send_flip_pulse(module_type, module_index, flip_on_key)
                     print(f"[param] flip_pulse {node.name}.{key}")
+                    did_write = True
                     continue
 
                 regular_params[key] = value
@@ -917,20 +1101,19 @@ class MainWindow(QMainWindow):
                 self.port_ctrl.send_param(module_type, module_index, regular_params)
                 for key, value in regular_params.items():
                     print(f"[param] sent {node.name}.{key} = {value}")
+                did_write = True
 
-            # Read back all schema fields so linked direct/indirect params stay in sync in UI.
-            schema_fields = node.param_schema() if hasattr(node, "param_schema") else []
-            refreshed_params = self.port_ctrl.query_module_params(module_type, module_index, schema_fields)
-            merged_params = dict(local_linked)
-            merged_params.update(refreshed_params)
-            if hasattr(node, "_params") and isinstance(node._params, dict):
-                node._params.update(merged_params)
-            return merged_params
+            if did_write:
+                if not isinstance(node, (ModuleFIRFilter, ModuleIIRFilter)):
+                    self._refresh_node_params_from_device(node)
+                node._commit_pending_cache_update()
         except Exception as exc:
+            node._rollback_pending_cache_update()
+            self._refresh_node_params_from_device(
+                node,
+                update_panel=not isinstance(node, (ModuleFIRFilter, ModuleIIRFilter)),
+            )
             print(f"[param] failed {node.name}: {exc}")
-            if hasattr(node, "_params") and isinstance(node._params, dict):
-                node._params.update(local_linked)
-            return local_linked
 
     def _port_to_ref(self, port):
         if isinstance(port, BorderPort):
@@ -1062,7 +1245,7 @@ class MainWindow(QMainWindow):
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
             self._disconnect_all_connections()
-            self._clear_canvas(emit_connection_removed=True)
+            self._clear_canvas(emit_connection_removed=False)
 
     def _build_config_dict(self):
         nodes = []
@@ -1070,14 +1253,14 @@ class MainWindow(QMainWindow):
 
         for item in self.scene.items():
             if isinstance(item, NodeItem):
-                params = item.get_params() if hasattr(item, "get_params") else {}
                 nodes.append(
                     {
                         "name": item.name,
                         "component_name": item.component_name,
                         "index": int(item.index),
                         "pos": {"x": float(item.pos().x()), "y": float(item.pos().y())},
-                        "params": params,
+                        "direct_params": self._node_direct_params(item),
+                        "special_methods": self._node_special_method_state(item),
                     }
                 )
 
@@ -1129,16 +1312,10 @@ class MainWindow(QMainWindow):
         self.view._apply_mode_to_node(node)
         self.scene.addItem(node)
 
-        params = node_cfg.get("params", {})
-        if isinstance(params, dict) and params:
-            try:
-                node.set_params(params)
-            except Exception as exc:
-                print(f"[config] apply params failed for {node.name}: {exc}")
-
         return node
 
-    def _restore_edges(self, edges_cfg, node_map):
+    def _restore_edges(self, edges_cfg, node_map, batch_upload: bool = False):
+        staged_routes = 0
         for edge_cfg in edges_cfg:
             src_port = self._resolve_port_ref(edge_cfg.get("src"), node_map)
             dst_port = self._resolve_port_ref(edge_cfg.get("dst"), node_map)
@@ -1166,7 +1343,29 @@ class MainWindow(QMainWindow):
 
             src_name = start_node.name if start_node else src_port.name
             dst_name = end_node.name if end_node else dst_port.name
-            self.signals.connection_created.emit(src_name, src_port.index, dst_name, dst_port.index)
+            src_port_num = resolve_port_number(src_name, src_port.index, "out")
+            dst_port_num = resolve_port_number(dst_name, dst_port.index, "in")
+            if src_port_num is None or dst_port_num is None:
+                print(f"[config] skip unresolved route: {src_name}:{src_port.index} -> {dst_name}:{dst_port.index}")
+                continue
+
+            self._apply_routing(
+                dst_port_num,
+                src_port_num,
+                f"{src_name}:Out{src_port.index + 1} -> {dst_name}:In{dst_port.index + 1}",
+                upload_immediately=not batch_upload,
+            )
+            if batch_upload:
+                staged_routes += 1
+
+        if batch_upload and staged_routes > 0:
+            router = self._ensure_router()
+            if router is not None:
+                try:
+                    router.upload()
+                    print(f"[route] uploaded staged routes: {staged_routes}")
+                except Exception as exc:
+                    print(f"[route] failed final batch upload: {exc}")
 
     def load_configuration(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "加载配置", "", "JSON Files (*.json);;All Files (*)")
@@ -1187,21 +1386,46 @@ class MainWindow(QMainWindow):
             return
 
         self._disconnect_all_connections()
-        self._clear_canvas(emit_connection_removed=True)
+        self._clear_canvas(emit_connection_removed=False)
 
         mode = config.get("mode")
         if isinstance(mode, str) and mode in ["Free Mode", "Developer Mode"]:
             self.mode_combo.setCurrentText(mode)
 
         node_map = {}
+        loaded_nodes = []
         for node_cfg in nodes_cfg:
             node = self._create_node_from_config(node_cfg)
             if node is not None:
+                loaded_nodes.append((node_cfg, node))
                 node_map.setdefault(node.name, node)
                 node_map[f"{node.component_name}@{int(node.index)}"] = node
                 if node.component_name in ("布尔值：是", "布尔值：否"):
                     node_map[f"{node.component_name}{int(node.index) + 1}"] = node
 
-        self._restore_edges(edges_cfg, node_map)
-        self.view.update_border_ports()
+        for node_cfg, node in loaded_nodes:
+            special_methods = node_cfg.get("special_methods", {})
+            if not isinstance(special_methods, dict):
+                continue
+            for method_name, method_args in special_methods.items():
+                if not method_name:
+                    continue
+                try:
+                    node.apply_special_method(method_name, method_args if isinstance(method_args, dict) else {})
+                except Exception as exc:
+                    print(f"[config] apply special method failed for {node.name}.{method_name}: {exc}")
+
+        for node_cfg, node in loaded_nodes:
+            direct_params = node_cfg.get("direct_params")
+            if not isinstance(direct_params, dict):
+                direct_params = node_cfg.get("params", {})
+            if not isinstance(direct_params, dict) or not direct_params:
+                continue
+            try:
+                node.set_params(direct_params)
+            except Exception as exc:
+                print(f"[config] apply direct params failed for {node.name}: {exc}")
+
+        self._restore_edges(edges_cfg, node_map, batch_upload=True)
+        self.view.center_on_nodes()
         print(f"[config] loaded: {file_path}")

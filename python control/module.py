@@ -5,6 +5,12 @@ import IIR
 # Defines methods for module manipulation
 
 # Base class of all modules
+
+def default_sign(x):
+    if x == 0:
+        return 1
+    else:
+        return np.sign(x)
 class ModuleBase():
     # Format: parameter_list[(int)address] = {"name": (str)name, "width": (int)width]
     parameter_list = {}
@@ -208,7 +214,7 @@ class ModulePID(ModuleBase):
                 raise ValueError("PD corner frequency cannot be zero")
         else:
             # Read, return address list and formula
-            address_list = [0, 1]
+            address_list = [0, 2]
             def formula(data_list):
                 gain_p = int.from_bytes(data_list[0], "big", signed = True)
                 gain_d = int.from_bytes(data_list[1], "big", signed = True)
@@ -242,7 +248,7 @@ class ModulePID(ModuleBase):
                 gain_i = int.from_bytes(data_list[0], "big", signed = True)
                 if gain_i == 0:
                     raise ValueError("gain_i is zero, cannot read saturation gain")
-                leak_digit = int.from_bytes(data_list[1], "big", signed = True)
+                leak_digit = int.from_bytes(data_list[1], "big", signed = False)
                 if leak_digit == 0:
                     return np.inf
                 return 20 * np.log10(np.abs(gain_i) * leak_digit * 256 / (2 ** 32))
@@ -298,7 +304,7 @@ class ModuleScaler(ModuleBase):
         if data is not None:
             # Write, return address-data pairs
             current_scale = int.from_bytes(self.read("scale"), "big", signed = True)
-            target_scale = int(np.sign(current_scale) * round(2 ** 16 * 10 ** (data / 20)))
+            target_scale = int(default_sign(current_scale) * round(2 ** 16 * 10 ** (data / 20)))
             if target_scale >= 2 ** 23 or target_scale < -2 ** 23:
                 raise ValueError("Resulting scale is out of range")
             return [(0, target_scale)]
@@ -680,7 +686,7 @@ class ModuleLinearTransformer(ModuleBase):
                         coef_int = int.from_bytes(data_list[i * 2 + j], "big")
                         if coef_int >= 2 ** 15:
                             coef_int = coef_int - 2 ** 16
-                        matrix[i, j] = coef_int / 2 ** 15
+                        matrix[i, j] = coef_int / (2 ** 15 - 1)
                 return matrix
             return address_list, formula
         
