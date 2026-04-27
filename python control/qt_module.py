@@ -1798,6 +1798,8 @@ class ModulePulsePatternGenerator(NodeItem):
             {"key": "segment_count", "label": "有效段数", "type": "int", "min": 1, "max": 8, "default": 2},
         ]
 
+        params = [field for field in params if field.get("key") != "hold_last_level"]
+
         for i in range(1, 9):
             params.append(
                 {
@@ -1810,9 +1812,10 @@ class ModulePulsePatternGenerator(NodeItem):
                     "decimals": 6,
                 }
             )
+            params[-1]["label"] = f"Segment {i} Time"
             params.append(
                 {
-                    "key": f"segment_{i}_delta_frequency",
+                    "key": f"segment_{i}_stop_frequency",
                     "label": f"第{i}段频偏变化(Hz)",
                     "type": "float",
                     "min": -1e9,
@@ -1821,6 +1824,7 @@ class ModulePulsePatternGenerator(NodeItem):
                     "decimals": 3,
                 }
             )
+            params[-1]["label"] = f"Segment {i} Stop Frequency (Hz)"
 
         return [
             {

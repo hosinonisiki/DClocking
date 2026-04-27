@@ -1,12 +1,18 @@
 -- ///////////////Documentation////////////////////
 -- Generates a pulse pattern composed of up to 8 line
--- segments. Each segment is described by an elapsed
--- time and a total delta on the output level.
+-- segments. The module is controlled by one wire:
+-- a rising edge starts a pattern, and the wire level
+-- is checked only at the end of each full pattern cycle.
 --
--- The host pre-computes a fixed-point slope for each
--- segment so the FPGA only needs additions while the
--- segment is active. A segment with zero duration is
--- treated as an immediate jump.
+-- While the pattern is active, parameters are held in
+-- internal registers so bus writes do not disturb the
+-- waveform. Each segment is defined by a starting point,
+-- a duration, and a slope. At the end of each full cycle,
+-- the waveform stops if the control wire is low or the
+-- configured repeat count has been reached.
+--
+-- A segment with zero duration is treated as an invalid
+-- configuration and stops the waveform cleanly.
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -28,216 +34,202 @@ end entity pulse_pattern_generator;
 
 architecture behavioral of pulse_pattern_generator is
     type duration_array_type is array (0 to 7) of unsigned(31 downto 0);
-    type delta_array_type is array (0 to 7) of signed(15 downto 0);
+    type start_array_type is array (0 to 7) of signed(15 downto 0);
     type slope_array_type is array (0 to 7) of signed(31 downto 0);
 
-    function sat16(x : signed(31 downto 0)) return signed is
-        variable result : signed(15 downto 0);
-    begin
-        if x > to_signed(32767, 32) then
-            result := to_signed(32767, 16);
-        elsif x < to_signed(-32768, 32) then
-            result := to_signed(-32768, 16);
-        else
-            result := resize(x, 16);
-        end if;
-        return result;
-    end function;
+    signal control_wire_in      : std_logic;
+    signal repeat_count_in      : unsigned(31 downto 0);
+    signal segment_count_in     : unsigned(3 downto 0);
+    signal idle_level_in        : signed(15 downto 0);
+    signal segment_duration_in  : duration_array_type := (others => (others => '0'));
+    signal segment_start_in     : start_array_type := (others => (others => '0'));
+    signal segment_slope_in     : slope_array_type := (others => (others => '0'));
 
-    function sat_add16(a : signed(15 downto 0); b : signed(15 downto 0)) return signed is
-    begin
-        return sat16(resize(a, 32) + resize(b, 32));
-    end function;
+    signal repeat_count_reg     : unsigned(31 downto 0) := (others => '0');
+    signal segment_count_reg    : unsigned(3 downto 0) := (others => '0');
+    signal idle_level_reg       : signed(15 downto 0) := (others => '0');
+    signal segment_duration_reg : duration_array_type := (others => (others => '0'));
+    signal segment_start_reg    : start_array_type := (others => (others => '0'));
+    signal segment_slope_reg    : slope_array_type := (others => (others => '0'));
 
-    function to_fp16_16(x : signed(15 downto 0)) return signed is
-        variable result : signed(31 downto 0);
-    begin
-        result := shift_left(resize(x, 32), 16);
-        return result;
-    end function;
+    signal current_slope        : signed(31 downto 0) := (others => '0');
+    signal next_duration        : unsigned(31 downto 0) := (others => '0');
+    signal next_start           : signed(15 downto 0) := (others => '0');
 
-    signal start_cmd            : std_logic;
-    signal stop_cmd             : std_logic;
-    signal clear_cmd            : std_logic;
-    signal repeat_count_cfg     : unsigned(31 downto 0);
-    signal segment_count_cfg    : unsigned(3 downto 0);
-    signal start_level_cfg      : signed(15 downto 0);
-    signal idle_level_cfg       : signed(15 downto 0);
-    signal hold_last_level      : std_logic;
-
-    signal segment_duration     : duration_array_type := (others => (others => '0'));
-    signal segment_delta        : delta_array_type := (others => (others => '0'));
-    signal segment_slope        : slope_array_type := (others => (others => '0'));
-
-    signal current_level_fp     : signed(31 downto 0) := (others => '0');
-    signal sig_out_buf          : signed(15 downto 0) := (others => '0');
-
+    signal control_prev         : std_logic := '0';
     signal active               : std_logic := '0';
-    signal infinite_mode        : std_logic := '0';
-    signal repeat_remaining     : unsigned(31 downto 0) := (others => '0');
+    signal cycle_count          : unsigned(31 downto 0) := (others => '0');
     signal segment_index        : unsigned(2 downto 0) := (others => '0');
     signal cycles_remaining     : unsigned(31 downto 0) := (others => '0');
-    signal target_level         : signed(15 downto 0) := (others => '0');
-
-    signal prev_start_cmd       : std_logic := '0';
-    signal prev_stop_cmd        : std_logic := '0';
-    signal prev_clear_cmd       : std_logic := '0';
+    signal current_level_fp     : signed(31 downto 0) := (others => '0');
+    signal idle_level_fp        : signed(31 downto 0) := (others => '0');
+    signal segment0_start_fp    : signed(31 downto 0) := (others => '0');
+    signal next_start_fp        : signed(31 downto 0) := (others => '0');
+    signal sig_out_buf          : std_logic_vector(15 downto 0) := (others => '0');
 begin
-    start_cmd <= core_param_in(0); -- address 0x00
-    stop_cmd <= core_param_in(32); -- address 0x01
-    clear_cmd <= core_param_in(64); -- address 0x02
-    repeat_count_cfg <= unsigned(core_param_in(127 downto 96)); -- address 0x03
-    segment_count_cfg <= unsigned(core_param_in(131 downto 128)); -- address 0x04
-    start_level_cfg <= signed(core_param_in(175 downto 160)); -- address 0x05
-    idle_level_cfg <= signed(core_param_in(207 downto 192)); -- address 0x06
-    hold_last_level <= core_param_in(224); -- address 0x07
+    control_wire_in <= core_param_in(0); -- address 0x00
+    repeat_count_in <= unsigned(core_param_in(127 downto 96)); -- address 0x03
+    segment_count_in <= unsigned(core_param_in(131 downto 128)); -- address 0x04
+    idle_level_in <= signed(core_param_in(207 downto 192)); -- address 0x06
 
     segment_map : for i in 0 to 7 generate
     begin
-        segment_duration(i) <= unsigned(core_param_in(32 * (8 + 3 * i) + 31 downto 32 * (8 + 3 * i))); -- address 0x08 + 3*i
-        segment_delta(i) <= signed(core_param_in(32 * (9 + 3 * i) + 15 downto 32 * (9 + 3 * i))); -- address 0x09 + 3*i
-        segment_slope(i) <= signed(core_param_in(32 * (10 + 3 * i) + 31 downto 32 * (10 + 3 * i))); -- address 0x0A + 3*i
+        segment_duration_in(i) <= unsigned(core_param_in(32 * (8 + 3 * i) + 31 downto 32 * (8 + 3 * i))); -- address 0x08 + 3*i
+        segment_start_in(i) <= signed(core_param_in(32 * (9 + 3 * i) + 15 downto 32 * (9 + 3 * i))); -- address 0x09 + 3*i
+        segment_slope_in(i) <= signed(core_param_in(32 * (10 + 3 * i) + 31 downto 32 * (10 + 3 * i))); -- address 0x0A + 3*i
     end generate;
 
-    sig_out_buf <= sat16(shift_right(current_level_fp, 16));
+    with segment_index select current_slope <=
+        segment_slope_reg(0) when "000",
+        segment_slope_reg(1) when "001",
+        segment_slope_reg(2) when "010",
+        segment_slope_reg(3) when "011",
+        segment_slope_reg(4) when "100",
+        segment_slope_reg(5) when "101",
+        segment_slope_reg(6) when "110",
+        segment_slope_reg(7) when others;
+
+    with segment_index select next_duration <=
+        segment_duration_reg(1) when "000",
+        segment_duration_reg(2) when "001",
+        segment_duration_reg(3) when "010",
+        segment_duration_reg(4) when "011",
+        segment_duration_reg(5) when "100",
+        segment_duration_reg(6) when "101",
+        segment_duration_reg(7) when "110",
+        segment_duration_reg(0) when others;
+
+    with segment_index select next_start <=
+        segment_start_reg(1) when "000",
+        segment_start_reg(2) when "001",
+        segment_start_reg(3) when "010",
+        segment_start_reg(4) when "011",
+        segment_start_reg(5) when "100",
+        segment_start_reg(6) when "101",
+        segment_start_reg(7) when "110",
+        segment_start_reg(0) when others;
+
+    idle_level_fp <= idle_level_reg & x"0000";
+    segment0_start_fp <= segment_start_reg(0) & x"0000";
+    next_start_fp <= next_start & x"0000";
+    sig_out_buf <= std_logic_vector(idle_level_reg) when active = '0' else std_logic_vector(current_level_fp(31 downto 16));
 
     use_output_buffer : if io_buf = buf_for_io or io_buf = buf_o_only generate
-        process(clk)
+        sig_out <= (others => '0') when rst = '1' else sig_out_buf;
+    end generate;
+
+    no_output_buffer : if io_buf = buf_i_only or io_buf = buf_none generate
+        process(rst, current_level_fp)
         begin
-            if rising_edge(clk) then
-                if rst = '1' then
-                    sig_out <= (others => '0');
-                else
-                    sig_out <= std_logic_vector(sig_out_buf);
-                end if;
+            if rst = '1' then
+                sig_out <= (others => '0');
+            else
+                sig_out <= std_logic_vector(current_level_fp(31 downto 16));
             end if;
         end process;
     end generate;
 
-    no_output_buffer : if io_buf = buf_i_only or io_buf = buf_none generate
-        sig_out <= (others => '0') when rst = '1' else std_logic_vector(sig_out_buf);
-    end generate;
-
     process(clk)
-        variable start_edge_v        : std_logic;
-        variable stop_edge_v         : std_logic;
-        variable clear_edge_v        : std_logic;
-        variable segment_count_v     : integer;
-        variable current_seg_v       : integer;
-        variable base_level_v        : signed(15 downto 0);
+        variable segment_count_v : integer;
+        variable segment_index_v : integer;
+        variable next_level_v    : signed(31 downto 0);
     begin
         if rising_edge(clk) then
             if rst = '1' then
-                current_level_fp <= (others => '0');
+                control_prev <= '0';
                 active <= '0';
-                infinite_mode <= '0';
-                repeat_remaining <= (others => '0');
+                cycle_count <= (others => '0');
                 segment_index <= (others => '0');
                 cycles_remaining <= (others => '0');
-                target_level <= (others => '0');
-                prev_start_cmd <= '0';
-                prev_stop_cmd <= '0';
-                prev_clear_cmd <= '0';
+                current_level_fp <= (others => '0');
+                repeat_count_reg <= (others => '0');
+                segment_count_reg <= (others => '0');
+                idle_level_reg <= (others => '0');
+                segment_duration_reg <= (others => (others => '0'));
+                segment_start_reg <= (others => (others => '0'));
+                segment_slope_reg <= (others => (others => '0'));
             else
-                if start_cmd = '1' and prev_start_cmd = '0' then
-                    start_edge_v := '1';
-                else
-                    start_edge_v := '0';
-                end if;
-
-                if stop_cmd = '1' and prev_stop_cmd = '0' then
-                    stop_edge_v := '1';
-                else
-                    stop_edge_v := '0';
-                end if;
-
-                if clear_cmd = '1' and prev_clear_cmd = '0' then
-                    clear_edge_v := '1';
-                else
-                    clear_edge_v := '0';
-                end if;
-
-                prev_start_cmd <= start_cmd;
-                prev_stop_cmd <= stop_cmd;
-                prev_clear_cmd <= clear_cmd;
-
-                segment_count_v := to_integer(segment_count_cfg);
-                if segment_count_v > 8 then
-                    segment_count_v := 8;
-                end if;
-
-                if clear_edge_v = '1' or stop_edge_v = '1' then
-                    active <= '0';
-                    infinite_mode <= '0';
-                    repeat_remaining <= (others => '0');
-                    segment_index <= (others => '0');
-                    cycles_remaining <= (others => '0');
-                    target_level <= idle_level_cfg;
-                    current_level_fp <= to_fp16_16(idle_level_cfg);
-
-                elsif start_edge_v = '1' then
-                    if segment_count_v = 0 then
-                        active <= '0';
-                        infinite_mode <= '0';
-                        repeat_remaining <= (others => '0');
-                        segment_index <= (others => '0');
-                        cycles_remaining <= (others => '0');
-                        target_level <= start_level_cfg;
-                        current_level_fp <= to_fp16_16(start_level_cfg);
+                if active = '0' then
+                    repeat_count_reg <= repeat_count_in;
+                    if segment_count_in > to_unsigned(8, 4) then
+                        segment_count_reg <= to_unsigned(8, 4);
                     else
-                        active <= '1';
-                        infinite_mode <= '1' when repeat_count_cfg = 0 else '0';
-                        repeat_remaining <= repeat_count_cfg;
-                        segment_index <= (others => '0');
-                        cycles_remaining <= segment_duration(0);
-                        target_level <= sat_add16(start_level_cfg, segment_delta(0));
-                        current_level_fp <= to_fp16_16(start_level_cfg);
+                        segment_count_reg <= segment_count_in;
                     end if;
+                    idle_level_reg <= idle_level_in;
+                    segment_duration_reg <= segment_duration_in;
+                    segment_start_reg <= segment_start_in;
+                    segment_slope_reg <= segment_slope_in;
+                    current_level_fp <= idle_level_in & x"0000";
 
-                elsif active = '1' then
-                    current_seg_v := to_integer(segment_index);
-
-                    if current_seg_v >= segment_count_v then
-                        active <= '0';
-                        infinite_mode <= '0';
-                        repeat_remaining <= (others => '0');
-                        current_level_fp <= to_fp16_16(idle_level_cfg);
-                        target_level <= idle_level_cfg;
-                    elsif segment_duration(current_seg_v) = 0 or cycles_remaining = 0 or cycles_remaining = 1 then
-                        base_level_v := target_level;
-                        current_level_fp <= to_fp16_16(base_level_v);
-
-                        if current_seg_v + 1 < segment_count_v then
-                            segment_index <= to_unsigned(current_seg_v + 1, segment_index'length);
-                            cycles_remaining <= segment_duration(current_seg_v + 1);
-                            target_level <= sat_add16(base_level_v, segment_delta(current_seg_v + 1));
+                    if control_wire_in = '1' and control_prev = '0' then
+                        if segment_count_in = to_unsigned(0, 4) or segment_duration_in(0) = to_unsigned(0, 32) then
+                            active <= '0';
+                            cycle_count <= (others => '0');
+                            segment_index <= (others => '0');
+                            cycles_remaining <= (others => '0');
+                            current_level_fp <= idle_level_in & x"0000";
                         else
-                            if infinite_mode = '1' or repeat_remaining > to_unsigned(1, repeat_remaining'length) then
-                                if infinite_mode = '0' then
-                                    repeat_remaining <= repeat_remaining - 1;
-                                end if;
+                            active <= '1';
+                            cycle_count <= to_unsigned(1, 32);
+                            segment_index <= (others => '0');
+                            cycles_remaining <= segment_duration_in(0) - 1;
+                            current_level_fp <= segment_start_in(0) & x"0000";
+                        end if;
+                    end if;
+                else
+                    segment_count_v := to_integer(segment_count_reg);
+                    segment_index_v := to_integer(segment_index);
+
+                    if cycles_remaining = 0 then
+                        if segment_index_v + 1 < segment_count_v then
+                            if next_duration = to_unsigned(0, 32) then
+                                active <= '0';
+                                cycle_count <= (others => '0');
                                 segment_index <= (others => '0');
-                                cycles_remaining <= segment_duration(0);
-                                target_level <= sat_add16(start_level_cfg, segment_delta(0));
-                                current_level_fp <= to_fp16_16(start_level_cfg);
+                                cycles_remaining <= (others => '0');
+                                current_level_fp <= idle_level_fp;
+                            else
+                                segment_index <= segment_index + 1;
+                                cycles_remaining <= next_duration - 1;
+                                current_level_fp <= next_start_fp;
+                            end if;
+                        else
+                            if repeat_count_reg /= to_unsigned(0, 32) and cycle_count >= repeat_count_reg then
+                                active <= '0';
+                                cycle_count <= (others => '0');
+                                segment_index <= (others => '0');
+                                cycles_remaining <= (others => '0');
+                                current_level_fp <= idle_level_fp;
+                            elsif control_wire_in = '1' then
+                                if segment_duration_reg(0) = to_unsigned(0, 32) then
+                                    active <= '0';
+                                    cycle_count <= (others => '0');
+                                    segment_index <= (others => '0');
+                                    cycles_remaining <= (others => '0');
+                                    current_level_fp <= idle_level_fp;
+                                else
+                                    cycle_count <= cycle_count + 1;
+                                    segment_index <= (others => '0');
+                                    cycles_remaining <= segment_duration_reg(0) - 1;
+                                    current_level_fp <= segment0_start_fp;
+                                end if;
                             else
                                 active <= '0';
-                                infinite_mode <= '0';
-                                repeat_remaining <= (others => '0');
-                                if hold_last_level = '1' then
-                                    current_level_fp <= to_fp16_16(base_level_v);
-                                    target_level <= base_level_v;
-                                else
-                                    current_level_fp <= to_fp16_16(idle_level_cfg);
-                                    target_level <= idle_level_cfg;
-                                end if;
+                                cycle_count <= (others => '0');
+                                segment_index <= (others => '0');
+                                cycles_remaining <= (others => '0');
+                                current_level_fp <= idle_level_fp;
                             end if;
                         end if;
                     else
-                        current_level_fp <= current_level_fp + segment_slope(current_seg_v);
+                        next_level_v := current_level_fp + current_slope;
+                        current_level_fp <= next_level_v;
                         cycles_remaining <= cycles_remaining - 1;
                     end if;
                 end if;
+
+                control_prev <= control_wire_in;
             end if;
         end if;
     end process;

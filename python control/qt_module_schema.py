@@ -28,6 +28,14 @@ PLSG_SCHEMA = [
     {"key": "idle_freq", "label": "空闲频偏", "type": "float", "min": -1e9, "max": 1e9, "unit": "Hz", "mode": "indirect", "free": True, "note": "停止或清零后的输出频偏"},
 ]
 
+PLSG_SCHEMA = [
+    {"key": "control", "label": "Control", "type": "bool", "mode": "direct", "free": True, "note": "A 0-to-1 edge starts the pattern while idle, and a low level stops it at the end of a completed cycle."},
+    {"key": "repeat_count", "label": "Repeat Count", "type": "int", "min": 0, "max": 2**31 - 1, "mode": "direct", "free": True, "note": "0 means unlimited repeat."},
+    {"key": "segment_count", "label": "Segment Count", "type": "int", "min": 0, "max": 8, "mode": "direct", "free": False, "note": "Managed by the waveform configuration method."},
+    {"key": "start_freq", "label": "Segment 1 Start", "type": "float", "min": -1e9, "max": 1e9, "unit": "Hz", "mode": "indirect", "free": True, "note": "The start frequency of segment 1, mapped from the signed 16-bit output code."},
+    {"key": "idle_freq", "label": "Idle Frequency", "type": "float", "min": -1e9, "max": 1e9, "unit": "Hz", "mode": "indirect", "free": True, "note": "Output frequency while the module is idle."},
+]
+
 ACCM_SCHEMA = [
     # 直接参数
     {"key" : "low", "label" : "每周期慢变累加值低32位", "mode" : "direct", "free" : False, "note" : "与high组成64位累加值"},
