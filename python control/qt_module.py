@@ -366,8 +366,77 @@ class QuantityLineEdit(QLineEdit):
         self._refresh_view()
         super().focusOutEvent(event)
 
+class PIDParamCanvas(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumSize(300, 110)
+        self.setFixedHeight(125)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        rect = self.rect().adjusted(1, 1, -1, -1)
+        painter.fillRect(rect, QColor("#F7F8FA"))
+        painter.setPen(QPen(QColor("#C7CDD6"), 1))
+        painter.drawRoundedRect(rect, 8, 8)
+
+        title_font = QFont()
+        title_font.setBold(True)
+        title_font.setPointSize(8)
+        painter.setFont(title_font)
+        painter.setPen(QColor("#243447"))
+        painter.drawText(QRectF(rect.left() + 10, rect.top() + 6, rect.width() - 20, 18), Qt.AlignLeft | Qt.AlignVCenter, "PID Schematic")
+
+        body_font = QFont()
+        body_font.setPointSize(6)
+        painter.setFont(body_font)
+        painter.setPen(QColor("#8A94A6"))
+
+        plot_rect = QRectF(rect.left() + 18, rect.top() + 26, rect.width() - 36, rect.height() - 40)
+        painter.setPen(QPen(QColor("#D7DCE4"), 1))
+        painter.drawRoundedRect(plot_rect, 6, 6)
+
+        x0 = plot_rect.left() + 14
+        x1 = plot_rect.left() + plot_rect.width() * 0.26
+        x2 = plot_rect.left() + plot_rect.width() * 0.48
+        x3 = plot_rect.left() + plot_rect.width() * 0.72
+        x4 = plot_rect.right() - 14
+
+        y_high = plot_rect.top() + 14
+        y_mid = plot_rect.center().y() + 2
+
+        painter.setPen(QPen(QColor("#2F6BFF"), 3))
+        painter.drawLine(QPointF(x0, y_high), QPointF(x1, y_high))
+        painter.drawLine(QPointF(x1, y_high), QPointF(x2, y_mid))
+        painter.drawLine(QPointF(x2, y_mid), QPointF(x3, y_mid))
+        painter.drawLine(QPointF(x3, y_mid), QPointF(x4, y_high))
+
+        painter.setPen(QPen(QColor("#AAB4C2"), 1, Qt.DashLine))
+        painter.drawLine(QPointF(plot_rect.left() + 6, y_high), QPointF(x1, y_high))
+        painter.drawLine(QPointF(plot_rect.left() + 6, y_mid), QPointF(x3, y_mid))
+        painter.drawLine(QPointF(x1, y_high), QPointF(x1, plot_rect.bottom() - 6))
+        painter.drawLine(QPointF(x2, y_mid), QPointF(x2, plot_rect.bottom() - 6))
+        painter.drawLine(QPointF(x3, y_mid), QPointF(x3, plot_rect.bottom() - 6))
+
+        painter.setPen(QColor("#5C6678"))
+        painter.drawText(QRectF(x0 - 4, y_high - 16, 54, 12), Qt.AlignLeft | Qt.AlignVCenter, "饱和增益")
+        painter.drawText(QRectF((x2 + x3) / 2 - 14, y_mid - 16, 28, 12), Qt.AlignCenter | Qt.AlignVCenter, "增益")
+
+        painter.drawText(QRectF(x1 - 32, plot_rect.bottom() - 4, 64, 12), Qt.AlignCenter | Qt.AlignVCenter, "饱和拐点频率")
+        painter.drawText(QRectF(x2 - 16, plot_rect.bottom() - 16, 32, 12), Qt.AlignCenter | Qt.AlignVCenter, "PI拐点")
+        painter.drawText(QRectF(x3 - 16, plot_rect.bottom() - 16, 32, 12), Qt.AlignCenter | Qt.AlignVCenter, "PD拐点")
+
+        painter.setPen(QColor("#8A94A6"))
+        painter.drawText(QRectF(plot_rect.left(), plot_rect.bottom() + 2, plot_rect.width(), 10), Qt.AlignCenter | Qt.AlignVCenter, "Frequency")
+        painter.save()
+        painter.translate(plot_rect.left() - 7, plot_rect.center().y())
+        painter.rotate(-90)
+        painter.drawText(QRectF(-plot_rect.height() / 2, -16, plot_rect.height(), 10), Qt.AlignCenter | Qt.AlignVCenter, "Gain")
+        painter.restore()
+        painter.end()
+
 class ParamDialog(QDialog):
-    def __init__(self, schema: list[dict], values: dict, parent = None, apply_callback = None):
+    def __init__(self, schema: list[dict], values: dict, parent = None, apply_callback = None, companion_widget_factory = None):
         super().__init__(parent)
         self.setWindowTitle("参数修改")
         self._editors = {}
@@ -375,8 +444,19 @@ class ParamDialog(QDialog):
         self._apply_callback = apply_callback
         self._committed_values = {}
         self._enter_committed_keys = set()
+        self._companion_widget = None
 
-        layout = QFormLayout(self)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(12, 12, 12, 12)
+        root.setSpacing(12)
+        form_host = QWidget(self)
+        layout = QFormLayout(form_host)
+        root.addWidget(form_host, 0)
+
+        if callable(companion_widget_factory):
+            self._companion_widget = companion_widget_factory(self)
+            if self._companion_widget is not None:
+                root.addWidget(self._companion_widget, 0)
 
         for field in schema:
             key = field["key"]

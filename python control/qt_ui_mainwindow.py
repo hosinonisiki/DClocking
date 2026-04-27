@@ -34,6 +34,7 @@ from qt_module import (
     ModulePDHFSM,
     ModuleLinerTransformer,
     ParamDialog,
+    PIDParamCanvas,
     SpecialMethodDialog,
     set_param_apply_handler,
     set_param_open_handler,
@@ -297,7 +298,17 @@ class MainWindow(QMainWindow):
         card_layout.addLayout(title_row)
 
         if schema:
-            param_widget = ParamDialog(schema, node.get_params(), parent=self, apply_callback=node.set_params)
+            companion_widget_factory = None
+            if isinstance(node, ModulePID):
+                companion_widget_factory = lambda dialog_parent: PIDParamCanvas(dialog_parent)
+
+            param_widget = ParamDialog(
+                schema,
+                node.get_params(),
+                parent=self,
+                apply_callback=node.set_params,
+                companion_widget_factory=companion_widget_factory,
+            )
             param_widget.setWindowFlags(Qt.Widget)
             card_layout.addWidget(param_widget)
             card._param_widget = param_widget
