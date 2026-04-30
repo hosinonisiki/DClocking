@@ -1147,8 +1147,8 @@ begin
     )port map(
         clk => sys_clk_in, 
         rst => '0', -- Do not reset the debouncer during clock switching
-        input => sys_mmcm_sel_cmd_buf,
-        output => sys_mmcm_sel_cmd
+        keyin => sys_mmcm_sel_cmd_buf,
+        keyout => sys_mmcm_sel_cmd
     );
     sys_mmcm_sel_ctrl_inst : entity work.sys_mmcm_sel_ctrl port map(
         clk => sys_clk_in, -- Don't use clock from MMCM
@@ -1169,8 +1169,8 @@ begin
     )port map(
         clk => sys_clk, 
         rst => not sys_clk_locked, -- This will reset the system on power up
-        input => sys_rst_raw,
-        output => sys_rst_bar
+        keyin => sys_rst_raw,
+        keyout => sys_rst_bar
     );
     sys_rst <= not sys_rst_bar;
 

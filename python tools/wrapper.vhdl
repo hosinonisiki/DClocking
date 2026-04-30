@@ -1112,8 +1112,8 @@ begin
     )port map(
         clk => sys_clk, 
         rst => not sys_clk_locked, -- This will reset the system on power up
-        input => sys_rst_raw,
-        output => sys_rst_bar
+        keyin => sys_rst_raw,
+        keyout => sys_rst_bar
     );
     sys_rst <= not sys_rst_bar;
 
