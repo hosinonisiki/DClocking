@@ -135,7 +135,7 @@ module board_ku060_adda_top(
 
   wire clk_250M;
   wire ad9144_core_reset;
-//  wire [255:0]ad9144_tx_data_tdata;
+  wire [255:0]ad9144_tx_data_tdata;
   wire ad9144_tx_data_tready;
   wire ad9144_tx_sync_0;
   wire ad9144_tx_sync_1;
@@ -186,15 +186,17 @@ wire    [63:0]  ad9144_tx_data_tdata_ch1;
 wire    [63:0]  ad9144_tx_data_tdata_ch2;
 wire    [63:0]  ad9144_tx_data_tdata_ch3;
 
-vio_dac_data vio_dac_data (
-  .clk(ad9144_core_clk_o),                // input wire clk
-  .probe_out0(ad9144_tx_data_tdata_ch0),  // output wire [63 : 0] probe_out0
-  .probe_out1(ad9144_tx_data_tdata_ch1),  // output wire [63 : 0] probe_out1
-  .probe_out2(ad9144_tx_data_tdata_ch2),  // output wire [63 : 0] probe_out2
-  .probe_out3(ad9144_tx_data_tdata_ch3)  // output wire [63 : 0] probe_out3
-);
-//assign ad9144_tx_data_tdata = {ad9144_tx_data_tdata_ch3,ad9144_tx_data_tdata_ch2,ad9144_tx_data_tdata_ch1,ad9144_tx_data_tdata_ch0};
-
+//vio_dac_data vio_dac_data (
+//  .clk(ad9144_core_clk_o),                // input wire clk
+//  .probe_out0(ad9144_tx_data_tdata_ch0),  // output wire [63 : 0] probe_out0
+//  .probe_out1(ad9144_tx_data_tdata_ch1),  // output wire [63 : 0] probe_out1
+//  .probe_out2(ad9144_tx_data_tdata_ch2),  // output wire [63 : 0] probe_out2
+//  .probe_out3(ad9144_tx_data_tdata_ch3)  // output wire [63 : 0] probe_out3
+//);
+assign ad9144_tx_data_tdata_ch0 = ad9144_tx_data_tdata[63:0];
+assign ad9144_tx_data_tdata_ch1 = ad9144_tx_data_tdata[127:64];
+assign ad9144_tx_data_tdata_ch2 = ad9144_tx_data_tdata[191:128];
+assign ad9144_tx_data_tdata_ch3 = ad9144_tx_data_tdata[255:192];
   adda_top adda_top_i
        (.ad9144_core_clk_o(ad9144_core_clk_o),
         .ad9144_refclk_0_clk_n(gty127_clk_n),
@@ -285,16 +287,19 @@ assign ad9144_cs = csb[10];
 assign sdio_i[10] = ad9144_miso; 
 
 
-wire    dac_tx_en ;
-wire    rf_tx_en ;
-vio_dac_txen vio_dac_txen (
-  .clk(ad9144_core_clk_o),                // input wire clk
-  .probe_out0(dac_tx_en),  // output wire [0 : 0] probe_out0
-  .probe_out1(rf_tx_en)  // output wire [0 : 0] probe_out1
-);
-assign ad9144_tx_en0 = dac_tx_en;
-assign ad9144_tx_en1 = dac_tx_en;
-assign rf_out_en = {rf_tx_en,rf_tx_en,rf_tx_en,rf_tx_en};
+//wire    dac_tx_en ;
+//wire    rf_tx_en ;
+//vio_dac_txen vio_dac_txen (
+//  .clk(ad9144_core_clk_o),                // input wire clk
+//  .probe_out0(dac_tx_en),  // output wire [0 : 0] probe_out0
+//  .probe_out1(rf_tx_en)  // output wire [0 : 0] probe_out1
+//);
+//assign ad9144_tx_en0 = dac_tx_en;
+//assign ad9144_tx_en1 = dac_tx_en;
+//assign rf_out_en = {rf_tx_en,rf_tx_en,rf_tx_en,rf_tx_en};
+assign ad9144_tx_en0 = ad9144_tx_valid;
+assign ad9144_tx_en1 = ad9144_tx_valid;
+assign rf_out_en = {ad9144_tx_valid,ad9144_tx_valid,ad9144_tx_valid,ad9144_tx_valid};
 
 assign ad9144_core_reset = gpio_o[5];
 ////j69     
@@ -405,17 +410,17 @@ assign ads54j60_adc_data_ch1    =  ads54j60_fifo_data_ch1[15:0]    ;
 assign ads54j60_adc_valid       =  ads54j60_fifo_valid       ;
 
 
-// ///ad9144  
-//  dac_axi256_tx  dac_axis256_tx_inst(
-//        .clk (ad9144_core_clk_o),
-//        .rst(ad9144_core_reset),
-//        .tx_tdata_out (ad9144_tx_data_tdata),
-//        .tx_tready_in(ad9144_tx_valid),
-//        .data_a_in (ad9144_tx_data_ch0),
-//        .data_b_in (ad9144_tx_data_ch1),
-//        .data_c_in (ad9144_tx_data_ch2),
-//        .data_d_in (ad9144_tx_data_ch3)       
-//    );
+ ///ad9144  
+  dac_axi256_tx  dac_axis_tx256_inst(
+        .clk (ad9144_core_clk_o),
+        .rst(ad9144_core_reset),
+        .tx_tdata_out (ad9144_tx_data_tdata),
+        .tx_tready_in(ad9144_tx_valid),
+        .data_a_in (ad9144_tx_data_ch0),
+        .data_b_in (ad9144_tx_data_ch1),
+        .data_c_in (ad9144_tx_data_ch2),
+        .data_d_in (ad9144_tx_data_ch3)       
+    );
 //assign gpio2_i[31:0] = mod_if_freq_H;
 //assign gpio3_i[31:0] = mod_if_freq_L;
 //ila_0 ila_data (

@@ -130,8 +130,33 @@ module wrapper_KU060_custom(
     wire sys_rst_bar;
     wire sys_mmcm_rst;
     
-//clk
- 
+////clk
+//wire gty_128_clk;
+// IBUFDS_GTEY #(
+//    .REFCLK_HROW_CK_SEL(2'b00),        // HROW时钟选择，通常设为00
+//    .CLKCM_CFG("TRUE"),                 // 时钟校正配置
+//    .CLKRCV_TRST("TRUE"),               // 接收器测试
+//    .CLKRCV_DLY_B(1'b0),                // 接收延迟
+//    .REFCLK_SRC("REF_PLL"),             // 参考时钟源选择
+//    .SIM_DEVICE("ULTRASCALE_PLUS")      // 仿真用，根据实际芯片修改
+//) gty_ibufds_inst (
+//    .O          (gty_128_clk),    // 单端时钟输出
+//    .ODIV2      (),                     // 二分频输出（不需要可悬空）
+//    .I          (gty128_clk_p),         // 差分输入P
+//    .IB         (gty128_clk_n)          // 差分输入N
+//);
+
+//wire global_clk;
+//BUFG_GT bufg_gt_inst (
+//    .O          (global_clk),           // 全局时钟输出
+//    .CE         (1'b1),                 // 时钟使能（高有效）
+//    .CEMASK     (1'b0),                 // CE屏蔽
+//    .CLR        (1'b0),                 // 异步清零
+//    .CLRMASK    (1'b0),                 // CLR屏蔽
+//    .DIV        (3'b000),               // 分频系数：000=不分频，001=2分频...
+//    .I          (gty_128_clk)     // 时钟输入
+//);
+
 //IBUFDS #(
 //    .DIFF_TERM("FALSE"),        // HR Bank 不支持，必须设为 FALSE
 //    .IBUF_LOW_PWR("TRUE"),
@@ -150,7 +175,19 @@ IBUFDS core_clk_ibufds (
     .I (core_clk_in_buf),
     .O (core_clk)
 ); 
-    
+//wire core_clk_200M;
+//  clk_wiz_0 inst_core_clk
+//  (
+//  // Clock out ports  
+//  .clk_out1(core_clk),
+//  .clk_out2(core_clk_200M),
+//  // Status and control signals               
+//  .reset(sys_rst), 
+//  .locked(),
+// // Clock in ports
+//  .clk_in1_p(coreclk_p),
+//  .clk_in1_n(coreclk_n)
+//  );    
 
          
     board_ku060_adda_top  u_adda_top(  
@@ -177,7 +214,7 @@ IBUFDS core_clk_ibufds (
         
         .gty127_clk_n(gty127_clk_n),
         .gty127_clk_p(gty127_clk_p),
-        .sysclk (sys_clk),
+        .sysclk (sys_clk_in),
 //        .sysclk_n(sysclk_n),
 //        .sysclk_p(sysclk_p),
         .sysrefclk_n(sysrefclk_n),
@@ -308,8 +345,7 @@ IBUFDS sys_clk_ibufds (
     .I (sys_clk_in_buf),
     .O (sys_clk_in)
 ); 
-   
-  sys_clk_mmcm1  sys_clk_mmcm1_inst   (
+ sys_clk_mmcm1  sys_clk_mmcm1_inst   (
         .clk_out1 ( sys_clk_buf),
         .clk_out2 ( sys_clk_125M_buf), 
         .clk_out3 ( sys_clk_250M_buf),
@@ -317,12 +353,22 @@ IBUFDS sys_clk_ibufds (
         .reset (sys_mmcm_rst),
         
         .locked ( sys_clk_locked),
-        .clk_in1 ( sys_clk_in),
-        .clk_in2 (core_clk),
-//        .clk_in2_p ( coreclk_p),
-//        .clk_in2_n ( coreclk_n),
-        .clk_in_sel ( sys_mmcm_sel )//'1' for sys_clk, '0' for ref_clk
-    );
+        .clk_in1 (core_clk)
+    );   
+//  sys_clk_mmcm1  sys_clk_mmcm1_inst   (
+//        .clk_out1 ( sys_clk_buf),
+//        .clk_out2 ( sys_clk_125M_buf), 
+//        .clk_out3 ( sys_clk_250M_buf),
+//        .clk_out4 ( sys_clk_500M_buf),
+//        .reset (sys_mmcm_rst),
+        
+//        .locked ( sys_clk_locked),
+//        .clk_in1 ( sys_clk_in),
+//        .clk_in2 (core_clk),
+////        .clk_in2_p ( coreclk_p),
+////        .clk_in2_n ( coreclk_n),
+//        .clk_in_sel ( sys_mmcm_sel )//'1' for sys_clk, '0' for ref_clk
+//    );
     
    BUFGCE  sys_clk_bufgce(
         .O ( sys_clk),
