@@ -298,9 +298,7 @@ IBUFDS core_clk_ibufds (
        
  top #(
     .ADC_channel_count(4),    // ADC 通道数，可修改
-    .DAC_channel_count(4),    // DAC 通道数，可修改
-    .ADC_DATA_WIDTH   (16),   // 每通道 ADC 数据位宽，可修改
-    .DAC_DATA_WIDTH   (16)    // 每通道 DAC 数据位宽，可修改
+    .DAC_channel_count(4)    // DAC 通道数，可修改
 ) u_top (
         .clk    (sys_clk),           // 输入时钟
         .rst    (sys_rst),           // 复位
@@ -353,7 +351,9 @@ IBUFDS sys_clk_ibufds (
         .reset (sys_mmcm_rst),
         
         .locked ( sys_clk_locked),
-        .clk_in1 (core_clk)
+        .clk_in1 ( sys_clk_in),
+        .clk_in2 ( core_clk),
+        .clk_in_sel ( sys_mmcm_sel )//'1' for sys_clk, '0' for ref_clk
     );   
 //  sys_clk_mmcm1  sys_clk_mmcm1_inst   (
 //        .clk_out1 ( sys_clk_buf),

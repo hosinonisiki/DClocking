@@ -46,6 +46,9 @@ architecture full of signal_router is
     signal ctrl_out_hold_reg : std_logic_vector(63 downto 0) := (others => '0');
 
     constant ctrl_base_addr : integer := 512;
+
+    attribute max_fanout : integer;
+    attribute max_fanout of control : signal is 10;
 begin
     use_input_buffer : if io_buf = buf_for_io or io_buf = buf_i_only generate
         process(clk)
@@ -87,7 +90,12 @@ begin
         ctrl_out <= (others => '0') when rst = '1' else ctrl_out_buf;
     end generate;
 
-    control <= core_param_in;
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            control <= core_param_in;
+        end if;
+    end process;
 
     routings : for i in 0 to 63 generate
         process(clk)
