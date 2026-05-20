@@ -352,7 +352,7 @@ IBUFDS sys_clk_ibufds (
         
         .locked ( sys_clk_locked),
         .clk_in1 ( sys_clk_in),
-        .clk_in2 ( core_clk),
+        .clk_in2 ( ),
         .clk_in_sel ( sys_mmcm_sel )//'1' for sys_clk, '0' for ref_clk
     );   
 //  sys_clk_mmcm1  sys_clk_mmcm1_inst   (
