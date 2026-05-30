@@ -10,4 +10,6 @@ modules/moku_mim_wrapper/mcc\ srcs
 
 testbenches/
 
-**.pycFPGA_Agent/config.json
+**.pyc
+__pycache__/
+FPGA_Agent/config.json
