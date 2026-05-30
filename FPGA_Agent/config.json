@@ -1,0 +1,13 @@
+{
+  "llm": {
+    "endpoint": "https://api.deepseek.com/v1",
+    "api_key": "sk-ee482931e446412aa9af9c9fbbe86678",
+    "model": "deepseek-chat",
+    "temperature": 0.1,
+    "max_tokens": 4096
+  },
+  "agent": {
+    "max_tool_iterations": 15,
+    "auto_layout_after_create": true
+  }
+}
