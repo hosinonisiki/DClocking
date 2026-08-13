@@ -173,6 +173,10 @@ class Port(QObject):
                         try:
                             self.parent.sync_from_device()
                         except Exception as sync_exc:
+                            if hasattr(self.parent, "_report_error"):
+                                self.parent._report_error(
+                                    f"[serial] connected but sync failed: {sync_exc}"
+                                )
                             qw.QMessageBox.warning(
                                 self.parent,
                                 self.tr("同步失败"),
@@ -185,6 +189,8 @@ class Port(QObject):
                     self.parent.connect_btn.setText(self.tr("连接"))
                     if hasattr(self.parent, "init_btn"):
                         self.parent.init_btn.setEnabled(False)
+                    if hasattr(self.parent, "_report_error"):
+                        self.parent._report_error(f"[serial] connection failed: {e}")
                     qw.QMessageBox.critical(
                         self.parent,
                         self.tr("连接失败"),

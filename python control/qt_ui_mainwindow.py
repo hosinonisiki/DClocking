@@ -476,6 +476,12 @@ class MainWindow(QMainWindow):
             message += "\n"
         self._append_error_text(message)
 
+    def _report_config_error(self, text):
+        message = str(text)
+        if hasattr(self, "_config_load_errors"):
+            self._config_load_errors.append(message)
+        self._report_error(message)
+
     def closeEvent(self, event):
         self._save_ui_state()
         self._restore_log_redirect()
@@ -1604,7 +1610,9 @@ class MainWindow(QMainWindow):
         component_name = node_cfg.get("component_name")
         cls = self.view.module_factory.get(component_name)
         if cls is None:
-            print(f"[config] skip unknown component: {component_name}")
+            self._report_config_error(
+                f"[config] skip unknown component: {component_name}"
+            )
             return None
 
         try:
@@ -1613,7 +1621,9 @@ class MainWindow(QMainWindow):
             pos = QPointF(float(pos_cfg.get("x", 0.0)), float(pos_cfg.get("y", 0.0)))
             node = cls(component_name, idx, pos)
         except Exception as exc:
-            print(f"[config] create node failed: {node_cfg}: {exc}")
+            self._report_config_error(
+                f"[config] create node failed: {node_cfg}: {exc}"
+            )
             return None
 
         self.view._used_indices.setdefault(component_name, set()).add(idx)
@@ -1628,14 +1638,18 @@ class MainWindow(QMainWindow):
             src_port = self._resolve_port_ref(edge_cfg.get("src"), node_map)
             dst_port = self._resolve_port_ref(edge_cfg.get("dst"), node_map)
             if src_port is None or dst_port is None:
-                print(f"[config] skip invalid edge: {edge_cfg}")
+                self._report_config_error(f"[config] skip invalid edge: {edge_cfg}")
                 continue
 
             if dst_port.port_type != "in":
-                print(f"[config] skip non-input destination edge: {edge_cfg}")
+                self._report_config_error(
+                    f"[config] skip non-input destination edge: {edge_cfg}"
+                )
                 continue
             if dst_port.has_connection():
-                print(f"[config] skip occupied destination edge: {edge_cfg}")
+                self._report_config_error(
+                    f"[config] skip occupied destination edge: {edge_cfg}"
+                )
                 continue
 
             edge = EdgeItem(src_port, dst_port)
@@ -1654,7 +1668,10 @@ class MainWindow(QMainWindow):
             src_port_num = resolve_port_number(src_name, src_port.index, "out")
             dst_port_num = resolve_port_number(dst_name, dst_port.index, "in")
             if src_port_num is None or dst_port_num is None:
-                print(f"[config] skip unresolved route: {src_name}:{src_port.index} -> {dst_name}:{dst_port.index}")
+                self._report_config_error(
+                    f"[config] skip unresolved route: {src_name}:{src_port.index} -> "
+                    f"{dst_name}:{dst_port.index}"
+                )
                 continue
 
             self._apply_routing(
@@ -1673,7 +1690,9 @@ class MainWindow(QMainWindow):
                     router.upload()
                     print(f"[route] uploaded staged routes: {staged_routes}")
                 except Exception as exc:
-                    self._report_error(f"[route] failed final batch upload: {exc}")
+                    self._report_config_error(
+                        f"[route] failed final batch upload: {exc}"
+                    )
 
     def load_configuration(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "加载配置", "", "JSON Files (*.json);;All Files (*)")
@@ -1692,6 +1711,8 @@ class MainWindow(QMainWindow):
         if not isinstance(nodes_cfg, list) or not isinstance(edges_cfg, list):
             self._report_error("[config] invalid format: nodes/edges must be list")
             return
+
+        self._config_load_errors = []
 
         self._disconnect_all_connections()
         self._clear_canvas(emit_connection_removed=False)
@@ -1721,7 +1742,7 @@ class MainWindow(QMainWindow):
                 try:
                     node.apply_special_method(method_name, method_args if isinstance(method_args, dict) else {})
                 except Exception as exc:
-                    self._report_error(
+                    self._report_config_error(
                         f"[config] apply special method failed for {node.name}.{method_name}: {exc}"
                     )
 
@@ -1734,11 +1755,18 @@ class MainWindow(QMainWindow):
             try:
                 node.set_params(direct_params)
             except Exception as exc:
-                self._report_error(
+                self._report_config_error(
                     f"[config] apply direct params failed for {node.name}: {exc}"
                 )
 
         self._restore_edges(edges_cfg, node_map, batch_upload=True)
         self.view.center_on_nodes()
         self._refresh_ui_status()
-        print(f"[config] loaded: {file_path}")
+        if self._config_load_errors:
+            self._report_error(
+                f"[config] partially loaded: {file_path} "
+                f"({len(self._config_load_errors)} issue(s))"
+            )
+        else:
+            print(f"[config] loaded: {file_path}")
+        del self._config_load_errors

@@ -98,6 +98,48 @@ class MainWindowShellTests(unittest.TestCase):
         self.assertTrue(self.window.is_log_expanded())
         self.assertIn("load failed", self.window.log_output.toPlainText())
 
+    def test_partial_config_reports_skipped_items_instead_of_success(self):
+        config = Path(self.temp_dir.name) / "partial.json"
+        config.write_text(
+            '{"version": 1, "mode": "Free Mode", '
+            '"nodes": [{"component_name": "未知模块", "index": 0}], '
+            '"edges": []}',
+            encoding="utf-8",
+        )
+        with patch(
+            "qt_ui_mainwindow.QFileDialog.getOpenFileName",
+            return_value=(str(config), "JSON (*.json)"),
+        ):
+            self.window.load_configuration()
+        log = self.window.log_output.toPlainText()
+        self.assertIn("skip unknown component", log)
+        self.assertIn("partially loaded", log)
+        self.assertNotIn(f"[config] loaded: {config}", log)
+
+    def test_serial_constructor_failure_logs_original_exception(self):
+        class FakeSerial:
+            def isOpen(self):
+                return False
+
+            def open(self, _mode):
+                return True
+
+            def clear(self):
+                pass
+
+            def close(self):
+                pass
+
+        self.window.port_ctrl.serial_port = FakeSerial()
+        with (
+            patch.object(self.window.port_ctrl, "setport"),
+            patch("qt_Port.QtSerial", side_effect=RuntimeError("wire failure")),
+            patch("qt_Port.qw.QMessageBox.critical"),
+        ):
+            self.window.port_ctrl.open_port()
+        self.assertTrue(self.window.is_log_expanded())
+        self.assertIn("wire failure", self.window.log_output.toPlainText())
+
 
 if __name__ == "__main__":
     unittest.main()
