@@ -1173,13 +1173,14 @@ class MainWindow(QMainWindow):
             return f"{node_name}[{int(getattr(candidates[0], 'index', 0))}]"
         return f"{node_name}[?]"
 
-    def _ensure_router(self):
+    def _ensure_router(self, error_reporter=None):
+        report_error = error_reporter or self._report_error
         if not self.port_ctrl.is_open():
-            self._report_error("[route] serial port not open, routing not sent")
+            report_error("[route] serial port not open, routing not sent")
             return None
         hw_router = getattr(self.port_ctrl.hw_controller, "router", None)
         if hw_router is None:
-            self._report_error("[route] router is not ready")
+            report_error("[route] router is not ready")
             return None
         self.router = hw_router
         return self.router
@@ -1201,10 +1202,10 @@ class MainWindow(QMainWindow):
         upload_immediately=True,
         error_reporter=None,
     ):
-        router = self._ensure_router()
+        report_error = error_reporter or self._report_error
+        router = self._ensure_router(error_reporter=report_error)
         if router is None:
             return False
-        report_error = error_reporter or self._report_error
         try:
             router.set_routing(dst_port_num, src_port_num)
             if upload_immediately:

@@ -166,6 +166,19 @@ class MainWindowShellTests(unittest.TestCase):
         self.assertEqual(len(self.window._config_load_errors), 1)
         self.assertIn("route staging failed", self.window._config_load_errors[0])
 
+    def test_missing_router_during_batch_restore_counts_as_config_error(self):
+        self.window._config_load_errors = []
+        success = self.window._apply_routing(
+            1,
+            2,
+            "offline route",
+            upload_immediately=False,
+            error_reporter=self.window._report_config_error,
+        )
+        self.assertFalse(success)
+        self.assertEqual(len(self.window._config_load_errors), 1)
+        self.assertIn("serial port not open", self.window._config_load_errors[0])
+
 
 if __name__ == "__main__":
     unittest.main()
