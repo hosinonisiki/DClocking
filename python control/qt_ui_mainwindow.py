@@ -1193,10 +1193,18 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             print(f"[sync] skip cache prime route : {exc}")
 
-    def _apply_routing(self, dst_port_num, src_port_num, label, upload_immediately=True):
+    def _apply_routing(
+        self,
+        dst_port_num,
+        src_port_num,
+        label,
+        upload_immediately=True,
+        error_reporter=None,
+    ):
         router = self._ensure_router()
         if router is None:
-            return
+            return False
+        report_error = error_reporter or self._report_error
         try:
             router.set_routing(dst_port_num, src_port_num)
             if upload_immediately:
@@ -1204,8 +1212,10 @@ class MainWindow(QMainWindow):
                 print(f"[route] sent: {label} ({src_port_num} -> {dst_port_num})")
             else:
                 print(f"[route] staged: {label} ({src_port_num} -> {dst_port_num})")
+            return True
         except Exception as exc:
-            self._report_error(f"[route] failed: {label}: {exc}")
+            report_error(f"[route] failed: {label}: {exc}")
+            return False
 
     def _clear_all_routes(self):
         hw_controller = getattr(self.port_ctrl, "hw_controller", None)
@@ -1674,13 +1684,16 @@ class MainWindow(QMainWindow):
                 )
                 continue
 
-            self._apply_routing(
+            route_applied = self._apply_routing(
                 dst_port_num,
                 src_port_num,
                 f"{src_name}:Out{src_port.index + 1} -> {dst_name}:In{dst_port.index + 1}",
                 upload_immediately=not batch_upload,
+                error_reporter=(
+                    self._report_config_error if batch_upload else None
+                ),
             )
-            if batch_upload:
+            if batch_upload and route_applied:
                 staged_routes += 1
 
         if batch_upload and staged_routes > 0:

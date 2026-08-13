@@ -140,6 +140,32 @@ class MainWindowShellTests(unittest.TestCase):
         self.assertTrue(self.window.is_log_expanded())
         self.assertIn("wire failure", self.window.log_output.toPlainText())
 
+    def test_failed_batch_route_is_not_counted_or_uploaded(self):
+        class BrokenRouter:
+            def __init__(self):
+                self.upload_calls = 0
+
+            def set_routing(self, _dst, _src):
+                raise RuntimeError("route staging failed")
+
+            def upload(self):
+                self.upload_calls += 1
+
+        router = BrokenRouter()
+        self.window._config_load_errors = []
+        with patch.object(self.window, "_ensure_router", return_value=router):
+            success = self.window._apply_routing(
+                1,
+                2,
+                "test route",
+                upload_immediately=False,
+                error_reporter=self.window._report_config_error,
+            )
+        self.assertFalse(success)
+        self.assertEqual(router.upload_calls, 0)
+        self.assertEqual(len(self.window._config_load_errors), 1)
+        self.assertIn("route staging failed", self.window._config_load_errors[0])
+
 
 if __name__ == "__main__":
     unittest.main()
