@@ -1,5 +1,7 @@
 import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QWidget
@@ -33,6 +35,7 @@ class MainWindowShellTests(unittest.TestCase):
             self.assertIsNotNone(self.window.findChild(QWidget, name))
         self.assertTrue(self.window.agent_toggle_btn.isHidden())
         self.assertTrue(self.window.agent_fab.isHidden())
+        self.assertTrue(self.window.settings_rail_btn.isHidden())
         self.assertFalse(self.window.is_log_expanded())
 
     def test_existing_controls_and_slots_are_reused(self):
@@ -63,6 +66,37 @@ class MainWindowShellTests(unittest.TestCase):
             self.assertAlmostEqual(actual[1], expected[1], delta=12)
         finally:
             restored.close()
+
+    def test_clear_refreshes_route_status(self):
+        from PySide6.QtCore import QPointF
+        from qt_module import ModuleScaler
+
+        source = ModuleScaler("线性缩放器", 0, QPointF(-200, 0))
+        target = ModuleScaler("线性缩放器", 1, QPointF(200, 0))
+        self.window.scene.addItem(source)
+        self.window.scene.addItem(target)
+        self.window.scene.create_connection(source.out_ports[0], target.in_ports[0])
+        self.window._refresh_ui_status()
+        self.assertEqual(self.window.route_status_label.text(), "1 routes")
+        self.window._clear_canvas(False)
+        self.assertEqual(self.window.route_status_label.text(), "0 routes")
+
+    def test_offline_route_and_bad_config_expand_error_log(self):
+        self.window.set_log_expanded(False)
+        self.assertIsNone(self.window._ensure_router())
+        self.assertTrue(self.window.is_log_expanded())
+        self.assertIn("serial port not open", self.window.log_output.toPlainText())
+
+        bad_config = Path(self.temp_dir.name) / "bad.json"
+        bad_config.write_text("{not json", encoding="utf-8")
+        self.window.set_log_expanded(False)
+        with patch(
+            "qt_ui_mainwindow.QFileDialog.getOpenFileName",
+            return_value=(str(bad_config), "JSON (*.json)"),
+        ):
+            self.window.load_configuration()
+        self.assertTrue(self.window.is_log_expanded())
+        self.assertIn("load failed", self.window.log_output.toPlainText())
 
 
 if __name__ == "__main__":

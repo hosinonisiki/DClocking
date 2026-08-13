@@ -428,6 +428,8 @@ class DiagramScene(QGraphicsScene):
         return None
 
     def _apply_preview_style(self, pen, start_port, end_port=None):
+        pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
         sig = self._preview_style(start_port, end_port)
         if sig == "phase":
             pen.setStyle(Qt.CustomDashLine)
@@ -479,13 +481,7 @@ class DiagramScene(QGraphicsScene):
 
     def mouseMoveEvent(self, event):
         if self.temp_line and self.start_port:
-            p1 = self.start_port.scenePos()
             p2 = event.scenePos()
-
-            path = QPainterPath()
-            path.moveTo(p1)
-
-            s_node = self.start_port.parent_node if hasattr(self.start_port, "parent_node") and self.start_port.parent_node else self.start_port
             hovered_items = self.items(event.scenePos())
             hovered_port = None
             for it in hovered_items:
@@ -507,54 +503,64 @@ class DiagramScene(QGraphicsScene):
                 self._apply_preview_style(pen, self.start_port)
                 pen.setWidth(self._preview_width(self.start_port))
                 self.temp_line.setPen(pen)
-
-            dx = abs(p2_ref.x() - s_node.scenePos().x())
-            dy = abs(p2_ref.y() - s_node.scenePos().y())
-            node_w = s_node.width
-            node_h = s_node.height
-
-            if dx <= node_w and dy > node_h:
-                h_extend = self.start_port.get_reverse_h_extend()
-                bypass_offset = self.start_port.get_bypass_offset()
-                if hovered_port:
-                    tmp_edge = EdgeItem(self.start_port, hovered_port)
-                    bypass_y = tmp_edge._calculate_bypass_y(bypass_offset)
-                    tmp_edge.remove()
-                else:
-                    if p2.y() > p1.y():
-                        bypass_y = max(s_node.scenePos().y() + node_h / 2, p2.y()) + bypass_offset
-                    else:
-                        bypass_y = min(s_node.scenePos().y() - node_h / 2, p2.y()) - bypass_offset
-
-                route = [
-                    p1,
-                    QPointF(p1.x() + h_extend, p1.y()),
-                    QPointF(p1.x() + h_extend, bypass_y),
-                    QPointF(p2_ref.x() - h_extend, bypass_y),
-                    QPointF(p2_ref.x() - h_extend, p2_ref.y()),
-                    p2_ref,
-                ]
-                for pt in route[1:]:
-                    path.lineTo(pt)
-            else:
-                if p2.x() < p1.x():
-                    h_extend = self.start_port.get_reverse_h_extend()
-                    bypass_offset = self.start_port.get_bypass_offset()
-                    bypass_y = p1.y() - bypass_offset
-                    path.lineTo(p1.x() + h_extend, p1.y())
-                    path.lineTo(p1.x() + h_extend, bypass_y)
-                    path.lineTo(p2.x() - h_extend, bypass_y)
-                    path.lineTo(p2.x() - h_extend, p2.y())
-                    path.lineTo(p2.x(), p2.y())
-                else:
-                    turn_x = p1.x() + self.start_port.get_turn_distance()
-                    path.lineTo(turn_x, p1.y())
-                    path.lineTo(turn_x, p2.y())
-                    path.lineTo(p2.x(), p2.y())
-
-            self.temp_line.setPath(path)
+            self.temp_line.setPath(self._preview_connection_path(p2, hovered_port))
 
         super().mouseMoveEvent(event)
+
+    def _preview_connection_path(self, cursor_pos, hovered_port=None):
+        """Build a drag-preview path, snapping its endpoint to a hovered port."""
+        path = QPainterPath()
+        if not self.start_port:
+            return path
+
+        p1 = self.start_port.scenePos()
+        p2 = hovered_port.scenePos() if hovered_port is not None else cursor_pos
+        path.moveTo(p1)
+        s_node = (
+            self.start_port.parent_node
+            if getattr(self.start_port, "parent_node", None)
+            else self.start_port
+        )
+        dx = abs(p2.x() - s_node.scenePos().x())
+        dy = abs(p2.y() - s_node.scenePos().y())
+        node_w = s_node.width
+        node_h = s_node.height
+
+        if dx <= node_w and dy > node_h:
+            h_extend = self.start_port.get_reverse_h_extend()
+            bypass_offset = self.start_port.get_bypass_offset()
+            if hovered_port is not None:
+                tmp_edge = EdgeItem(self.start_port, hovered_port)
+                bypass_y = tmp_edge._calculate_bypass_y(bypass_offset)
+                tmp_edge.remove()
+            elif p2.y() > p1.y():
+                bypass_y = max(s_node.scenePos().y() + node_h / 2, p2.y()) + bypass_offset
+            else:
+                bypass_y = min(s_node.scenePos().y() - node_h / 2, p2.y()) - bypass_offset
+            route = (
+                p1,
+                QPointF(p1.x() + h_extend, p1.y()),
+                QPointF(p1.x() + h_extend, bypass_y),
+                QPointF(p2.x() - h_extend, bypass_y),
+                QPointF(p2.x() - h_extend, p2.y()),
+                p2,
+            )
+            for point in route[1:]:
+                path.lineTo(point)
+        elif p2.x() < p1.x():
+            h_extend = self.start_port.get_reverse_h_extend()
+            bypass_y = p1.y() - self.start_port.get_bypass_offset()
+            path.lineTo(p1.x() + h_extend, p1.y())
+            path.lineTo(p1.x() + h_extend, bypass_y)
+            path.lineTo(p2.x() - h_extend, bypass_y)
+            path.lineTo(p2.x() - h_extend, p2.y())
+            path.lineTo(p2)
+        else:
+            turn_x = p1.x() + self.start_port.get_turn_distance()
+            path.lineTo(turn_x, p1.y())
+            path.lineTo(turn_x, p2.y())
+            path.lineTo(p2)
+        return path
 
     def mouseReleaseEvent(self, event):
         if self.temp_line and self.start_port:

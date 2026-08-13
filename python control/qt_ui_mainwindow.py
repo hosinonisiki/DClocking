@@ -108,6 +108,8 @@ class MainWindow(QMainWindow):
         self.save_cfg_btn = QPushButton("保存配置")
         self.load_cfg_btn = QPushButton("加载配置")
         self.clear_btn = QPushButton("清空画布")
+        self._serial_was_open = False
+        self.connect_btn.pressed.connect(self._capture_serial_state)
         serial_bar = QWidget(self)
         serial_bar.setObjectName("command_bar")
         serial_bar.setFixedHeight(64)
@@ -205,6 +207,7 @@ class MainWindow(QMainWindow):
         self.log_rail_btn = add_rail_button("⌁", "运行日志")
         rail_layout.addStretch()
         self.settings_rail_btn = add_rail_button("⚙", "Agent 设置")
+        self.settings_rail_btn.hide()
 
         self.design_rail_btn.clicked.connect(self.view.setFocus)
         self.param_rail_btn.clicked.connect(self._focus_inspector)
@@ -346,6 +349,16 @@ class MainWindow(QMainWindow):
         self.agent_fab.setText("AI")
         self.agent_toggle_btn.show()
         self.agent_fab.show()
+        self.settings_rail_btn.show()
+        saved_state = self._settings.value("window/agent_main_state")
+        if saved_state:
+            self.restoreState(saved_state)
+        preferred_width = int(self._settings.value("window/agent_width", 340))
+        self.resizeDocks([dock], [max(320, preferred_width)], Qt.Horizontal)
+        should_show = self._settings.value(
+            "window/agent_visible", False, type=bool
+        )
+        action.setChecked(should_show)
         self._position_agent_fab()
         return action
 
@@ -368,15 +381,25 @@ class MainWindow(QMainWindow):
         self.route_status_label.setText(f"{route_count} routes")
 
     def _refresh_connection_presentation(self):
+        if not self._serial_was_open and not self.serial_port.isOpen():
+            self._report_error("[serial] unable to open serial port")
         if self.connect_btn.text() == "连接":
             self.connect_btn.setText("连接设备")
         self._refresh_ui_status()
 
+    def _capture_serial_state(self):
+        self._serial_was_open = self.serial_port.isOpen()
+
     def _save_ui_state(self):
         self._settings.setValue("window/geometry", self.saveGeometry())
         self._settings.setValue("window/workspace_splitter", self.workspace_splitter.saveState())
+        self._settings.setValue("window/content_splitter", self.content_splitter.saveState())
         self._settings.setValue("window/log_expanded", self.is_log_expanded())
         self._settings.setValue("window/log_height", self._last_log_height)
+        if self._agent_dock is not None:
+            self._settings.setValue("window/agent_main_state", self.saveState())
+            self._settings.setValue("window/agent_visible", self._agent_dock.isVisible())
+            self._settings.setValue("window/agent_width", self._agent_dock.width())
         self._settings.sync()
 
     def _restore_ui_state(self):
@@ -386,6 +409,9 @@ class MainWindow(QMainWindow):
         splitter = self._settings.value("window/workspace_splitter")
         if splitter:
             self.workspace_splitter.restoreState(splitter)
+        content_splitter = self._settings.value("window/content_splitter")
+        if content_splitter:
+            self.content_splitter.restoreState(content_splitter)
         self._last_log_height = int(
             self._settings.value("window/log_height", self._last_log_height)
         )
@@ -443,6 +469,12 @@ class MainWindow(QMainWindow):
         self._append_log_text(text)
         if text and str(text).strip():
             self.set_log_expanded(True)
+
+    def _report_error(self, text):
+        message = str(text)
+        if not message.endswith("\n"):
+            message += "\n"
+        self._append_error_text(message)
 
     def closeEvent(self, event):
         self._save_ui_state()
@@ -1137,11 +1169,11 @@ class MainWindow(QMainWindow):
 
     def _ensure_router(self):
         if not self.port_ctrl.is_open():
-            print("[route] serial port not open, routing not sent")
+            self._report_error("[route] serial port not open, routing not sent")
             return None
         hw_router = getattr(self.port_ctrl.hw_controller, "router", None)
         if hw_router is None:
-            print("[route] router is not ready")
+            self._report_error("[route] router is not ready")
             return None
         self.router = hw_router
         return self.router
@@ -1167,7 +1199,7 @@ class MainWindow(QMainWindow):
             else:
                 print(f"[route] staged: {label} ({src_port_num} -> {dst_port_num})")
         except Exception as exc:
-            print(f"[route] failed: {label}: {exc}")
+            self._report_error(f"[route] failed: {label}: {exc}")
 
     def _clear_all_routes(self):
         hw_controller = getattr(self.port_ctrl, "hw_controller", None)
@@ -1186,7 +1218,7 @@ class MainWindow(QMainWindow):
             else:
                 print("[route] cleared all routes in local cache (serial not open)")
         except Exception as exc:
-            print(f"[route] failed to clear all routes: {exc}")
+            self._report_error(f"[route] failed to clear all routes: {exc}")
 
     def _disconnect_all_connections(self):
         # 仅负责断开底层连线（硬件/缓存路由），避免与画布清理耦合。
@@ -1387,7 +1419,7 @@ class MainWindow(QMainWindow):
                 node,
                 update_panel=not isinstance(node, (ModuleFIRFilter, ModuleIIRFilter)),
             )
-            print(f"[param] failed {node.name}: {exc}")
+            self._report_error(f"[param] failed {node.name}: {exc}")
 
     def _port_to_ref(self, port):
         if isinstance(port, BorderPort):
@@ -1513,6 +1545,8 @@ class MainWindow(QMainWindow):
 
         for key in self.view._used_indices:
             self.view._used_indices[key].clear()
+        if hasattr(self, "route_status_label"):
+            self._refresh_ui_status()
 
     def confirm_clear_canvas(self):
         reply = QMessageBox.question(self, '清空画布', '确定要清空所有模块和连线吗？', 
@@ -1564,7 +1598,7 @@ class MainWindow(QMainWindow):
                 json.dump(config, f, ensure_ascii=False, indent=2)
             print(f"[config] saved: {file_path}")
         except Exception as exc:
-            print(f"[config] save failed: {exc}")
+            self._report_error(f"[config] save failed: {exc}")
 
     def _create_node_from_config(self, node_cfg):
         component_name = node_cfg.get("component_name")
@@ -1639,7 +1673,7 @@ class MainWindow(QMainWindow):
                     router.upload()
                     print(f"[route] uploaded staged routes: {staged_routes}")
                 except Exception as exc:
-                    print(f"[route] failed final batch upload: {exc}")
+                    self._report_error(f"[route] failed final batch upload: {exc}")
 
     def load_configuration(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "加载配置", "", "JSON Files (*.json);;All Files (*)")
@@ -1650,13 +1684,13 @@ class MainWindow(QMainWindow):
             with open(file_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
         except Exception as exc:
-            print(f"[config] load failed: {exc}")
+            self._report_error(f"[config] load failed: {exc}")
             return
 
         nodes_cfg = config.get("nodes", [])
         edges_cfg = config.get("edges", [])
         if not isinstance(nodes_cfg, list) or not isinstance(edges_cfg, list):
-            print("[config] invalid format: nodes/edges must be list")
+            self._report_error("[config] invalid format: nodes/edges must be list")
             return
 
         self._disconnect_all_connections()
@@ -1687,7 +1721,9 @@ class MainWindow(QMainWindow):
                 try:
                     node.apply_special_method(method_name, method_args if isinstance(method_args, dict) else {})
                 except Exception as exc:
-                    print(f"[config] apply special method failed for {node.name}.{method_name}: {exc}")
+                    self._report_error(
+                        f"[config] apply special method failed for {node.name}.{method_name}: {exc}"
+                    )
 
         for node_cfg, node in loaded_nodes:
             direct_params = node_cfg.get("direct_params")
@@ -1698,8 +1734,11 @@ class MainWindow(QMainWindow):
             try:
                 node.set_params(direct_params)
             except Exception as exc:
-                print(f"[config] apply direct params failed for {node.name}: {exc}")
+                self._report_error(
+                    f"[config] apply direct params failed for {node.name}: {exc}"
+                )
 
         self._restore_edges(edges_cfg, node_map, batch_upload=True)
         self.view.center_on_nodes()
+        self._refresh_ui_status()
         print(f"[config] loaded: {file_path}")

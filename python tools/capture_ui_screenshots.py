@@ -47,6 +47,7 @@ def capture(factory, variant, width, height, output_dir, settings_path):
     app = QApplication.instance()
     app.processEvents()
     add_demo_graph(window)
+    window.set_log_expanded(False)
 
     if variant == "integrated" and width >= 1600:
         window._agent_action.setChecked(True)

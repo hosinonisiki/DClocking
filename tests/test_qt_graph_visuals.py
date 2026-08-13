@@ -66,6 +66,20 @@ class GraphVisualTests(unittest.TestCase):
         edge.update_path()
         self.assert_path_touches_ports(edge)
 
+    def test_temporary_edge_snaps_to_hovered_port_center(self):
+        scene = DiagramScene(NodeSignals())
+        source = ModuleScaler("线性缩放器", 0, QPointF(0, 0))
+        target = ModuleScaler("线性缩放器", 1, QPointF(420, 0))
+        scene.addItem(source)
+        scene.addItem(target)
+        scene.start_port = source.out_ports[0]
+        cursor = target.in_ports[0].scenePos() + QPointF(2, 1)
+        path = scene._preview_connection_path(cursor, target.in_ports[0])
+        last = path.elementAt(path.elementCount() - 1)
+        center = target.in_ports[0].scenePos()
+        self.assertAlmostEqual(last.x, center.x(), delta=0.01)
+        self.assertAlmostEqual(last.y, center.y(), delta=0.01)
+
     def test_palette_filter_hides_nonmatching_modules_and_keeps_section_headers(self):
         palette = ComponentPalette()
         palette.filter_items("PID")

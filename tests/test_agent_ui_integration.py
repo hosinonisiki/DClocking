@@ -3,7 +3,7 @@ import unittest
 import sys
 from unittest.mock import patch
 
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import QTextBrowser
 
 from tests.qt_test_support import ensure_app
@@ -18,8 +18,10 @@ class AgentUiIntegrationTests(unittest.TestCase):
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
-        settings = QSettings(f"{self.temp_dir.name}/ui.ini", QSettings.IniFormat)
-        self.window = MainWindow(settings=settings)
+        self.settings = QSettings(
+            f"{self.temp_dir.name}/ui.ini", QSettings.IniFormat
+        )
+        self.window = MainWindow(settings=self.settings)
         self.window.resize(1280, 720)
         self.window.show()
         self.app.processEvents()
@@ -66,6 +68,31 @@ class AgentUiIntegrationTests(unittest.TestCase):
         message = chat._msg_container.findChildren(QTextBrowser)[0]
         self.assertNotIn("##", message.toPlainText())
         self.assertNotIn("**", message.toPlainText())
+
+    def test_agent_visibility_and_dock_state_restore_after_registration(self):
+        chat = AgentChatWidget(self.window)
+        self.window.register_agent_dock(chat)
+        self.window.resizeDocks([chat], [360], Qt.Horizontal)
+        self.window._agent_action.setChecked(True)
+        self.app.processEvents()
+        self.window._save_ui_state()
+        self.window.close()
+
+        restored = MainWindow(settings=self.settings)
+        restored.resize(1280, 720)
+        restored_chat = AgentChatWidget(restored)
+        action = restored.register_agent_dock(restored_chat)
+        restored.show()
+        self.app.processEvents()
+        try:
+            self.assertTrue(action.isChecked())
+            self.assertTrue(restored_chat.isVisible())
+            self.assertEqual(
+                restored.dockWidgetArea(restored_chat), Qt.RightDockWidgetArea
+            )
+            self.assertGreaterEqual(restored_chat.width(), 320)
+        finally:
+            restored.close()
 
 
 if __name__ == "__main__":

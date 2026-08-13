@@ -117,6 +117,8 @@ class UiFunctionalRegressionTests(unittest.TestCase):
         ):
             self.window._apply_param_to_hardware(node, {key: replacement})
         self.assertEqual(node._params[key], previous)
+        self.assertTrue(self.window.is_log_expanded())
+        self.assertIn("offline", self.window.log_output.toPlainText())
 
     def test_ordinary_and_integrated_windows_construct_at_target_sizes(self):
         self.window.close()
