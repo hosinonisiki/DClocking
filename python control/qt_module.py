@@ -13,6 +13,7 @@ import re
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
 from qt_module_schema import PID_SCHEMA, ACCM_SCHEMA, SCLR_SCHEMA, FIRF_SCHEMA, LTRN_SCHEMA, PDH_SCHEMA, SCLO_SCHEMA, IIR_SCHEMA
 from quantity_entry_core import QuantityEntryCore, QuantityFormat
+from qt_ui_theme import UiColors, draw_node_chrome
 
 _PARAM_APPLY_HANDLER = None
 _PARAM_OPEN_HANDLER = None
@@ -870,12 +871,14 @@ class PortItem(QGraphicsItem):
             )
     def paint(self, painter, option, widget):
         painter.setBrush(self.brush)
-        painter.setPen(QPen(Qt.white, 1))
+        painter.setPen(QPen(QColor(UiColors.TEXT_ON_DARK), 1))
         painter.drawEllipse(-self.radius, -self.radius, 2*self.radius, 2*self.radius)
 
         # draw the outward short wire from the port center
         painter.save()
         line_pen = QPen(QColor(self.line_color) if self.line_color else Qt.gray, 2)
+        line_pen.setCapStyle(Qt.RoundCap)
+        line_pen.setJoinStyle(Qt.RoundJoin)
         painter.setPen(line_pen)
         line_y = self.radius + 4   # 你可以改成 +3/+6 来微调高度
         if self.port_type == 'out':
@@ -1280,9 +1283,7 @@ class ModulePID(NodeItem):
 
     def paint(self, painter, option, widget):
         rect = self.boundingRect()
-        painter.setBrush(QBrush(QColor("#2C3E50")))
-        painter.setPen(QPen(Qt.white, 2))
-        painter.drawRoundedRect(rect, 8, 8)
+        draw_node_chrome(painter, rect, self.isSelected())
 
         painter.setPen(Qt.white)
         font = QFont()
@@ -1383,9 +1384,7 @@ class ModuleAccumulator(NodeItem):
 
     def paint(self, painter, option, widget):
         rect = self.boundingRect()
-        painter.setBrush(QBrush(QColor("#2C3E50")))
-        painter.setPen(QPen(Qt.white, 2))
-        painter.drawRoundedRect(rect, 8, 8)
+        draw_node_chrome(painter, rect, self.isSelected())
 
         painter.setPen(Qt.white)
         font = QFont()
@@ -1528,9 +1527,7 @@ class ModuleBase(NodeItem):
 
     def paint(self, painter, option, widget):
         rect = self.boundingRect()
-        painter.setBrush(QBrush(QColor("#2C3E50")))
-        painter.setPen(QPen(Qt.white, 2))
-        painter.drawRoundedRect(rect, 8, 8)
+        draw_node_chrome(painter, rect, self.isSelected())
         
         painter.setPen(Qt.white)
         font = QFont()
@@ -1609,9 +1606,7 @@ class ModuleScaler(NodeItem):
 
     def paint(self, painter, option, widget):
         rect = self.boundingRect()
-        painter.setBrush(QBrush(QColor("#2C3E50")))
-        painter.setPen(QPen(Qt.white, 2))
-        painter.drawRoundedRect(rect, 8, 8)
+        draw_node_chrome(painter, rect, self.isSelected())
         
         painter.setPen(Qt.white)
         font = QFont()
@@ -1711,9 +1706,7 @@ class ModuleFIRFilter(NodeItem):
 
     def paint(self, painter, option, widget):
         rect = self.boundingRect()
-        painter.setBrush(QBrush(QColor("#2C3E50")))
-        painter.setPen(QPen(Qt.white, 2))
-        painter.drawRoundedRect(rect, 8, 8)
+        draw_node_chrome(painter, rect, self.isSelected())
 
         painter.setPen(Qt.white)
         font = QFont()
@@ -1828,9 +1821,7 @@ class ModuleLinerTransformer(NodeItem):
 
     def paint(self, painter, option, widget):
         rect = self.boundingRect()
-        painter.setBrush(QBrush(QColor("#2C3E50")))
-        painter.setPen(QPen(Qt.white, 2))
-        painter.drawRoundedRect(rect, 8, 8)
+        draw_node_chrome(painter, rect, self.isSelected())
         painter.setPen(Qt.white)
 
         font = QFont()
@@ -1927,9 +1918,7 @@ class ModulePDHFSM(NodeItem):
 
     def paint(self, painter, option, widget):
         rect = self.boundingRect()
-        painter.setBrush(QBrush(QColor("#2C3E50")))
-        painter.setPen(QPen(Qt.white, 2))
-        painter.drawRoundedRect(rect, 8, 8)
+        draw_node_chrome(painter, rect, self.isSelected())
         painter.setPen(Qt.white)
 
         font = QFont()
@@ -2030,9 +2019,7 @@ class ModuleIIRFilter(NodeItem):
 
     def paint(self, painter, option, widget):
         rect = self.boundingRect()
-        painter.setBrush(QBrush(QColor("#2C3E50")))
-        painter.setPen(QPen(Qt.white, 2))
-        painter.drawRoundedRect(rect, 8, 8)
+        draw_node_chrome(painter, rect, self.isSelected())
 
         painter.setPen(Qt.white)
         font = QFont()
@@ -2145,9 +2132,7 @@ class ModuleSCLOFSM(NodeItem):
 
     def paint(self, painter, option, widget):
         rect = self.boundingRect()
-        painter.setBrush(QBrush(QColor("#2C3E50")))
-        painter.setPen(QPen(Qt.white, 2))
-        painter.drawRoundedRect(rect, 8, 8)
+        draw_node_chrome(painter, rect, self.isSelected())
         painter.setPen(Qt.white)
 
         font = QFont()
@@ -2245,9 +2230,7 @@ class ModuleConstantBool(NodeItem):
 
     def paint(self, painter, option, widget):
         rect = self.boundingRect()
-        painter.setBrush(QBrush(QColor("#2C3E50")))
-        painter.setPen(QPen(Qt.white, 2))
-        painter.drawRoundedRect(rect, 8, 8)
+        draw_node_chrome(painter, rect, self.isSelected())
 
         painter.setPen(Qt.white)
         font = QFont()

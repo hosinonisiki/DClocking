@@ -28,6 +28,7 @@ from qt_module import (
     DigitalControlledOscillator,
     module_maxm,
 )
+from qt_ui_theme import UiColors, draw_node_chrome
 
 
 class NodeSignals(QObject):
@@ -67,10 +68,10 @@ class BorderPort(PortItem):
 
     def paint(self, painter, option, widget):
         painter.setBrush(self.brush)
-        painter.setPen(QPen(Qt.white, 1))
+        painter.setPen(QPen(QColor(UiColors.TEXT_ON_DARK), 1))
         painter.drawEllipse(-self.radius, -self.radius, 2 * self.radius, 2 * self.radius)
 
-        painter.setPen(Qt.white)
+        painter.setPen(QColor(UiColors.TEXT_ON_DARK))
         font = QFont()
         font.setBold(True)
         font.setPointSize(10)
@@ -140,6 +141,8 @@ class EdgeItem(QGraphicsPathItem):
         return None
 
     def _apply_pen_style(self, pen):
+        pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
         sig = self._physical_signal_type()
         if sig == "phase":
             pen.setStyle(Qt.CustomDashLine)
@@ -367,7 +370,7 @@ class DiagramScene(QGraphicsScene):
         self.start_port = None
         self.developer_mode = False
 
-        self.setBackgroundBrush(QBrush(QColor("#1E1E1E")))
+        self.setBackgroundBrush(QBrush(QColor(UiColors.CANVAS_BG)))
         self.setSceneRect(-2400, -1350, 4800, 2700)
 
         self.left_ports = []
@@ -380,6 +383,16 @@ class DiagramScene(QGraphicsScene):
             right_port = BorderPort("in", i, QPointF(0, 0))
             self.addItem(right_port)
             self.right_ports.append(right_port)
+
+    def drawBackground(self, painter, rect):
+        painter.fillRect(rect, QColor(UiColors.CANVAS_BG))
+        grid = 36
+        left = int(rect.left()) - (int(rect.left()) % grid)
+        top = int(rect.top()) - (int(rect.top()) % grid)
+        painter.setPen(QPen(QColor(UiColors.CANVAS_GRID), 1))
+        for x in range(left, int(rect.right()) + grid, grid):
+            for y in range(top, int(rect.bottom()) + grid, grid):
+                painter.drawPoint(x, y)
 
     def set_developer_mode(self, enabled: bool):
         self.developer_mode = bool(enabled)
@@ -962,9 +975,7 @@ class DiagramView(QGraphicsView):
         p.setRenderHint(QPainter.Antialiasing)
 
         rect = QRectF(5, 5, thumbnail_size[0] - 10, thumbnail_size[1] - 10)
-        p.setBrush(QBrush(QColor("#2C3E50")))
-        p.setPen(QPen(Qt.white, 2))
-        p.drawRoundedRect(rect, 8, 8)
+        draw_node_chrome(p, rect)
 
         p.setPen(Qt.white)
         font = QFont()
@@ -1080,11 +1091,13 @@ class DiagramView(QGraphicsView):
 class ComponentPalette(QListWidget):
     def __init__(self):
         super().__init__()
-        self.setFixedWidth(150)
+        self.setObjectName("component_palette")
+        self.setMinimumWidth(176)
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
         self.setDropIndicatorShown(True)
-        self.setStyleSheet("font-size: 14px; padding: 5px;")
+        self.setStyleSheet("font-size: 13px;")
+        self._sections = []
 
         normal_items = [
             "PID控制器",
@@ -1110,13 +1123,26 @@ class ComponentPalette(QListWidget):
         header = QListWidgetItem(title)
         header.setFlags(Qt.ItemIsEnabled)
         header.setTextAlignment(Qt.AlignCenter)
-        header.setForeground(QColor("#888888"))
+        header.setForeground(QColor(UiColors.TEXT_MUTED))
         self.addItem(header)
 
+        children = []
         for name in items:
             item = QListWidgetItem(name)
             item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled)
             self.addItem(item)
+            children.append(item)
+        self._sections.append((header, children))
+
+    def filter_items(self, query: str) -> None:
+        normalized = str(query or "").strip().casefold()
+        for header, children in self._sections:
+            section_visible = False
+            for item in children:
+                matches = not normalized or normalized in item.text().casefold()
+                item.setHidden(not matches)
+                section_visible = section_visible or matches
+            header.setHidden(not section_visible)
 
     def _create_component_thumbnail(self, component_name, size=(120, 100)):
         img = QImage(size[0], size[1], QImage.Format_ARGB32_Premultiplied)
@@ -1125,9 +1151,7 @@ class ComponentPalette(QListWidget):
         p = QPainter(img)
         p.setRenderHint(QPainter.Antialiasing)
         rect = QRectF(5, 5, size[0] - 10, size[1] - 10)
-        p.setBrush(QBrush(QColor("#2C3E50")))
-        p.setPen(QPen(Qt.white, 2))
-        p.drawRoundedRect(rect, 8, 8)
+        draw_node_chrome(p, rect)
 
         p.setPen(Qt.white)
         font = QFont()
