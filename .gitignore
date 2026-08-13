@@ -13,3 +13,4 @@ testbenches/
 **.pyc
 __pycache__/
 FPGA_Agent/config.json
+.worktrees/
