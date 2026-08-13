@@ -144,7 +144,7 @@ class Port(QObject):
     
     def open_port(self):	#打开串口
         if self.serial_port.isOpen():
-            self.parent.connect_btn.setText(self.tr("连接设备"))
+            self.parent.connect_btn.setText(self.tr("连接"))
             self.serial_port.close()
             self.qt_serial = None
             if hasattr(self.parent, "router"):
@@ -182,7 +182,7 @@ class Port(QObject):
                     # 建立 QtSerial 失败时回滚连接状态
                     self.serial_port.close()
                     self.qt_serial = None
-                    self.parent.connect_btn.setText(self.tr("连接设备"))
+                    self.parent.connect_btn.setText(self.tr("连接"))
                     if hasattr(self.parent, "init_btn"):
                         self.parent.init_btn.setEnabled(False)
                     qw.QMessageBox.critical(

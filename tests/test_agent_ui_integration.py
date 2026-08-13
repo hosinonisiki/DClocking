@@ -1,5 +1,7 @@
 import tempfile
 import unittest
+import sys
+from unittest.mock import patch
 
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QTextBrowser
@@ -56,6 +58,14 @@ class AgentUiIntegrationTests(unittest.TestCase):
         self.assertIn("#85172E", chat.widget().styleSheet())
         self.assertEqual(chat._send_btn.accessibleName(), "发送 Agent 消息")
         self.assertTrue(callable(chat.open_settings))
+
+    def test_markdown_fallback_uses_qt_renderer_without_raw_markers(self):
+        chat = AgentChatWidget(self.window)
+        with patch.dict(sys.modules, {"markdown": None}):
+            chat.add_assistant_message("## Ready\n\n**connected**")
+        message = chat._msg_container.findChildren(QTextBrowser)[0]
+        self.assertNotIn("##", message.toPlainText())
+        self.assertNotIn("**", message.toPlainText())
 
 
 if __name__ == "__main__":

@@ -134,9 +134,9 @@ class AgentChatWidget(QDockWidget):
                 extensions=["fenced_code", "tables", "codehilite"],
             )
         except ImportError:
-            html = markdown_text.replace("\n", "<br>")
-
-        bubble.setHtml(html)
+            bubble.setMarkdown(markdown_text)
+        else:
+            bubble.setHtml(html)
         self._add_bubble(bubble, align_right=False)
 
     def add_system_message(self, text: str):

@@ -19,7 +19,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QApplication
 
 
-def create_window():
+def create_window(settings=None):
     # ---- Ensure our own package is importable (for absolute imports) ----
     agent_dir = str(Path(__file__).resolve().parent)
     if agent_dir not in sys.path:
@@ -34,7 +34,7 @@ def create_window():
     # ---- Import existing MainWindow ----
     from qt_ui_mainwindow import MainWindow
 
-    window = MainWindow()
+    window = MainWindow(settings=settings)
     window.setWindowTitle("FPGA Designer + Agent")
 
     # ---- Load config ----

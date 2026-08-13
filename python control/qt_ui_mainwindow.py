@@ -157,7 +157,7 @@ class MainWindow(QMainWindow):
         self.load_cfg_btn.clicked.connect(self.load_configuration)
         self.clear_btn.clicked.connect(self.confirm_clear_canvas)
         self.connect_btn.clicked.connect(
-            lambda: QTimer.singleShot(0, self._refresh_ui_status)
+            lambda: QTimer.singleShot(0, self._refresh_connection_presentation)
         )
 
         self._build_workstation_shell(serial_bar)
@@ -353,7 +353,7 @@ class MainWindow(QMainWindow):
         if self._agent_dock is not None and hasattr(self._agent_dock, "open_settings"):
             self._agent_dock.open_settings()
             return
-        self.statusBar().showMessage("Agent 仅在集成入口中可用", 2500)
+        self._append_log_text("[ui] Agent 设置仅在集成入口中可用\n")
 
     def _refresh_ui_status(self):
         connected = self.serial_port.isOpen()
@@ -366,6 +366,11 @@ class MainWindow(QMainWindow):
         self.mode_status_label.setText("DEVELOPER MODE" if developer else "FREE MODE")
         route_count = sum(isinstance(item, EdgeItem) for item in self.scene.items())
         self.route_status_label.setText(f"{route_count} routes")
+
+    def _refresh_connection_presentation(self):
+        if self.connect_btn.text() == "连接":
+            self.connect_btn.setText("连接设备")
+        self._refresh_ui_status()
 
     def _save_ui_state(self):
         self._settings.setValue("window/geometry", self.saveGeometry())
