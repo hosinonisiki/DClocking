@@ -4,8 +4,8 @@ from collections import deque
 from datetime import datetime
 import module as hw_module_defs
 
-from PySide6.QtCore import Qt, QPointF, QObject, Signal
-from PySide6.QtGui import QTextCursor
+from PySide6.QtCore import Qt, QPointF, QObject, Signal, QSettings, QEvent, QTimer
+from PySide6.QtGui import QTextCursor, QAction
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -20,6 +20,10 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QFrame,
     QPlainTextEdit,
+    QToolButton,
+    QLineEdit,
+    QTabWidget,
+    QDockWidget,
 )
 from PySide6.QtSerialPort import QSerialPort
 
@@ -41,6 +45,7 @@ from qt_module import (
 )
 from qt_Port import Port
 from qt_ui_graph import NodeSignals, BorderPort, EdgeItem, DiagramScene, DiagramView, ComponentPalette
+from qt_ui_theme import UiColors, apply_application_theme
 from qt_ui_utils import (
     ensure_port_methods,
     border_port_index,
@@ -74,10 +79,15 @@ class _StreamProxy(QObject):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, settings=None):
         super().__init__()
-        self.setWindowTitle("PySide6 节点流编辑器 - 支持复杂绕行规则")
+        self._settings = settings or QSettings("DClocking", "PrecisionWorkstation")
+        self._last_log_height = 160
+        self._agent_dock = None
+        self._agent_action = None
+        self.setWindowTitle("DClocking · FPGA 精密控制工作台")
         self.resize(1600, 900)
+        self.setMinimumSize(1120, 680)
 
         self._route_queue = deque()
         self._route_sending = False
@@ -85,35 +95,43 @@ class MainWindow(QMainWindow):
 
         self.comboBox = QComboBox()
         self.mode_combo = QComboBox()
-        self.mode_combo.setFixedWidth(120)
+        self.mode_combo.setFixedWidth(142)
         self.mode_combo.addItems(["Free Mode", "Developer Mode"])
         self.mode_combo.currentTextChanged.connect(self._on_mode_changed)
-        self.comboBox.setFixedWidth(180)
+        self.comboBox.setMinimumWidth(190)
 
-        self.connect_btn = QPushButton("连接")
-        self.connect_btn.setFixedWidth(80)
+        self.connect_btn = QPushButton("连接设备")
+        self.connect_btn.setProperty("variant", "primary")
+        self.connect_btn.setMinimumWidth(98)
         self.init_btn = QPushButton("初始化")
-        self.init_btn.setFixedWidth(80)
+        self.init_btn.setMinimumWidth(74)
         self.save_cfg_btn = QPushButton("保存配置")
-        self.save_cfg_btn.setFixedWidth(90)
         self.load_cfg_btn = QPushButton("加载配置")
-        self.load_cfg_btn.setFixedWidth(90)
         self.clear_btn = QPushButton("清空画布")
-        self.clear_btn.setFixedWidth(90)
-
-        serial_bar = QWidget()
-        serial_bar.setFixedHeight(40)
+        serial_bar = QWidget(self)
+        serial_bar.setObjectName("command_bar")
+        serial_bar.setFixedHeight(64)
         serial_layout = QHBoxLayout(serial_bar)
-        serial_layout.setContentsMargins(8, 4, 8, 4)
-        serial_layout.addStretch()
+        serial_layout.setContentsMargins(18, 10, 18, 10)
+        serial_layout.setSpacing(10)
+        context = QLabel("DEVICE / MODE")
+        context.setProperty("role", "eyebrow")
+        serial_layout.addWidget(context)
         serial_layout.addWidget(self.comboBox)
         serial_layout.addWidget(self.mode_combo)
         serial_layout.addWidget(self.connect_btn)
         serial_layout.addWidget(self.init_btn)
+        serial_layout.addStretch()
         serial_layout.addWidget(self.save_cfg_btn)
         serial_layout.addWidget(self.load_cfg_btn)
         serial_layout.addWidget(self.clear_btn)
-        serial_layout.addStretch()
+        self.agent_toggle_btn = QToolButton(self)
+        self.agent_toggle_btn.setObjectName("agent_toggle_button")
+        self.agent_toggle_btn.setText("AI Agent")
+        self.agent_toggle_btn.setToolTip("显示或隐藏 FPGA Agent")
+        self.agent_toggle_btn.setCheckable(True)
+        self.agent_toggle_btn.hide()
+        serial_layout.addWidget(self.agent_toggle_btn)
 
         self.serial_port = QSerialPort(self)
         self.port_ctrl = Port(self, self.serial_port)
@@ -127,6 +145,7 @@ class MainWindow(QMainWindow):
 
         self.scene = DiagramScene(self.signals)
         self.view = DiagramView(self.scene)
+        self.view.setObjectName("canvas_frame")
         self.palette = ComponentPalette()
         self._param_panels = {}
         self._build_side_panel()
@@ -137,36 +156,254 @@ class MainWindow(QMainWindow):
         self.save_cfg_btn.clicked.connect(self.save_configuration)
         self.load_cfg_btn.clicked.connect(self.load_configuration)
         self.clear_btn.clicked.connect(self.confirm_clear_canvas)
+        self.connect_btn.clicked.connect(
+            lambda: QTimer.singleShot(0, self._refresh_ui_status)
+        )
 
-        splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(self.view)
-        splitter.addWidget(self.side_panel)
-        splitter.setSizes([1200, 400])
-
-        main_widget = QWidget()
-        main_layout = QVBoxLayout(main_widget)
-        main_layout.addWidget(serial_bar)
-        main_layout.addWidget(splitter, stretch=1)
-        main_layout.addWidget(self.log_panel, stretch=0)
-        self.setCentralWidget(main_widget)
+        self._build_workstation_shell(serial_bar)
+        apply_application_theme(self)
+        self._restore_ui_state()
+        self._refresh_ui_status()
 
         set_param_apply_handler(self._apply_param_to_hardware)
         set_param_open_handler(self._open_param_panel)
 
+    def _build_workstation_shell(self, command_bar):
+        main_widget = QWidget(self)
+        main_widget.setObjectName("workstation_shell")
+        root_layout = QHBoxLayout(main_widget)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+
+        self.left_rail = QWidget(main_widget)
+        self.left_rail.setObjectName("left_rail")
+        self.left_rail.setFixedWidth(64)
+        rail_layout = QVBoxLayout(self.left_rail)
+        rail_layout.setContentsMargins(8, 16, 8, 14)
+        rail_layout.setSpacing(8)
+        brand = QLabel("DC", self.left_rail)
+        brand.setAlignment(Qt.AlignCenter)
+        brand.setStyleSheet("color: white; font-weight: 800; font-size: 17px;")
+        rail_layout.addWidget(brand)
+        rail_layout.addSpacing(18)
+
+        def add_rail_button(text, tooltip, checked=False):
+            button = QToolButton(self.left_rail)
+            button.setText(text)
+            button.setToolTip(tooltip)
+            button.setAccessibleName(tooltip)
+            button.setProperty("rail", True)
+            button.setCheckable(True)
+            button.setAutoExclusive(False)
+            button.setChecked(checked)
+            rail_layout.addWidget(button)
+            return button
+
+        self.design_rail_btn = add_rail_button("◇", "画布设计", True)
+        self.param_rail_btn = add_rail_button("▤", "参数检查器")
+        self.config_rail_btn = add_rail_button("▣", "加载配置")
+        self.log_rail_btn = add_rail_button("⌁", "运行日志")
+        rail_layout.addStretch()
+        self.settings_rail_btn = add_rail_button("⚙", "Agent 设置")
+
+        self.design_rail_btn.clicked.connect(self.view.setFocus)
+        self.param_rail_btn.clicked.connect(self._focus_inspector)
+        self.config_rail_btn.clicked.connect(self.load_configuration)
+        self.log_rail_btn.clicked.connect(
+            lambda: self.set_log_expanded(not self.is_log_expanded())
+        )
+        self.settings_rail_btn.clicked.connect(self.open_agent_settings)
+
+        body = QWidget(main_widget)
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(0)
+        body_layout.addWidget(command_bar)
+
+        self.workspace_splitter = QSplitter(Qt.Horizontal, body)
+        self.workspace_splitter.setObjectName("workspace_splitter")
+        self.workspace_splitter.setChildrenCollapsible(False)
+        self.workspace_splitter.addWidget(self.view)
+        self.workspace_splitter.addWidget(self.side_panel)
+        self.workspace_splitter.setStretchFactor(0, 1)
+        self.workspace_splitter.setStretchFactor(1, 0)
+        self.workspace_splitter.setSizes([1180, 320])
+
+        self.content_splitter = QSplitter(Qt.Vertical, body)
+        self.content_splitter.setObjectName("content_splitter")
+        self.content_splitter.setChildrenCollapsible(False)
+        self.content_splitter.addWidget(self.workspace_splitter)
+        self.content_splitter.addWidget(self.log_panel)
+        self.content_splitter.setStretchFactor(0, 1)
+        self.content_splitter.setStretchFactor(1, 0)
+        body_layout.addWidget(self.content_splitter, 1)
+
+        self._build_status_bar(body_layout)
+        root_layout.addWidget(self.left_rail)
+        root_layout.addWidget(body, 1)
+        self.setCentralWidget(main_widget)
+
+        self.agent_fab = QToolButton(self.view.viewport())
+        self.agent_fab.setObjectName("agent_fab")
+        self.agent_fab.setText("AI")
+        self.agent_fab.setToolTip("显示或隐藏 FPGA Agent")
+        self.agent_fab.setAccessibleName("显示或隐藏 FPGA Agent")
+        self.agent_fab.setCheckable(True)
+        self.agent_fab.setProperty("variant", "primary")
+        self.agent_fab.setFixedSize(44, 44)
+        self.agent_fab.hide()
+        self.view.viewport().installEventFilter(self)
+        QTimer.singleShot(0, self._position_agent_fab)
+
+    def _build_status_bar(self, body_layout):
+        self.status_panel = QFrame(self)
+        self.status_panel.setObjectName("status_bar")
+        self.status_panel.setFixedHeight(34)
+        layout = QHBoxLayout(self.status_panel)
+        layout.setContentsMargins(14, 0, 10, 0)
+        layout.setSpacing(12)
+        self.device_status_label = QLabel("● 设备离线", self.status_panel)
+        self.device_status_label.setObjectName("device_status")
+        self.mode_status_label = QLabel("FREE MODE", self.status_panel)
+        self.route_status_label = QLabel("0 routes", self.status_panel)
+        for label in (
+            self.device_status_label,
+            self.mode_status_label,
+            self.route_status_label,
+        ):
+            label.setStyleSheet("font-family: Menlo; font-size: 10px;")
+            layout.addWidget(label)
+        layout.addStretch()
+        self.log_toggle_btn = QToolButton(self.status_panel)
+        self.log_toggle_btn.setText("日志 ▴")
+        self.log_toggle_btn.setToolTip("展开运行日志")
+        self.log_toggle_btn.setCheckable(True)
+        self.log_toggle_btn.clicked.connect(self.set_log_expanded)
+        layout.addWidget(self.log_toggle_btn)
+        body_layout.addWidget(self.status_panel)
+
+    def _focus_inspector(self):
+        self.side_panel.show()
+        self.palette_search.setFocus()
+
+    def _position_agent_fab(self):
+        if not hasattr(self, "agent_fab"):
+            return
+        viewport = self.view.viewport()
+        margin = 18
+        self.agent_fab.move(
+            max(margin, viewport.width() - self.agent_fab.width() - margin),
+            max(margin, viewport.height() - self.agent_fab.height() - margin),
+        )
+        self.agent_fab.raise_()
+
+    def eventFilter(self, watched, event):
+        if watched is getattr(self.view, "viewport", lambda: None)() and event.type() in (
+            QEvent.Resize,
+            QEvent.Show,
+        ):
+            QTimer.singleShot(0, self._position_agent_fab)
+        return super().eventFilter(watched, event)
+
+    def set_log_expanded(self, expanded):
+        expanded = bool(expanded)
+        self._log_expanded = expanded
+        if expanded:
+            self.log_panel.show()
+            total = max(1, self.content_splitter.height())
+            log_height = min(max(120, self._last_log_height), max(120, total // 2))
+            self.content_splitter.setSizes([max(1, total - log_height), log_height])
+        else:
+            sizes = self.content_splitter.sizes()
+            if len(sizes) > 1 and sizes[1] > 20:
+                self._last_log_height = sizes[1]
+            self.log_panel.hide()
+            self.content_splitter.setSizes([max(1, self.content_splitter.height()), 0])
+        self.log_toggle_btn.setChecked(expanded)
+        self.log_toggle_btn.setText("日志 ▾" if expanded else "日志 ▴")
+        self.log_rail_btn.setChecked(expanded)
+
+    def is_log_expanded(self):
+        return bool(getattr(self, "_log_expanded", False))
+
+    def register_agent_dock(self, dock):
+        if not isinstance(dock, QDockWidget):
+            raise TypeError("Agent panel must be a QDockWidget")
+        self._agent_dock = dock
+        dock.setObjectName(dock.objectName() or "agent_dock")
+        dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.addDockWidget(Qt.RightDockWidgetArea, dock)
+        dock.hide()
+
+        action = QAction("AI Agent", self)
+        action.setCheckable(True)
+        action.toggled.connect(dock.setVisible)
+        dock.visibilityChanged.connect(action.setChecked)
+        self._agent_action = action
+        self.agent_toggle_btn.setDefaultAction(action)
+        self.agent_fab.setDefaultAction(action)
+        self.agent_toggle_btn.setText("AI Agent")
+        self.agent_fab.setText("AI")
+        self.agent_toggle_btn.show()
+        self.agent_fab.show()
+        self._position_agent_fab()
+        return action
+
+    def open_agent_settings(self):
+        if self._agent_dock is not None and hasattr(self._agent_dock, "open_settings"):
+            self._agent_dock.open_settings()
+            return
+        self.statusBar().showMessage("Agent 仅在集成入口中可用", 2500)
+
+    def _refresh_ui_status(self):
+        connected = self.serial_port.isOpen()
+        self.device_status_label.setText("● 设备在线" if connected else "● 设备离线")
+        color = UiColors.STATUS_OK if connected else UiColors.TEXT_MUTED
+        self.device_status_label.setStyleSheet(
+            f"color: {color}; font-family: Menlo; font-size: 10px;"
+        )
+        developer = self.mode_combo.currentText() == "Developer Mode"
+        self.mode_status_label.setText("DEVELOPER MODE" if developer else "FREE MODE")
+        route_count = sum(isinstance(item, EdgeItem) for item in self.scene.items())
+        self.route_status_label.setText(f"{route_count} routes")
+
+    def _save_ui_state(self):
+        self._settings.setValue("window/geometry", self.saveGeometry())
+        self._settings.setValue("window/workspace_splitter", self.workspace_splitter.saveState())
+        self._settings.setValue("window/log_expanded", self.is_log_expanded())
+        self._settings.setValue("window/log_height", self._last_log_height)
+        self._settings.sync()
+
+    def _restore_ui_state(self):
+        geometry = self._settings.value("window/geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+        splitter = self._settings.value("window/workspace_splitter")
+        if splitter:
+            self.workspace_splitter.restoreState(splitter)
+        self._last_log_height = int(
+            self._settings.value("window/log_height", self._last_log_height)
+        )
+        expanded = self._settings.value("window/log_expanded", False, type=bool)
+        self.set_log_expanded(expanded)
+
     def _build_log_panel(self):
         self.log_panel = QFrame(self)
+        self.log_panel.setObjectName("log_panel")
         self.log_panel.setFrameShape(QFrame.StyledPanel)
-        self.log_panel.setFixedHeight(140)
+        self.log_panel.setMinimumHeight(110)
 
         layout = QVBoxLayout(self.log_panel)
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setSpacing(4)
 
-        title = QLabel("命令行输出")
+        title = QLabel("运行日志 / CONSOLE")
+        title.setProperty("role", "sectionTitle")
         layout.addWidget(title)
 
         self.log_output = QPlainTextEdit(self.log_panel)
         self.log_output.setReadOnly(True)
+        self.log_output.setStyleSheet("font-family: Menlo; font-size: 11px;")
         self.log_output.document().setMaximumBlockCount(300)
         layout.addWidget(self.log_output, stretch=1)
 
@@ -177,7 +414,7 @@ class MainWindow(QMainWindow):
         self._stdout_proxy = _StreamProxy(self._stdout_origin)
         self._stderr_proxy = _StreamProxy(self._stderr_origin)
         self._stdout_proxy.text_written.connect(self._append_log_text)
-        self._stderr_proxy.text_written.connect(self._append_log_text)
+        self._stderr_proxy.text_written.connect(self._append_error_text)
 
         sys.stdout = self._stdout_proxy
         sys.stderr = self._stderr_proxy
@@ -197,31 +434,55 @@ class MainWindow(QMainWindow):
         self.log_output.setTextCursor(cursor)
         self.log_output.ensureCursorVisible()
 
+    def _append_error_text(self, text):
+        self._append_log_text(text)
+        if text and str(text).strip():
+            self.set_log_expanded(True)
+
     def closeEvent(self, event):
+        self._save_ui_state()
         self._restore_log_redirect()
         super().closeEvent(event)
 
     def _build_side_panel(self):
         self.side_panel = QWidget()
-        side_layout = QHBoxLayout(self.side_panel)
-        side_layout.setContentsMargins(6, 6, 6, 6)
-        side_layout.setSpacing(8)
+        self.side_panel.setObjectName("inspector_panel")
+        self.side_panel.setMinimumWidth(278)
+        self.side_panel.setMaximumWidth(420)
+        side_layout = QVBoxLayout(self.side_panel)
+        side_layout.setContentsMargins(14, 14, 14, 12)
+        side_layout.setSpacing(10)
 
-        module_col = QWidget(self.side_panel)
+        inspector_label = QLabel("INSPECTOR")
+        inspector_label.setProperty("role", "eyebrow")
+        side_layout.addWidget(inspector_label)
+
+        tabs = QTabWidget(self.side_panel)
+        tabs.setObjectName("inspector_tabs")
+
+        module_col = QWidget(tabs)
         module_layout = QVBoxLayout(module_col)
         module_layout.setContentsMargins(0, 0, 0, 0)
-        module_layout.setSpacing(6)
-        palette_title = QLabel("模块列表")
+        module_layout.setSpacing(8)
+        palette_title = QLabel("模块库")
+        palette_title.setProperty("role", "sectionTitle")
         module_layout.addWidget(palette_title)
+        self.palette_search = QLineEdit(module_col)
+        self.palette_search.setObjectName("palette_search")
+        self.palette_search.setPlaceholderText("搜索模块…")
+        self.palette_search.setClearButtonEnabled(True)
+        self.palette_search.textChanged.connect(self.palette.filter_items)
+        module_layout.addWidget(self.palette_search)
         module_layout.addWidget(self.palette, stretch=1)
 
-        param_col = QWidget(self.side_panel)
+        param_col = QWidget(tabs)
         param_layout_root = QVBoxLayout(param_col)
         param_layout_root.setContentsMargins(0, 0, 0, 0)
         param_layout_root.setSpacing(6)
 
         header_row = QHBoxLayout()
-        param_title = QLabel("参数窗口")
+        param_title = QLabel("选中模块参数")
+        param_title.setProperty("role", "sectionTitle")
         clear_btn = QPushButton("清空")
         clear_btn.setFixedWidth(60)
         clear_btn.clicked.connect(self._clear_param_panels)
@@ -240,8 +501,10 @@ class MainWindow(QMainWindow):
         self.param_scroll.setWidget(self.param_container)
         param_layout_root.addWidget(self.param_scroll, stretch=1)
 
-        side_layout.addWidget(module_col, stretch=1)
-        side_layout.addWidget(param_col, stretch=2)
+        tabs.addTab(module_col, "模块")
+        tabs.addTab(param_col, "参数")
+        side_layout.addWidget(tabs, stretch=1)
+        self.inspector_tabs = tabs
 
     def _scroll_to_panel(self, panel_widget):
         scrollbar = self.param_scroll.verticalScrollBar()
@@ -397,6 +660,8 @@ class MainWindow(QMainWindow):
         for item in self.scene.items():
             if isinstance(item, NodeItem) and hasattr(item, "free_mode"):
                 item.free_mode = not developer_mode
+        if hasattr(self, "mode_status_label"):
+            self._refresh_ui_status()
 
     def _port_ref_for_name_index(self, node_name, port_idx, role, node_map):
         if node_name.startswith("Border_out_") and node_name not in ("Border_out_HIGH", "Border_out_LOW"):
@@ -813,8 +1078,10 @@ class MainWindow(QMainWindow):
         dst_port_num = resolve_port_number(dst, dst_port, "in")
         if src_port_num is None or dst_port_num is None:
             print(f"[route] skip: unresolved port mapping src={src}:{src_port} dst={dst}:{dst_port}")
+            self._refresh_ui_status()
             return
         self._apply_routing(dst_port_num, src_port_num, f"{src_log}:Out{src_port+1} -> {dst_log}:In{dst_port+1}")
+        self._refresh_ui_status()
 
     def handle_connection_removed(self, src, src_port, dst, dst_port):
         src_log = self._runtime_log_name(src, src_port, "out", dst, dst_port, "in")
@@ -823,9 +1090,11 @@ class MainWindow(QMainWindow):
         dst_port_num = resolve_port_number(dst, dst_port, "in")
         if dst_port_num is None:
             print(f"[route] skip: unresolved port mapping dst={dst}:{dst_port}")
+            self._refresh_ui_status()
             return
         src_port_num = pn.VOID_BOOL if dst_port_num >= 64 else pn.VOID
         self._apply_routing(dst_port_num, src_port_num, f"{dst_log}:In{dst_port+1} cleared")
+        self._refresh_ui_status()
 
     def _runtime_log_name(self, node_name, port_idx, role, peer_name=None, peer_port_idx=None, peer_role=None):
         if node_name not in ("HIGH", "LOW"):
