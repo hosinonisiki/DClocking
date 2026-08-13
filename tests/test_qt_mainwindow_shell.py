@@ -116,6 +116,22 @@ class MainWindowShellTests(unittest.TestCase):
         self.assertIn("partially loaded", log)
         self.assertNotIn(f"[config] loaded: {config}", log)
 
+    def test_config_rail_button_does_not_stay_selected_after_successful_load(self):
+        config = Path(self.temp_dir.name) / "empty.json"
+        config.write_text(
+            '{"version": 1, "mode": "Free Mode", "nodes": [], "edges": []}',
+            encoding="utf-8",
+        )
+
+        with patch(
+            "qt_ui_mainwindow.QFileDialog.getOpenFileName",
+            return_value=(str(config), "JSON (*.json)"),
+        ):
+            self.window.config_rail_btn.click()
+        self.app.processEvents()
+
+        self.assertFalse(self.window.config_rail_btn.isChecked())
+
     def test_serial_constructor_failure_logs_original_exception(self):
         class FakeSerial:
             def isOpen(self):

@@ -206,6 +206,7 @@ class MainWindow(QMainWindow):
         self.design_rail_btn = add_rail_button("◇", "画布设计", True)
         self.param_rail_btn = add_rail_button("▤", "参数检查器")
         self.config_rail_btn = add_rail_button("▣", "加载配置")
+        self.config_rail_btn.setCheckable(False)
         self.log_rail_btn = add_rail_button("⌁", "运行日志")
         rail_layout.addStretch()
         self.settings_rail_btn = add_rail_button("⚙", "Agent 设置")
