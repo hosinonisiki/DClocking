@@ -2,31 +2,31 @@
 
 CHAT_WIDGET_STYLE = """
 QWidget#chat_panel {
-    background-color: #1e1e2e;
+    background-color: #FBFBF9;
     border: none;
 }
 
-QWidget#chat_scroll_area {
-    background-color: #1e1e2e;
+QScrollArea#chat_scroll_area, QScrollArea#chat_scroll_area > QWidget > QWidget {
+    background-color: #FBFBF9;
     border: none;
 }
 
 QPlainTextEdit#chat_input {
-    background-color: #313244;
-    color: #cdd6f4;
-    border: 1px solid #45475a;
+    background-color: #FFFFFF;
+    color: #303438;
+    border: 1px solid #D8D4CE;
     border-radius: 8px;
     padding: 8px 12px;
     font-size: 13px;
-    selection-background-color: #585b70;
+    selection-background-color: #85172E;
 }
 QPlainTextEdit#chat_input:focus {
-    border-color: #89b4fa;
+    border: 2px solid #85172E;
 }
 
 QPushButton#send_button {
-    background-color: #89b4fa;
-    color: #1e1e2e;
+    background-color: #85172E;
+    color: #FFFFFF;
     border: none;
     border-radius: 8px;
     padding: 8px 16px;
@@ -34,41 +34,41 @@ QPushButton#send_button {
     font-size: 13px;
 }
 QPushButton#send_button:hover {
-    background-color: #b4d0fb;
+    background-color: #9D1C38;
 }
 QPushButton#send_button:pressed {
-    background-color: #74a8f7;
+    background-color: #681123;
 }
 QPushButton#send_button:disabled {
-    background-color: #45475a;
-    color: #6c7086;
+    background-color: #EEECE8;
+    color: #AAA8A3;
 }
 
 QPushButton#settings_button {
     background-color: transparent;
-    color: #a6adc8;
-    border: 1px solid #45475a;
+    color: #303438;
+    border: 1px solid #D8D4CE;
     border-radius: 6px;
     padding: 6px 12px;
     font-size: 12px;
 }
 QPushButton#settings_button:hover {
-    background-color: #313244;
-    border-color: #89b4fa;
+    background-color: #F2F0ED;
+    border-color: #85172E;
 }
 
 QScrollBar:vertical {
-    background-color: #1e1e2e;
+    background-color: transparent;
     width: 8px;
     border: none;
 }
 QScrollBar::handle:vertical {
-    background-color: #45475a;
+    background-color: #BDB7AF;
     border-radius: 4px;
     min-height: 30px;
 }
 QScrollBar::handle:vertical:hover {
-    background-color: #585b70;
+    background-color: #8D8881;
 }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0px;
@@ -77,8 +77,8 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
 
 USER_BUBBLE_STYLE = """
 QTextBrowser {
-    background-color: #89b4fa;
-    color: #1e1e2e;
+    background-color: #85172E;
+    color: #FFFFFF;
     border-radius: 12px;
     padding: 10px 14px;
     font-size: 13px;
@@ -87,8 +87,9 @@ QTextBrowser {
 
 ASSISTANT_BUBBLE_STYLE = """
 QTextBrowser {
-    background-color: #313244;
-    color: #cdd6f4;
+    background-color: #FFFFFF;
+    color: #303438;
+    border: 1px solid #D8D4CE;
     border-radius: 12px;
     padding: 10px 14px;
     font-size: 13px;
@@ -97,7 +98,7 @@ QTextBrowser {
 
 SYSTEM_MSG_STYLE = """
 QLabel {
-    color: #6c7086;
+    color: #72777B;
     font-size: 11px;
     padding: 4px 8px;
 }
@@ -105,14 +106,14 @@ QLabel {
 
 TOOL_CALL_STYLE = """
 QFrame#tool_call_frame {
-    background-color: #2a2a3d;
-    border: 1px solid #45475a;
+    background-color: #F2F0ED;
+    border: 1px solid #D8D4CE;
     border-radius: 8px;
     padding: 8px;
 }
 QPushButton#tool_toggle {
     background-color: transparent;
-    color: #94e2d5;
+    color: #85172E;
     border: none;
     font-size: 12px;
     font-weight: bold;
@@ -120,19 +121,19 @@ QPushButton#tool_toggle {
     padding: 4px;
 }
 QPushButton#tool_toggle:hover {
-    color: #b4efe4;
+    color: #9D1C38;
 }
 QLabel#tool_detail {
-    color: #bac2de;
+    color: #303438;
     font-size: 11px;
     padding: 4px;
-    font-family: "Consolas", "Courier New", monospace;
+    font-family: "Menlo", "Courier New", monospace;
 }
 """
 
 THINKING_STYLE = """
 QLabel#thinking_label {
-    color: #6c7086;
+    color: #72777B;
     font-size: 12px;
     padding: 8px 16px;
     font-style: italic;

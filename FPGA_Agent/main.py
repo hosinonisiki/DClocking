@@ -17,10 +17,9 @@ import os
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt
 
 
-def main():
+def create_window():
     # ---- Ensure our own package is importable (for absolute imports) ----
     agent_dir = str(Path(__file__).resolve().parent)
     if agent_dir not in sys.path:
@@ -34,10 +33,6 @@ def main():
 
     # ---- Import existing MainWindow ----
     from qt_ui_mainwindow import MainWindow
-
-    # ---- Create application ----
-    app = QApplication(sys.argv)
-    app.setStyle("Fusion")
 
     window = MainWindow()
     window.setWindowTitle("FPGA Designer + Agent")
@@ -82,8 +77,8 @@ def main():
     agent = AgentCore(llm, executor, None, bridge, config)
 
     # Chat widget
-    chat = AgentChatWidget()
-    window.addDockWidget(Qt.RightDockWidgetArea, chat)
+    chat = AgentChatWidget(window)
+    window.register_agent_dock(chat)
 
     # ---- Wire signals ----
     chat.user_message_submitted.connect(agent.send_message)
@@ -97,9 +92,6 @@ def main():
     agent.tool_executed.connect(
         lambda name, args, result: chat.add_tool_call(name, args, result)
     )
-
-    # ---- Show window ----
-    window.show()
 
     # ---- Welcome message ----
     chat.add_assistant_message(
@@ -118,6 +110,23 @@ def main():
         chat.add_system_message(
             "API key not configured. Click Settings to enter your API key."
         )
+
+    window._agent_components = {
+        "bridge": bridge,
+        "code_generator": code_gen,
+        "executor": executor,
+        "llm": llm,
+        "agent": agent,
+        "chat": chat,
+    }
+    return window
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    window = create_window()
+    window.show()
 
     sys.exit(app.exec())
 

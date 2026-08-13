@@ -52,13 +52,14 @@ class AgentChatWidget(QDockWidget):
         # Header bar
         header = QHBoxLayout()
         title = QLabel("FPGA Agent")
-        title.setStyleSheet("color: #cdd6f4; font-size: 14px; font-weight: bold;")
+        title.setStyleSheet("color: #303438; font-size: 14px; font-weight: bold;")
         header.addWidget(title)
         header.addStretch()
 
-        self._settings_btn = QPushButton("Settings")
+        self._settings_btn = QPushButton("设置")
         self._settings_btn.setObjectName("settings_button")
-        self._settings_btn.clicked.connect(self._open_settings)
+        self._settings_btn.setAccessibleName("打开 Agent 设置")
+        self._settings_btn.clicked.connect(self.open_settings)
         header.addWidget(self._settings_btn)
 
         layout.addLayout(header)
@@ -94,8 +95,9 @@ class AgentChatWidget(QDockWidget):
         self._input.installEventFilter(self)
         input_row.addWidget(self._input)
 
-        self._send_btn = QPushButton("Send")
+        self._send_btn = QPushButton("发送")
         self._send_btn.setObjectName("send_button")
+        self._send_btn.setAccessibleName("发送 Agent 消息")
         self._send_btn.clicked.connect(self._send_message)
         input_row.addWidget(self._send_btn)
 
@@ -168,6 +170,10 @@ class AgentChatWidget(QDockWidget):
             item = self._msg_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+
+    def open_settings(self):
+        """Open the Agent settings dialog from any presentation control."""
+        self._open_settings()
 
     # ------------------------------------------------------------------
     # Internals
