@@ -14,6 +14,10 @@ from qt_ui_mainwindow import MainWindow
 
 
 class UiFunctionalRegressionTests(unittest.TestCase):
+    EXPECTED_WINDOW_TITLE = (
+        "北京大学&长三角光电科学研究院 智能集成光学控制平台系统"
+    )
+
     @classmethod
     def setUpClass(cls):
         cls.app = ensure_app()
@@ -143,6 +147,15 @@ class UiFunctionalRegressionTests(unittest.TestCase):
                     )
                 window.close()
                 self.app.processEvents()
+
+    def test_ordinary_and_integrated_entries_share_platform_title(self):
+        self.window.close()
+        for factory in (create_ordinary_window, create_integrated_window):
+            window = factory()
+            try:
+                self.assertEqual(window.windowTitle(), self.EXPECTED_WINDOW_TITLE)
+            finally:
+                window.close()
 
 
 if __name__ == "__main__":

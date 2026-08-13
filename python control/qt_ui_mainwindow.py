@@ -55,6 +55,8 @@ from qt_ui_utils import (
 )
 import port_numbers as pn
 
+PLATFORM_WINDOW_TITLE = "北京大学&长三角光电科学研究院 智能集成光学控制平台系统"
+
 
 class _StreamProxy(QObject):
     text_written = Signal(str)
@@ -85,7 +87,7 @@ class MainWindow(QMainWindow):
         self._last_log_height = 160
         self._agent_dock = None
         self._agent_action = None
-        self.setWindowTitle("DClocking · FPGA 精密控制工作台")
+        self.setWindowTitle(PLATFORM_WINDOW_TITLE)
         self.resize(1600, 900)
         self.setMinimumSize(1120, 680)
 

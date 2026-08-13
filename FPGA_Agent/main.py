@@ -35,7 +35,6 @@ def create_window(settings=None):
     from qt_ui_mainwindow import MainWindow
 
     window = MainWindow(settings=settings)
-    window.setWindowTitle("FPGA Designer + Agent")
 
     # ---- Load config ----
     agent_dir = Path(__file__).resolve().parent
