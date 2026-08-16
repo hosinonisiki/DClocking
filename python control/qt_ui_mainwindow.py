@@ -553,9 +553,18 @@ class MainWindow(QMainWindow):
         self.inspector_tabs = tabs
 
     def _scroll_to_panel(self, panel_widget):
-        scrollbar = self.param_scroll.verticalScrollBar()
-        target = max(0, panel_widget.y() - 8)
-        scrollbar.setValue(target)
+        def activate_panel():
+            if panel_widget.parent() is None:
+                return
+            self.param_layout.activate()
+            scrollbar = self.param_scroll.verticalScrollBar()
+            target = max(0, panel_widget.y() - 8)
+            scrollbar.setValue(target)
+            editor = panel_widget.findChild(QLineEdit)
+            if editor is not None:
+                editor.setFocus(Qt.OtherFocusReason)
+
+        QTimer.singleShot(0, activate_panel)
 
     def _close_param_panel(self, panel_key):
         panel = self._param_panels.pop(panel_key, None)

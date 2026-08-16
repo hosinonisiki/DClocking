@@ -4,12 +4,12 @@ from unittest.mock import patch
 
 from PySide6.QtCore import QPoint, QPointF, QRect, QSettings, Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QLineEdit, QWidget
 
 from tests.qt_test_support import ensure_app
 from FPGA_Agent.main import create_window as create_integrated_window
 from qt_UI1 import create_window as create_ordinary_window
-from qt_module import ModuleScaler
+from qt_module import ModulePID, ModuleScaler
 from qt_ui_mainwindow import MainWindow
 
 
@@ -104,6 +104,76 @@ class UiFunctionalRegressionTests(unittest.TestCase):
         self.assertIsNotNone(panel)
         self.assertEqual(self.window.inspector_tabs.currentIndex(), 1)
         self.assertTrue(panel.isVisibleTo(self.window))
+
+    def test_second_same_type_node_activates_its_parameter_editor(self):
+        first = ModulePID("PID控制器", 0, QPointF(-180, 0))
+        second = ModulePID("PID控制器", 1, QPointF(180, 0))
+        self.window.scene.addItem(first)
+        self.window.scene.addItem(second)
+        self.window.set_log_expanded(True)
+        self.app.processEvents()
+
+        for node in (first, second):
+            viewport_pos = self.window.view.mapFromScene(node.scenePos())
+            QTest.mouseClick(
+                self.window.view.viewport(),
+                Qt.LeftButton,
+                Qt.NoModifier,
+                viewport_pos,
+            )
+            QTest.mouseDClick(
+                self.window.view.viewport(),
+                Qt.LeftButton,
+                Qt.NoModifier,
+                viewport_pos,
+            )
+            QTest.mouseRelease(
+                self.window.view.viewport(),
+                Qt.LeftButton,
+                Qt.NoModifier,
+                viewport_pos,
+            )
+            QTest.qWait(10)
+
+        panel_key = f"{second.name}@{second.component_name}:{second.index}"
+        editor = self.window._param_panels[panel_key].findChild(QLineEdit)
+        self.assertIsNotNone(editor)
+        self.assertTrue(editor.hasFocus())
+
+    def test_reopening_existing_node_reactivates_its_parameter_editor(self):
+        first = ModulePID("PID控制器", 0, QPointF(-180, 0))
+        second = ModulePID("PID控制器", 1, QPointF(180, 0))
+        self.window.scene.addItem(first)
+        self.window.scene.addItem(second)
+        self.window.set_log_expanded(True)
+        self.app.processEvents()
+
+        for node in (first, second, first):
+            viewport_pos = self.window.view.mapFromScene(node.scenePos())
+            QTest.mouseClick(
+                self.window.view.viewport(),
+                Qt.LeftButton,
+                Qt.NoModifier,
+                viewport_pos,
+            )
+            QTest.mouseDClick(
+                self.window.view.viewport(),
+                Qt.LeftButton,
+                Qt.NoModifier,
+                viewport_pos,
+            )
+            QTest.mouseRelease(
+                self.window.view.viewport(),
+                Qt.LeftButton,
+                Qt.NoModifier,
+                viewport_pos,
+            )
+            QTest.qWait(10)
+
+        panel_key = f"{first.name}@{first.component_name}:{first.index}"
+        editor = self.window._param_panels[panel_key].findChild(QLineEdit)
+        self.assertIsNotNone(editor)
+        self.assertTrue(editor.hasFocus())
 
     def test_configuration_helpers_round_trip_direct_params_and_edges(self):
         source, target = self.add_scaler_pair()
