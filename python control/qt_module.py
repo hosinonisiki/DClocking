@@ -389,14 +389,28 @@ class QuantityLineEdit(QLineEdit):
 class PIDParamCanvas(QWidget):
     """Live Bode magnitude preview using the same scaling as ``ModulePID``."""
 
+    parameter_changed = Signal(str, float)
     _DIRECT_KEYS = {"gain_p", "gain_i", "gain_d", "leak_digit"}
     _MAX_PLOT_FREQUENCY_HZ = 125_000_000.0
+    _FREQUENCY_DRAG_KEYS = (
+        "saturation_turning_frequency",
+        "pi_corner",
+        "pd_corner",
+    )
 
     def __init__(self, parent=None, allow_expand=True, compact=True):
         super().__init__(parent)
         self._parameters = {}
         self._changed_key = None
         self._expanded_window = None
+        self._plot_metrics = None
+        self._handle_positions = {}
+        self._hover_key = None
+        self._drag_key = None
+        self._drag_transform = None
+        self._drag_origin_position = None
+        self._drag_origin_value = None
+        self._last_drag_value = None
         self._response = self.calculate_response({}, self._logspace(1.0, 100_000_000.0, 180))
         if compact:
             self.setMinimumSize(340, 205)
@@ -404,7 +418,9 @@ class PIDParamCanvas(QWidget):
         else:
             self.setMinimumSize(600, 360)
             self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.setToolTip("依据 FPGA PID 定标实时计算：P、I、D 分量及其复数合成幅频响应")
+        self.setMouseTracking(True)
+        self.setAccessibleName("PID 实时频率响应，可拖动 P、PI、PD 和泄漏标记调参")
+        self.setToolTip("拖动 P 基准线调节整体增益；横向拖动 PI、PD、泄漏标记调节对应频率")
 
         self._expand_button = None
         if allow_expand:
@@ -448,6 +464,7 @@ class PIDParamCanvas(QWidget):
             changed_key=self._changed_key,
             parent=self.window(),
         )
+        window._canvas.parameter_changed.connect(self.parameter_changed.emit)
         window.destroyed.connect(self._clear_expanded_window)
         self._expanded_window = window
         window.show()
@@ -664,8 +681,11 @@ class PIDParamCanvas(QWidget):
     def set_parameters(self, parameters, changed_key=None):
         self._parameters = dict(parameters or {})
         self._changed_key = changed_key
-        low, high = self._frequency_range(self._parameters, changed_key=changed_key)
-        frequencies = self._logspace(low, high, 200)
+        if self._drag_key and self._response.get("frequencies_hz"):
+            frequencies = self._response["frequencies_hz"]
+        else:
+            low, high = self._frequency_range(self._parameters, changed_key=changed_key)
+            frequencies = self._logspace(low, high, 200)
         self._response = self.calculate_response(
             self._parameters,
             frequencies,
@@ -677,6 +697,138 @@ class PIDParamCanvas(QWidget):
                 self._expanded_window.set_parameters(self._parameters, changed_key=changed_key)
             except RuntimeError:
                 self._expanded_window = None
+
+    def interactive_handle_positions(self):
+        """Return the currently rendered graph handles for UI automation."""
+        return {
+            key: QPointF(position)
+            for key, position in self._handle_positions.items()
+        }
+
+    def _hit_test_drag_target(self, position):
+        metrics = self._plot_metrics
+        if not metrics:
+            return None
+        plot_rect = metrics["plot_rect"]
+        if not plot_rect.adjusted(-12, -12, 12, 12).contains(position):
+            return None
+
+        for key, handle in self._handle_positions.items():
+            if abs(position.x() - handle.x()) <= 11 and abs(position.y() - handle.y()) <= 11:
+                return key
+
+        for key in self._FREQUENCY_DRAG_KEYS:
+            handle = self._handle_positions.get(key)
+            frequency = self._response.get(
+                {
+                    "saturation_turning_frequency": "leak_frequency_hz",
+                    "pi_corner": "pi_corner_hz",
+                    "pd_corner": "pd_corner_hz",
+                }[key]
+            )
+            if (
+                handle is not None
+                and frequency is not None
+                and frequency > 0.0
+                and abs(position.x() - handle.x()) <= 9
+                and plot_rect.top() <= position.y() <= plot_rect.bottom()
+            ):
+                return key
+
+        gain_handle = self._handle_positions.get("overall_gain")
+        if (
+            gain_handle is not None
+            and abs(position.y() - gain_handle.y()) <= 9
+            and plot_rect.left() <= position.x() <= plot_rect.right()
+        ):
+            return "overall_gain"
+        return None
+
+    def _dragged_parameter_value(self, position):
+        if not self._drag_key or not self._drag_transform:
+            return None
+        transform = self._drag_transform
+        plot_rect = transform["plot_rect"]
+
+        if self._drag_key == "overall_gain":
+            pixels = self._drag_origin_position.y() - position.y()
+            db_per_pixel = (
+                (transform["y_max"] - transform["y_min"])
+                / max(1.0, plot_rect.height())
+            )
+            value = self._drag_origin_value + pixels * db_per_pixel
+            return round(max(-180.0, min(180.0, value)), 1)
+
+        fraction = (position.x() - plot_rect.left()) / max(1.0, plot_rect.width())
+        fraction = max(0.0, min(1.0, fraction))
+        value = 10.0 ** (
+            transform["log_low"] + fraction * transform["log_span"]
+        )
+        return float(f"{value:.7g}")
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            key = self._hit_test_drag_target(event.position())
+            if key is not None:
+                self._drag_key = key
+                self._hover_key = key
+                self._drag_transform = dict(self._plot_metrics)
+                self._drag_transform["plot_rect"] = QRectF(self._plot_metrics["plot_rect"])
+                self._drag_origin_position = QPointF(event.position())
+                if key == "overall_gain":
+                    value = self._parameters.get(
+                        "overall_gain",
+                        self._response.get("overall_gain_db", 0.0),
+                    )
+                    self._drag_origin_value = self._finite_float(value, 0.0)
+                else:
+                    self._drag_origin_value = None
+                self._last_drag_value = None
+                self.setCursor(Qt.ClosedHandCursor)
+                self.update()
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_key is not None:
+            value = self._dragged_parameter_value(event.position())
+            if value is not None and (
+                self._last_drag_value is None
+                or not math.isclose(value, self._last_drag_value, rel_tol=1e-9, abs_tol=1e-9)
+            ):
+                self._last_drag_value = value
+                self.parameter_changed.emit(self._drag_key, value)
+            event.accept()
+            return
+
+        hover_key = self._hit_test_drag_target(event.position())
+        if hover_key != self._hover_key:
+            self._hover_key = hover_key
+            self.setCursor(Qt.OpenHandCursor if hover_key else Qt.ArrowCursor)
+            self.update()
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and self._drag_key is not None:
+            changed_key = self._drag_key
+            self._drag_key = None
+            self._drag_transform = None
+            self._drag_origin_position = None
+            self._drag_origin_value = None
+            self._last_drag_value = None
+            self.setCursor(Qt.OpenHandCursor)
+            self.set_parameters(self._parameters, changed_key=changed_key)
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def leaveEvent(self, event):
+        if self._drag_key is None and self._hover_key is not None:
+            self._hover_key = None
+            self.unsetCursor()
+            self.update()
+        super().leaveEvent(event)
 
     def response_data(self):
         return dict(self._response)
@@ -726,7 +878,7 @@ class PIDParamCanvas(QWidget):
         painter.drawText(
             QRectF(rect.right() - 150, rect.top() + 7, 110, 16),
             Qt.AlignRight | Qt.AlignVCenter,
-            "LIVE · FPGA MODEL",
+            "拖动标记 · LIVE",
         )
 
         plot_rect = QRectF(rect.left() + 45, rect.top() + 46, rect.width() - 60, rect.height() - 75)
@@ -757,11 +909,21 @@ class PIDParamCanvas(QWidget):
             y_max = min(180.0, center + 20.0)
         if y_max <= y_min:
             y_min, y_max = -20.0, 20.0
+        if self._drag_key is not None and self._drag_transform is not None:
+            y_min = self._drag_transform["y_min"]
+            y_max = self._drag_transform["y_max"]
 
         low_frequency = frequencies[0]
         high_frequency = frequencies[-1]
         log_low = math.log10(low_frequency)
         log_span = max(1e-9, math.log10(high_frequency) - log_low)
+        self._plot_metrics = {
+            "plot_rect": QRectF(plot_rect),
+            "y_min": y_min,
+            "y_max": y_max,
+            "log_low": log_low,
+            "log_span": log_span,
+        }
 
         def map_x(frequency):
             return plot_rect.left() + (math.log10(frequency) - log_low) / log_span * plot_rect.width()
@@ -802,19 +964,49 @@ class PIDParamCanvas(QWidget):
                 painter.setPen(QPen(QColor("#E6E9EE"), 1, Qt.DotLine))
 
         marker_specs = (
-            ("leak_frequency_hz", "泄漏", QColor("#A670D6")),
-            ("pi_corner_hz", "PI", QColor("#E9953E")),
-            ("pd_corner_hz", "PD", QColor("#25A8A2")),
+            ("saturation_turning_frequency", "leak_frequency_hz", "泄漏", QColor("#A670D6")),
+            ("pi_corner", "pi_corner_hz", "PI", QColor("#E9953E")),
+            ("pd_corner", "pd_corner_hz", "PD", QColor("#25A8A2")),
         )
-        for key, label, color in marker_specs:
-            frequency = response.get(key)
-            if frequency is None or not math.isfinite(frequency) or not (low_frequency <= frequency <= high_frequency):
-                continue
-            x = map_x(frequency)
-            painter.setPen(QPen(color, 1, Qt.DashLine))
-            painter.drawLine(QPointF(x, plot_rect.top()), QPointF(x, plot_rect.bottom()))
-            painter.setPen(color)
-            painter.drawText(QRectF(x - 18, plot_rect.top() + 2, 36, 11), Qt.AlignCenter, label)
+        self._handle_positions = {}
+        rendered_markers = []
+        disabled_index = 0
+        for parameter_key, response_key, label, color in marker_specs:
+            frequency = response.get(response_key)
+            visible = (
+                frequency is not None
+                and math.isfinite(frequency)
+                and low_frequency <= frequency <= high_frequency
+            )
+            if visible:
+                x = map_x(frequency)
+                handle = QPointF(x, plot_rect.top() + 19)
+                painter.setPen(QPen(
+                    color,
+                    2 if parameter_key in {self._hover_key, self._drag_key} else 1,
+                    Qt.DashLine,
+                ))
+                painter.drawLine(QPointF(x, plot_rect.top()), QPointF(x, plot_rect.bottom()))
+                painter.setPen(color)
+                painter.drawText(
+                    QRectF(x - 18, plot_rect.top() + 2, 36, 11),
+                    Qt.AlignCenter,
+                    label,
+                )
+            else:
+                handle = QPointF(
+                    plot_rect.left() + 5,
+                    plot_rect.top() + 17 + disabled_index * 17,
+                )
+                disabled_index += 1
+                painter.setPen(color)
+                painter.drawText(
+                    QRectF(handle.x() + 8, handle.y() - 6, 46, 12),
+                    Qt.AlignLeft | Qt.AlignVCenter,
+                    f"{label} 关闭",
+                )
+            self._handle_positions[parameter_key] = handle
+            rendered_markers.append((parameter_key, color, handle))
 
         def draw_series(key, color, width, style=Qt.SolidLine):
             painter.setPen(QPen(color, width, style, Qt.RoundCap, Qt.RoundJoin))
@@ -837,6 +1029,30 @@ class PIDParamCanvas(QWidget):
         draw_series("integral_db", QColor("#E9953E"), 1)
         draw_series("derivative_db", QColor("#25A8A2"), 1)
         draw_series("total_db", QColor("#1769FF"), 2)
+
+        overall_gain = response.get("overall_gain_db")
+        overall_gain_y = map_y(overall_gain if overall_gain is not None else 0.0)
+        if overall_gain_y is not None:
+            overall_gain_y = max(plot_rect.top(), min(plot_rect.bottom(), overall_gain_y))
+            gain_handle = QPointF(plot_rect.left() + 13, overall_gain_y)
+            self._handle_positions["overall_gain"] = gain_handle
+            gain_active = "overall_gain" in {self._hover_key, self._drag_key}
+            painter.setPen(QPen(QColor("#9B0036" if gain_active else "#7D8795"), 2))
+            painter.setBrush(QColor("#FFF2F6" if gain_active else "#FFFFFF"))
+            radius = 6 if gain_active else 4.5
+            painter.drawEllipse(gain_handle, radius, radius)
+            painter.drawText(
+                QRectF(gain_handle.x() + 7, gain_handle.y() - 7, 22, 14),
+                Qt.AlignLeft | Qt.AlignVCenter,
+                "P",
+            )
+
+        for parameter_key, color, handle in rendered_markers:
+            active = parameter_key in {self._hover_key, self._drag_key}
+            painter.setPen(QPen(color, 2 if active else 1.5))
+            painter.setBrush(QColor("#FFF2F6" if active else "#FFFFFF"))
+            radius = 6 if active else 4.5
+            painter.drawEllipse(handle, radius, radius)
 
         legend = (("总响应", "#1769FF"), ("P", "#7D8795"), ("I", "#E9953E"), ("D", "#25A8A2"))
         legend_x = rect.left() + 12
@@ -2383,6 +2599,9 @@ class ParamDialog(QDialog):
                         available_keys=available_keys,
                     )
                     self._pid_tuning_panel.parameter_changed.connect(
+                        self._apply_pid_tuning_parameter
+                    )
+                    self._companion_widget.parameter_changed.connect(
                         self._apply_pid_tuning_parameter
                     )
                     root.addWidget(self._pid_tuning_panel, 0)

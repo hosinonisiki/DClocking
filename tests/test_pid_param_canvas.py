@@ -1,7 +1,9 @@
 import math
 import unittest
 
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QImage
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QSlider, QToolButton
 
 from tests.qt_test_support import ensure_app
@@ -161,6 +163,66 @@ class PIDParamCanvasTests(unittest.TestCase):
             editor_value,
         )
         self.assertEqual(applied[-1], {"overall_gain": editor_value})
+        dialog.close()
+
+    def test_plot_markers_drag_to_apply_frequency_and_gain_parameters(self):
+        schema = [field for field in PID_SCHEMA if field.get("mode") == "indirect"]
+        applied = []
+        dialog = ParamDialog(
+            schema,
+            {
+                "overall_gain": 0.0,
+                "pi_corner": 100.0,
+                "pd_corner": 10_000.0,
+                "saturation_gain": 20.0,
+                "saturation_turning_frequency": 10.0,
+            },
+            apply_callback=applied.append,
+            companion_widget_factory=lambda parent: PIDParamCanvas(parent),
+        )
+        dialog.show()
+        canvas = dialog._companion_widget
+        canvas.resize(620, 230)
+        self._render(canvas)
+        self.app.processEvents()
+
+        handles = canvas.interactive_handle_positions()
+        self.assertEqual(
+            set(handles),
+            {
+                "overall_gain",
+                "pi_corner",
+                "pd_corner",
+                "saturation_turning_frequency",
+            },
+        )
+
+        pi_handle = handles["pi_corner"].toPoint()
+        QTest.mousePress(canvas, Qt.LeftButton, pos=pi_handle)
+        QTest.mouseMove(canvas, QPoint(pi_handle.x() + 35, pi_handle.y()))
+        QTest.mouseRelease(
+            canvas,
+            Qt.LeftButton,
+            pos=QPoint(pi_handle.x() + 35, pi_handle.y()),
+        )
+        self.app.processEvents()
+        pi_value = dialog._editors["pi_corner"][1].preview_quantity_value()
+        self.assertGreater(pi_value, 100.0)
+        self.assertEqual(applied[-1], {"pi_corner": pi_value})
+
+        self._render(canvas)
+        gain_handle = canvas.interactive_handle_positions()["overall_gain"].toPoint()
+        QTest.mousePress(canvas, Qt.LeftButton, pos=gain_handle)
+        QTest.mouseMove(canvas, QPoint(gain_handle.x(), gain_handle.y() - 18))
+        QTest.mouseRelease(
+            canvas,
+            Qt.LeftButton,
+            pos=QPoint(gain_handle.x(), gain_handle.y() - 18),
+        )
+        self.app.processEvents()
+        gain_value = dialog._editors["overall_gain"][1].preview_quantity_value()
+        self.assertGreater(gain_value, 0.0)
+        self.assertEqual(applied[-1], {"overall_gain": gain_value})
         dialog.close()
 
     def test_expand_button_opens_one_resizable_standalone_window(self):
