@@ -2,7 +2,7 @@ import math
 import unittest
 
 from PySide6.QtGui import QImage
-from PySide6.QtWidgets import QApplication, QToolButton
+from PySide6.QtWidgets import QApplication, QSlider, QToolButton
 
 from tests.qt_test_support import ensure_app
 from qt_module import PIDParamCanvas, ParamDialog
@@ -116,6 +116,51 @@ class PIDParamCanvasTests(unittest.TestCase):
         after = self._render(canvas)
 
         self.assertNotEqual(before, after)
+        dialog.close()
+
+    def test_manual_tuning_sliders_update_editor_curve_and_apply_callback(self):
+        schema = [field for field in PID_SCHEMA if field.get("mode") == "indirect"]
+        applied = []
+        dialog = ParamDialog(
+            schema,
+            {
+                "overall_gain": 0.0,
+                "pi_corner": 100.0,
+                "pd_corner": 10_000.0,
+                "saturation_gain": 20.0,
+                "saturation_turning_frequency": 10.0,
+            },
+            apply_callback=applied.append,
+            companion_widget_factory=lambda parent: PIDParamCanvas(parent),
+        )
+        dialog.show()
+        self.app.processEvents()
+
+        tuning_panel = getattr(dialog, "_pid_tuning_panel", None)
+        self.assertIsNotNone(tuning_panel)
+        sliders = {
+            key: tuning_panel.findChild(QSlider, f"pid_tune_{key}")
+            for key in (
+                "overall_gain",
+                "pi_corner",
+                "pd_corner",
+                "saturation_turning_frequency",
+            )
+        }
+        self.assertTrue(all(sliders.values()))
+        self.assertEqual(sliders["overall_gain"].accessibleName(), "滑动调节 P 整体增益")
+
+        gain_slider = sliders["overall_gain"]
+        gain_slider.setValue(gain_slider.value() + 80)
+        self.app.processEvents()
+
+        editor_value = dialog._editors["overall_gain"][1].preview_quantity_value()
+        self.assertGreater(editor_value, 0.0)
+        self.assertAlmostEqual(
+            dialog._companion_widget.response_data()["overall_gain_db"],
+            editor_value,
+        )
+        self.assertEqual(applied[-1], {"overall_gain": editor_value})
         dialog.close()
 
     def test_expand_button_opens_one_resizable_standalone_window(self):

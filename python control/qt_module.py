@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QSplitter, QGraphicsEllipseItem, QDialog, QFormLayout,
                                QSpinBox, QDoubleSpinBox, QLineEdit,
                                QCheckBox, QPushButton, QToolButton, QToolTip, QComboBox,
-                               QMessageBox, QLabel, QSizePolicy, QFrame)
+                               QMessageBox, QLabel, QSizePolicy, QFrame, QSlider)
 # 导入PySide6的QtCore模块中的相关类
 from PySide6.QtCore import Qt, QMimeData, QPointF, QRectF, Signal, QObject, QByteArray, QPoint
 # 导入PySide6.QtGui模块中的相关类
@@ -855,6 +855,239 @@ class PIDParamCanvas(QWidget):
             "对数频率 (Hz)",
         )
         painter.end()
+
+
+class PIDManualTuningPanel(QFrame):
+    """High-level PID controls that map normalized sliders to real parameters."""
+
+    parameter_changed = Signal(str, float)
+    _SLIDER_STEPS = 1000
+    _FREQUENCY_MIN_HZ = 0.1
+    _FREQUENCY_MAX_HZ = 100_000_000.0
+    _CONTROL_SPECS = (
+        (
+            "overall_gain",
+            "P · 整体增益",
+            "滑动调节 P 整体增益",
+            "linear",
+            -80.0,
+            80.0,
+            "−80 dB",
+            "+80 dB",
+        ),
+        (
+            "pi_corner",
+            "I · PI 交点",
+            "滑动调节 I 通道 PI 交点频率",
+            "frequency",
+            _FREQUENCY_MIN_HZ,
+            _FREQUENCY_MAX_HZ,
+            "关闭 / 0 Hz",
+            "100 MHz",
+        ),
+        (
+            "pd_corner",
+            "D · PD 交点",
+            "滑动调节 D 通道 PD 交点频率",
+            "frequency",
+            _FREQUENCY_MIN_HZ,
+            _FREQUENCY_MAX_HZ,
+            "关闭 / 0 Hz",
+            "100 MHz",
+        ),
+        (
+            "saturation_turning_frequency",
+            "I · 泄漏拐点",
+            "滑动调节积分泄漏拐点频率",
+            "frequency",
+            _FREQUENCY_MIN_HZ,
+            _FREQUENCY_MAX_HZ,
+            "关闭 / 0 Hz",
+            "100 MHz",
+        ),
+    )
+
+    def __init__(self, parent=None, available_keys=None):
+        super().__init__(parent)
+        self.setObjectName("pid_manual_tuning_panel")
+        self.setAccessibleName("PID 实时滑动调参")
+        self._available_keys = set(available_keys or ())
+        self._sliders = {}
+        self._value_labels = {}
+        self._specs = {spec[0]: spec for spec in self._CONTROL_SPECS}
+        self._syncing = False
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(12, 10, 12, 12)
+        root.setSpacing(9)
+
+        header = QHBoxLayout()
+        title = QLabel("实时滑动调参")
+        title.setObjectName("pid_tuning_title")
+        hint = QLabel("拖动即应用 · 曲线实时更新")
+        hint.setObjectName("pid_tuning_hint")
+        hint.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        header.addWidget(title)
+        header.addStretch()
+        header.addWidget(hint)
+        root.addLayout(header)
+
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(8)
+        root.addLayout(grid)
+
+        visible_specs = [
+            spec for spec in self._CONTROL_SPECS
+            if not self._available_keys or spec[0] in self._available_keys
+        ]
+        for index, spec in enumerate(visible_specs):
+            key, title_text, accessible_name, _kind, _minimum, _maximum, low_text, high_text = spec
+            card = QFrame(self)
+            card.setObjectName("pid_tuning_card")
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(10, 8, 10, 7)
+            card_layout.setSpacing(5)
+
+            label_row = QHBoxLayout()
+            label_row.setContentsMargins(0, 0, 0, 0)
+            label = QLabel(title_text)
+            label.setObjectName("pid_tuning_label")
+            value_label = QLabel("—")
+            value_label.setObjectName("pid_tuning_value")
+            value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            label_row.addWidget(label)
+            label_row.addStretch()
+            label_row.addWidget(value_label)
+            card_layout.addLayout(label_row)
+
+            slider = QSlider(Qt.Horizontal, card)
+            slider.setObjectName(f"pid_tune_{key}")
+            slider.setAccessibleName(accessible_name)
+            slider.setToolTip(f"{title_text}：拖动滑块实时更新数值与频率响应，精确值仍可在下方输入")
+            slider.setRange(0, self._SLIDER_STEPS)
+            slider.setSingleStep(1)
+            slider.setPageStep(25)
+            slider.setTracking(True)
+            slider.valueChanged.connect(
+                lambda position, parameter_key=key: self._slider_value_changed(
+                    parameter_key,
+                    position,
+                )
+            )
+            card_layout.addWidget(slider)
+
+            range_row = QHBoxLayout()
+            range_row.setContentsMargins(0, 0, 0, 0)
+            low_label = QLabel(low_text)
+            low_label.setObjectName("pid_tuning_range")
+            high_label = QLabel(high_text)
+            high_label.setObjectName("pid_tuning_range")
+            high_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            range_row.addWidget(low_label)
+            range_row.addStretch()
+            range_row.addWidget(high_label)
+            card_layout.addLayout(range_row)
+
+            self._sliders[key] = slider
+            self._value_labels[key] = value_label
+            grid.addWidget(card, index // 2, index % 2)
+
+        self.setStyleSheet(
+            "QFrame#pid_manual_tuning_panel { background: #FFFFFF; border: 1px solid #C7CDD6; "
+            "border-radius: 9px; }"
+            "QFrame#pid_tuning_card { background: #F7F8FA; border: 1px solid #E1E5EB; "
+            "border-radius: 7px; }"
+            "QLabel#pid_tuning_title { color: #243447; font-size: 13px; font-weight: 700; "
+            "border: none; background: transparent; }"
+            "QLabel#pid_tuning_hint { color: #7B8492; font-size: 10px; border: none; "
+            "background: transparent; }"
+            "QLabel#pid_tuning_label { color: #4B5563; font-size: 11px; font-weight: 600; "
+            "border: none; background: transparent; }"
+            "QLabel#pid_tuning_value { color: #9B0036; font-size: 12px; font-weight: 700; "
+            "border: none; background: transparent; }"
+            "QLabel#pid_tuning_range { color: #929AA6; font-size: 9px; border: none; "
+            "background: transparent; }"
+            "QSlider::groove:horizontal { height: 6px; background: #DDE2E8; border-radius: 3px; }"
+            "QSlider::sub-page:horizontal { background: #9B0036; border-radius: 3px; }"
+            "QSlider::handle:horizontal { width: 18px; height: 18px; margin: -6px 0; "
+            "background: #FFFFFF; border: 2px solid #9B0036; border-radius: 9px; }"
+            "QSlider::handle:horizontal:hover { background: #FFF2F6; border-color: #B0003E; }"
+            "QSlider::handle:horizontal:pressed { background: #F3DDE5; }"
+            "QSlider:focus { outline: none; }"
+        )
+
+    @staticmethod
+    def _format_frequency(value):
+        value = max(0.0, float(value))
+        if value == 0.0:
+            return "关闭 · 0 Hz"
+        for scale, suffix in ((1e6, "MHz"), (1e3, "kHz")):
+            if value >= scale:
+                return f"{value / scale:.3g} {suffix}"
+        return f"{value:.3g} Hz"
+
+    def _position_to_value(self, key, position):
+        spec = self._specs[key]
+        _key, _title, _accessible, kind, minimum, maximum, _low, _high = spec
+        position = max(0, min(self._SLIDER_STEPS, int(position)))
+        if kind == "linear":
+            value = minimum + (maximum - minimum) * position / self._SLIDER_STEPS
+            return round(value, 1)
+        if position == 0:
+            return 0.0
+        fraction = (position - 1) / max(1, self._SLIDER_STEPS - 1)
+        return 10.0 ** (
+            math.log10(minimum)
+            + fraction * (math.log10(maximum) - math.log10(minimum))
+        )
+
+    def _value_to_position(self, key, value):
+        spec = self._specs[key]
+        _key, _title, _accessible, kind, minimum, maximum, _low, _high = spec
+        try:
+            value = float(value)
+        except (TypeError, ValueError, OverflowError):
+            value = 0.0
+        if not math.isfinite(value):
+            value = maximum if value > 0.0 else minimum
+        if kind == "linear":
+            fraction = (max(minimum, min(maximum, value)) - minimum) / (maximum - minimum)
+            return round(fraction * self._SLIDER_STEPS)
+        if value <= 0.0:
+            return 0
+        value = max(minimum, min(maximum, value))
+        fraction = (
+            (math.log10(value) - math.log10(minimum))
+            / (math.log10(maximum) - math.log10(minimum))
+        )
+        return 1 + round(fraction * (self._SLIDER_STEPS - 1))
+
+    def _format_value(self, key, value):
+        if self._specs[key][3] == "linear":
+            return f"{float(value):+.1f} dB"
+        return self._format_frequency(value)
+
+    def _slider_value_changed(self, key, position):
+        if self._syncing:
+            return
+        value = self._position_to_value(key, position)
+        self._value_labels[key].setText(self._format_value(key, value))
+        self.parameter_changed.emit(key, value)
+
+    def set_parameters(self, parameters):
+        parameters = dict(parameters or {})
+        self._syncing = True
+        try:
+            for key, slider in self._sliders.items():
+                value = parameters.get(key, 0.0)
+                slider.blockSignals(True)
+                slider.setValue(self._value_to_position(key, value))
+                slider.blockSignals(False)
+                self._value_labels[key].setText(self._format_value(key, value))
+        finally:
+            self._syncing = False
 
 
 class PIDResponseWindow(QDialog):
@@ -2130,6 +2363,7 @@ class ParamDialog(QDialog):
         self._committed_values = {}
         self._enter_committed_keys = set()
         self._companion_widget = None
+        self._pid_tuning_panel = None
         self._companion_refresh_suspended = False
 
         root = QVBoxLayout(self)
@@ -2142,6 +2376,16 @@ class ParamDialog(QDialog):
         if callable(companion_widget_factory):
             self._companion_widget = companion_widget_factory(self)
             if self._companion_widget is not None:
+                if isinstance(self._companion_widget, PIDParamCanvas):
+                    available_keys = {field.get("key") for field in schema}
+                    self._pid_tuning_panel = PIDManualTuningPanel(
+                        self,
+                        available_keys=available_keys,
+                    )
+                    self._pid_tuning_panel.parameter_changed.connect(
+                        self._apply_pid_tuning_parameter
+                    )
+                    root.addWidget(self._pid_tuning_panel, 0)
                 root.addWidget(self._companion_widget, 0)
 
         for field in schema:
@@ -2245,10 +2489,9 @@ class ParamDialog(QDialog):
         return widget.text()
 
     def _refresh_companion(self, changed_key=None) -> None:
-        if self._companion_refresh_suspended or self._companion_widget is None:
+        if self._companion_refresh_suspended:
             return
-        setter = getattr(self._companion_widget, "set_parameters", None)
-        if not callable(setter):
+        if self._companion_widget is None and self._pid_tuning_panel is None:
             return
 
         preview_values = dict(self._committed_values)
@@ -2257,7 +2500,29 @@ class ParamDialog(QDialog):
                 preview_values[key] = self._preview_value_from_editor(key)
             except Exception:
                 continue
-        setter(preview_values, changed_key=changed_key)
+
+        if self._pid_tuning_panel is not None:
+            self._pid_tuning_panel.set_parameters(preview_values)
+
+        setter = getattr(self._companion_widget, "set_parameters", None)
+        if callable(setter):
+            setter(preview_values, changed_key=changed_key)
+
+    def _apply_pid_tuning_parameter(self, key: str, value: float) -> None:
+        editor = self._editors.get(key)
+        if editor is None:
+            return
+        ftype, widget = editor
+        if ftype not in {"int_qty", "float_qty"}:
+            return
+
+        widget.set_quantity_value(int(round(value)) if ftype == "int_qty" else float(value))
+        self._refresh_companion(key)
+        if self._apply_callback and not self._apply_field(key):
+            committed_value = self._committed_values.get(key)
+            if committed_value is not None:
+                widget.set_quantity_value(committed_value)
+            self._refresh_companion(key)
 
     def _bind_text_events(self, key: str, widget: QLineEdit) -> None:
         widget.returnPressed.connect(lambda k=key: self._apply_field_on_enter(k))
