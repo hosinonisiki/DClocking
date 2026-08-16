@@ -1,16 +1,18 @@
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
-                               QHBoxLayout, QListWidget, QGraphicsView, QGraphicsScene,
+                               QHBoxLayout, QGridLayout, QListWidget, QGraphicsView, QGraphicsScene,
                                QGraphicsItem, QGraphicsPathItem, QGraphicsTextItem,
                                QSplitter, QGraphicsEllipseItem, QDialog, QFormLayout,
                                QSpinBox, QDoubleSpinBox, QLineEdit,
                                QCheckBox, QPushButton, QToolButton, QToolTip, QComboBox,
-                               QMessageBox, QLabel, QSizePolicy)
+                               QMessageBox, QLabel, QSizePolicy, QFrame)
 # 导入PySide6的QtCore模块中的相关类
 from PySide6.QtCore import Qt, QMimeData, QPointF, QRectF, Signal, QObject, QByteArray, QPoint
 # 导入PySide6.QtGui模块中的相关类
 from PySide6.QtGui import QDrag, QPainter, QPen, QBrush, QPainterPath, QColor, QFont, QPixmap, QImage, QCursor
 import math
 import re
+import numpy as np
+from scipy import signal as scipy_signal
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
 from qt_module_schema import PID_SCHEMA, ACCM_SCHEMA, SCLR_SCHEMA, FIRF_SCHEMA, LTRN_SCHEMA, PDH_SCHEMA, SCLO_SCHEMA, IIR_SCHEMA
 from quantity_entry_core import QuantityEntryCore, QuantityFormat
@@ -876,6 +878,631 @@ class PIDResponseWindow(QDialog):
 
     def set_parameters(self, parameters, changed_key=None):
         self._canvas.set_parameters(parameters, changed_key=changed_key)
+
+
+class FIRDesignModel:
+    """Design and analyse the same low-pass FIR loaded by ``ModuleFIRFilter``."""
+
+    DEFAULT_SPECS = {
+        "freq_pass": 1_000_000.0,
+        "freq_stop": 10_000_000.0,
+        "freq_sample": 250_000_000.0,
+        "weight": 1.0,
+        "taps": 64,
+    }
+
+    @classmethod
+    def normalized_specs(cls, specifications=None):
+        specs = dict(cls.DEFAULT_SPECS)
+        specs.update(dict(specifications or {}))
+        try:
+            specs["freq_pass"] = float(specs["freq_pass"])
+            specs["freq_stop"] = float(specs["freq_stop"])
+            specs["freq_sample"] = float(specs["freq_sample"])
+            specs["weight"] = float(specs["weight"])
+            specs["taps"] = int(specs["taps"])
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("FIR 规格包含无效数值") from exc
+        return specs
+
+    @classmethod
+    def validate(cls, specifications=None):
+        specs = cls.normalized_specs(specifications)
+        values = (specs["freq_pass"], specs["freq_stop"], specs["freq_sample"], specs["weight"])
+        if not all(math.isfinite(value) for value in values):
+            raise ValueError("FIR 规格必须为有限数值")
+        if specs["taps"] not in (16, 32, 64):
+            raise ValueError("抽头数仅支持 16、32 或 64")
+        if specs["freq_sample"] <= 0.0:
+            raise ValueError("采样频率必须大于 0")
+        if specs["freq_pass"] <= 0.0:
+            raise ValueError("通带边缘必须大于 0")
+        if specs["freq_stop"] <= specs["freq_pass"]:
+            raise ValueError("阻带边缘必须大于通带边缘")
+        if specs["freq_stop"] >= specs["freq_sample"] / 2.0:
+            raise ValueError("阻带边缘必须低于 Nyquist 频率")
+        if specs["weight"] <= 0.0:
+            raise ValueError("阻带权重必须大于 0")
+        return specs
+
+    @classmethod
+    def design(cls, specifications=None):
+        specs = cls.validate(specifications)
+        taps = specs["taps"]
+        try:
+            coefficients = scipy_signal.remez(
+                taps,
+                [0.0, specs["freq_pass"], specs["freq_stop"], specs["freq_sample"] / 2.0],
+                [1.0, 0.0],
+                fs=specs["freq_sample"],
+                weight=[1.0, specs["weight"]],
+            )
+        except Exception as exc:
+            raise ValueError(f"Remez 设计未收敛：{exc}") from exc
+
+        peak = float(np.max(np.abs(coefficients)))
+        if peak <= 0.0 or not math.isfinite(peak):
+            raise ValueError("滤波器系数无法归一化")
+        coefficients = np.asarray(coefficients, dtype=float) / peak * 0.98
+        l1_norm = float(np.sum(np.abs(coefficients)))
+        normalization = taps / 2.0 / l1_norm * 0.98
+        max_normalization = 1024.0 / taps
+        if normalization < 1.0 or normalization > max_normalization:
+            raise ValueError(
+                f"归一化系数 {normalization:.3f} 超出 FPGA 范围 1–{max_normalization:g}；"
+                "请增大通带频率或调整抽头数"
+            )
+
+        q23_scale = float((2**23) - 1)
+        coefficient_words = np.rint(coefficients * q23_scale).astype(np.int64)
+        quantized = coefficient_words.astype(float) / q23_scale
+        frequencies, response = scipy_signal.freqz(
+            quantized,
+            worN=768,
+            fs=specs["freq_sample"],
+        )
+        amplitude = np.abs(response)
+        pass_mask = frequencies <= specs["freq_pass"]
+        reference = float(np.max(amplitude[pass_mask])) if np.any(pass_mask) else float(np.max(amplitude))
+        reference = max(reference, 1e-18)
+        magnitude_db = 20.0 * np.log10(np.maximum(amplitude / reference, 1e-9))
+        phase_degrees = np.unwrap(np.angle(response)) * 180.0 / math.pi
+        pass_values = magnitude_db[pass_mask]
+        stop_values = magnitude_db[frequencies >= specs["freq_stop"]]
+        passband_ripple = float(np.max(pass_values) - np.min(pass_values)) if pass_values.size else 0.0
+        stopband_attenuation = float(max(0.0, -np.max(stop_values))) if stop_values.size else 0.0
+
+        roots = np.roots(quantized) if len(quantized) > 1 else np.array([], dtype=complex)
+        return {
+            **specs,
+            "coefficients": tuple(float(value) for value in coefficients),
+            "coefficient_words": tuple(int(value) for value in coefficient_words),
+            "quantized_coefficients": tuple(float(value) for value in quantized),
+            "normalization": float(normalization),
+            "frequencies_hz": tuple(float(value) for value in frequencies),
+            "magnitude_db": tuple(float(value) for value in magnitude_db),
+            "phase_degrees": tuple(float(value) for value in phase_degrees),
+            "zeros": tuple((float(value.real), float(value.imag)) for value in roots),
+            "passband_ripple_db": passband_ripple,
+            "stopband_attenuation_db": stopband_attenuation,
+            "transition_width_hz": specs["freq_stop"] - specs["freq_pass"],
+            "group_delay_seconds": (taps - 1) / (2.0 * specs["freq_sample"]),
+        }
+
+
+class FIRResponseCanvas(QWidget):
+    """Four-view scientific plot for an FPGA FIR design result."""
+
+    VIEW_LABELS = {
+        "magnitude": "幅频响应",
+        "phase": "相位响应",
+        "impulse": "冲激响应",
+        "zplane": "零极点图",
+    }
+
+    def __init__(self, parent=None, compact=True):
+        super().__init__(parent)
+        self._result = None
+        self._view_mode = "magnitude"
+        self.setObjectName("fir_response_canvas")
+        self.setAccessibleName("FIR 响应分析图")
+        self.setMinimumSize(310, 245)
+        if compact:
+            self.setFixedHeight(275)
+        else:
+            self.setMinimumSize(620, 420)
+            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    def set_design_result(self, result):
+        self._result = dict(result) if isinstance(result, dict) else None
+        self.update()
+
+    def design_result(self):
+        return dict(self._result) if self._result is not None else None
+
+    def set_view_mode(self, view_mode):
+        if view_mode not in self.VIEW_LABELS:
+            raise ValueError(f"Unknown FIR view mode: {view_mode}")
+        self._view_mode = view_mode
+        self.update()
+
+    @staticmethod
+    def _format_frequency(value):
+        for scale, suffix in ((1e9, "GHz"), (1e6, "MHz"), (1e3, "kHz")):
+            if abs(value) >= scale:
+                return f"{value / scale:.3g}{suffix}"
+        return f"{value:.3g}Hz"
+
+    @staticmethod
+    def _map_linear(value, low, high, pixel_low, pixel_high):
+        span = max(1e-12, high - low)
+        return pixel_low + (value - low) / span * (pixel_high - pixel_low)
+
+    def _draw_frame(self, painter, rect):
+        painter.fillRect(rect, QColor("#F7F8FA"))
+        painter.setPen(QPen(QColor("#C7CDD6"), 1))
+        painter.drawRoundedRect(rect, 8, 8)
+        title_font = QFont()
+        title_font.setBold(True)
+        title_font.setPointSize(8)
+        painter.setFont(title_font)
+        painter.setPen(QColor("#243447"))
+        painter.drawText(
+            QRectF(rect.left() + 12, rect.top() + 7, rect.width() - 24, 16),
+            Qt.AlignLeft | Qt.AlignVCenter,
+            f"FIR · {self.VIEW_LABELS[self._view_mode]}",
+        )
+        painter.setPen(QColor("#7B8492"))
+        painter.drawText(
+            QRectF(rect.right() - 145, rect.top() + 7, 133, 16),
+            Qt.AlignRight | Qt.AlignVCenter,
+            "Q1.23 · FPGA PREVIEW",
+        )
+
+    def _draw_grid(self, painter, plot_rect, x_labels, y_labels):
+        painter.setPen(QPen(QColor("#E2E6EB"), 1, Qt.DotLine))
+        label_font = QFont()
+        label_font.setPointSize(6)
+        painter.setFont(label_font)
+        for fraction, text in x_labels:
+            x = plot_rect.left() + fraction * plot_rect.width()
+            painter.setPen(QPen(QColor("#E2E6EB"), 1, Qt.DotLine))
+            painter.drawLine(QPointF(x, plot_rect.top()), QPointF(x, plot_rect.bottom()))
+            painter.setPen(QColor("#6C7685"))
+            painter.drawText(QRectF(x - 30, plot_rect.bottom() + 3, 60, 13), Qt.AlignCenter, text)
+        for fraction, text in y_labels:
+            y = plot_rect.bottom() - fraction * plot_rect.height()
+            painter.setPen(QPen(QColor("#E2E6EB"), 1, Qt.DotLine))
+            painter.drawLine(QPointF(plot_rect.left(), y), QPointF(plot_rect.right(), y))
+            painter.setPen(QColor("#6C7685"))
+            painter.drawText(QRectF(plot_rect.left() - 43, y - 7, 38, 14), Qt.AlignRight | Qt.AlignVCenter, text)
+        painter.setPen(QPen(QColor("#C7CDD6"), 1))
+        painter.drawRect(plot_rect)
+
+    def _draw_magnitude(self, painter, plot_rect, result):
+        nyquist = result["freq_sample"] / 2.0
+        pass_fraction = result["freq_pass"] / nyquist
+        stop_fraction = result["freq_stop"] / nyquist
+        pass_color = QColor("#DFF3EC")
+        transition_color = QColor("#FFF1D8")
+        stop_color = QColor("#F3E4E9")
+        painter.fillRect(QRectF(plot_rect.left(), plot_rect.top(), plot_rect.width() * pass_fraction, plot_rect.height()), pass_color)
+        painter.fillRect(
+            QRectF(plot_rect.left() + plot_rect.width() * pass_fraction, plot_rect.top(),
+                   plot_rect.width() * (stop_fraction - pass_fraction), plot_rect.height()),
+            transition_color,
+        )
+        painter.fillRect(
+            QRectF(plot_rect.left() + plot_rect.width() * stop_fraction, plot_rect.top(),
+                   plot_rect.width() * (1.0 - stop_fraction), plot_rect.height()),
+            stop_color,
+        )
+        self._draw_grid(
+            painter,
+            plot_rect,
+            [(fraction, self._format_frequency(nyquist * fraction)) for fraction in (0.0, 0.25, 0.5, 0.75, 1.0)],
+            [(fraction, f"{-100 + fraction * 105:.0f}") for fraction in (0.0, 0.25, 0.5, 0.75, 1.0)],
+        )
+        for frequency, label, color in (
+            (result["freq_pass"], "FP", QColor("#1F8F75")),
+            (result["freq_stop"], "FS", QColor("#A4003B")),
+        ):
+            x = self._map_linear(frequency, 0.0, nyquist, plot_rect.left(), plot_rect.right())
+            painter.setPen(QPen(color, 1, Qt.DashLine))
+            painter.drawLine(QPointF(x, plot_rect.top()), QPointF(x, plot_rect.bottom()))
+            painter.setPen(color)
+            painter.drawText(QRectF(x - 15, plot_rect.top() + 3, 30, 12), Qt.AlignCenter, label)
+
+        path = QPainterPath()
+        active = False
+        for frequency, magnitude in zip(result["frequencies_hz"], result["magnitude_db"]):
+            clipped = max(-100.0, min(5.0, magnitude))
+            point = QPointF(
+                self._map_linear(frequency, 0.0, nyquist, plot_rect.left(), plot_rect.right()),
+                self._map_linear(clipped, -100.0, 5.0, plot_rect.bottom(), plot_rect.top()),
+            )
+            if not active:
+                path.moveTo(point)
+                active = True
+            else:
+                path.lineTo(point)
+        painter.setPen(QPen(QColor("#1769FF"), 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        painter.drawPath(path)
+        painter.setPen(QColor("#6C7685"))
+        painter.drawText(QRectF(plot_rect.left() - 40, plot_rect.top() - 15, 36, 12), Qt.AlignRight, "dB")
+
+    def _draw_phase(self, painter, plot_rect, result):
+        phases = result["phase_degrees"]
+        phase_min = math.floor(min(phases) / 180.0) * 180.0
+        phase_max = max(0.0, math.ceil(max(phases) / 180.0) * 180.0)
+        if phase_max <= phase_min:
+            phase_max = phase_min + 360.0
+        nyquist = result["freq_sample"] / 2.0
+        self._draw_grid(
+            painter,
+            plot_rect,
+            [(fraction, self._format_frequency(nyquist * fraction)) for fraction in (0.0, 0.25, 0.5, 0.75, 1.0)],
+            [(fraction, f"{phase_min + fraction * (phase_max - phase_min):.0f}°") for fraction in (0.0, 0.25, 0.5, 0.75, 1.0)],
+        )
+        path = QPainterPath()
+        for index, (frequency, phase) in enumerate(zip(result["frequencies_hz"], phases)):
+            point = QPointF(
+                self._map_linear(frequency, 0.0, nyquist, plot_rect.left(), plot_rect.right()),
+                self._map_linear(phase, phase_min, phase_max, plot_rect.bottom(), plot_rect.top()),
+            )
+            path.moveTo(point) if index == 0 else path.lineTo(point)
+        painter.setPen(QPen(QColor("#25A8A2"), 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        painter.drawPath(path)
+
+    def _draw_impulse(self, painter, plot_rect, result):
+        coefficients = result["quantized_coefficients"]
+        peak = max(1e-9, max(abs(value) for value in coefficients))
+        y_limit = peak * 1.12
+        self._draw_grid(
+            painter,
+            plot_rect,
+            [(fraction, str(round((len(coefficients) - 1) * fraction))) for fraction in (0.0, 0.25, 0.5, 0.75, 1.0)],
+            [(fraction, f"{-y_limit + fraction * 2.0 * y_limit:.2f}") for fraction in (0.0, 0.25, 0.5, 0.75, 1.0)],
+        )
+        zero_y = self._map_linear(0.0, -y_limit, y_limit, plot_rect.bottom(), plot_rect.top())
+        painter.setPen(QPen(QColor("#A4003B"), 1))
+        painter.setBrush(QColor("#A4003B"))
+        for index, coefficient in enumerate(coefficients):
+            x = self._map_linear(index, 0, max(1, len(coefficients) - 1), plot_rect.left(), plot_rect.right())
+            y = self._map_linear(coefficient, -y_limit, y_limit, plot_rect.bottom(), plot_rect.top())
+            painter.drawLine(QPointF(x, zero_y), QPointF(x, y))
+            painter.drawEllipse(QPointF(x, y), 1.8, 1.8)
+
+    def _draw_zplane(self, painter, plot_rect, result):
+        side = min(plot_rect.width(), plot_rect.height())
+        square = QRectF(
+            plot_rect.center().x() - side / 2.0,
+            plot_rect.center().y() - side / 2.0,
+            side,
+            side,
+        )
+        painter.fillRect(plot_rect, QColor("#FFFFFF"))
+        painter.setPen(QPen(QColor("#D7DCE4"), 1))
+        painter.drawRect(plot_rect)
+        center = square.center()
+        radius = side * 0.42
+        painter.setPen(QPen(QColor("#AEB6C1"), 1, Qt.DashLine))
+        painter.drawEllipse(center, radius, radius)
+        painter.drawLine(QPointF(center.x() - radius * 1.15, center.y()), QPointF(center.x() + radius * 1.15, center.y()))
+        painter.drawLine(QPointF(center.x(), center.y() - radius * 1.15), QPointF(center.x(), center.y() + radius * 1.15))
+        painter.setPen(QPen(QColor("#1769FF"), 1.5))
+        for real, imaginary in result["zeros"]:
+            x = center.x() + max(-1.2, min(1.2, real)) * radius
+            y = center.y() - max(-1.2, min(1.2, imaginary)) * radius
+            painter.drawEllipse(QPointF(x, y), 3.2, 3.2)
+        painter.setPen(QPen(QColor("#A4003B"), 2))
+        painter.drawLine(QPointF(center.x() - 4, center.y() - 4), QPointF(center.x() + 4, center.y() + 4))
+        painter.drawLine(QPointF(center.x() - 4, center.y() + 4), QPointF(center.x() + 4, center.y() - 4))
+        painter.setPen(QColor("#6C7685"))
+        painter.drawText(QRectF(square.right() - 18, center.y() + 3, 30, 13), Qt.AlignLeft, "Re")
+        painter.drawText(QRectF(center.x() + 4, square.top() - 2, 30, 13), Qt.AlignLeft, "Im")
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        rect = self.rect().adjusted(1, 1, -1, -1)
+        self._draw_frame(painter, rect)
+        plot_rect = QRectF(rect.left() + 48, rect.top() + 42, rect.width() - 62, rect.height() - 70)
+        painter.fillRect(plot_rect, QColor("#FFFFFF"))
+        if self._result is None:
+            painter.setPen(QColor("#7B8492"))
+            painter.drawText(plot_rect, Qt.AlignCenter, "输入有效规格后生成 FPGA 预览")
+            painter.end()
+            return
+
+        if self._view_mode == "magnitude":
+            self._draw_magnitude(painter, plot_rect, self._result)
+        elif self._view_mode == "phase":
+            self._draw_phase(painter, plot_rect, self._result)
+        elif self._view_mode == "impulse":
+            self._draw_impulse(painter, plot_rect, self._result)
+        else:
+            self._draw_zplane(painter, plot_rect, self._result)
+        painter.end()
+
+
+class FIRDesignerWidget(QWidget):
+    """MATLAB-inspired FIR workbench adapted to the narrow FPGA inspector."""
+
+    def __init__(self, parent=None, apply_callback=None, initial_values=None, compact=True, allow_expand=True):
+        super().__init__(parent)
+        self.setObjectName("fir_designer_widget")
+        self.setAccessibleName("FIR 可视化设计器")
+        self._apply_callback = apply_callback
+        self._initial_values = dict(initial_values or {})
+        self._result = None
+        self._expanded_window = None
+        initial_specs = self._initial_values.get("design_lowpass", FIRDesignModel.DEFAULT_SPECS)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(9)
+
+        header = QHBoxLayout()
+        header.setSpacing(7)
+        title = QLabel("FIR FILTER DESIGNER")
+        title.setObjectName("fir_designer_title")
+        method_chip = QLabel("REMEZ · Q1.23")
+        method_chip.setObjectName("fir_method_chip")
+        header.addWidget(title)
+        header.addWidget(method_chip)
+        header.addStretch()
+        if allow_expand:
+            expand_button = QToolButton(self)
+            expand_button.setObjectName("fir_designer_expand_button")
+            expand_button.setAccessibleName("在独立窗口中打开 FIR 设计器")
+            expand_button.setToolTip("在独立窗口中打开 FIR 设计工作台")
+            expand_button.setText("↗")
+            expand_button.setCursor(Qt.PointingHandCursor)
+            expand_button.clicked.connect(self.open_expanded_window)
+            header.addWidget(expand_button)
+        root.addLayout(header)
+
+        specification_panel = QWidget(self)
+        specification_panel.setObjectName("fir_specification_panel")
+        spec_layout = QGridLayout(specification_panel)
+        spec_layout.setContentsMargins(0, 0, 0, 0)
+        spec_layout.setHorizontalSpacing(8)
+        spec_layout.setVerticalSpacing(6)
+
+        response_combo = QComboBox()
+        response_combo.setObjectName("fir_response_type_combo")
+        response_combo.setAccessibleName("FIR 响应类型")
+        response_combo.addItem("低通 / Low-pass", "lowpass")
+        spec_layout.addWidget(QLabel("响应类型"), 0, 0)
+        spec_layout.addWidget(response_combo, 0, 1)
+
+        self._taps_combo = QComboBox()
+        self._taps_combo.setObjectName("fir_taps_combo")
+        self._taps_combo.setAccessibleName("FIR 抽头数")
+        for taps in (16, 32, 64):
+            self._taps_combo.addItem(f"{taps} taps", taps)
+        spec_layout.addWidget(QLabel("抽头数"), 1, 0)
+        spec_layout.addWidget(self._taps_combo, 1, 1)
+
+        field_specs = (
+            ("freq_sample", "采样频率", 1.0, 1e12, "Hz"),
+            ("freq_pass", "通带边缘 FP", 0.0, 1e12, "Hz"),
+            ("freq_stop", "阻带边缘 FS", 0.0, 1e12, "Hz"),
+            ("weight", "阻带权重", 1e-6, 1e6, ""),
+        )
+        self._editors = {}
+        for row, (key, label, minimum, maximum, unit) in enumerate(field_specs, start=2):
+            field = {
+                "key": key,
+                "label": label,
+                "type": "float",
+                "min": minimum,
+                "max": maximum,
+                "unit": unit,
+            }
+            editor = QuantityLineEdit(value=float(initial_specs.get(key, FIRDesignModel.DEFAULT_SPECS[key])), field=field)
+            editor.setObjectName(f"fir_{key}_edit")
+            editor.setAccessibleName(label)
+            self._editors[key] = editor
+            spec_layout.addWidget(QLabel(label), row, 0)
+            spec_layout.addWidget(editor, row, 1)
+
+        taps_index = self._taps_combo.findData(int(initial_specs.get("taps", 64)))
+        self._taps_combo.setCurrentIndex(max(0, taps_index))
+
+        analysis_panel = QWidget(self)
+        analysis_layout = QVBoxLayout(analysis_panel)
+        analysis_layout.setContentsMargins(0, 0, 0, 0)
+        analysis_layout.setSpacing(7)
+        view_row = QHBoxLayout()
+        view_label = QLabel("ANALYSIS")
+        view_label.setObjectName("fir_analysis_label")
+        self._view_combo = QComboBox()
+        self._view_combo.setObjectName("fir_analysis_view_combo")
+        self._view_combo.setAccessibleName("FIR 分析视图")
+        for key, label in FIRResponseCanvas.VIEW_LABELS.items():
+            self._view_combo.addItem(label, key)
+        view_row.addWidget(view_label)
+        view_row.addStretch()
+        view_row.addWidget(self._view_combo)
+        analysis_layout.addLayout(view_row)
+
+        self._canvas = FIRResponseCanvas(self, compact=compact)
+        analysis_layout.addWidget(self._canvas, 1)
+        self._metrics_label = QLabel("—")
+        self._metrics_label.setObjectName("fir_metric_summary")
+        self._metrics_label.setWordWrap(True)
+        analysis_layout.addWidget(self._metrics_label)
+
+        if compact:
+            root.addWidget(specification_panel)
+            root.addWidget(analysis_panel)
+        else:
+            body = QHBoxLayout()
+            body.setSpacing(14)
+            specification_panel.setFixedWidth(300)
+            body.addWidget(specification_panel, 0)
+            body.addWidget(analysis_panel, 1)
+            root.addLayout(body, 1)
+
+        footer = QHBoxLayout()
+        self._status_label = QLabel("正在计算…")
+        self._status_label.setObjectName("fir_design_status")
+        self._status_label.setWordWrap(True)
+        self._apply_btn = QPushButton("应用到 FIR")
+        self._apply_btn.setObjectName("fir_design_apply_button")
+        self._apply_btn.setAccessibleName("应用 FIR 设计")
+        self._apply_btn.setProperty("variant", "primary")
+        footer.addWidget(self._status_label, 1)
+        footer.addWidget(self._apply_btn, 0)
+        root.addLayout(footer)
+
+        self.setStyleSheet(
+            "#fir_designer_title { color: #243447; font-weight: 700; letter-spacing: 1px; }"
+            "#fir_method_chip { color: #8F123D; background: #F5E6EB; border: 1px solid #E5C7D2; "
+            "border-radius: 8px; padding: 2px 7px; font-size: 10px; }"
+            "#fir_analysis_label { color: #6C7685; font-size: 10px; font-weight: 700; letter-spacing: 1px; }"
+            "#fir_metric_summary { color: #586273; background: #F1F3F6; border-radius: 5px; "
+            "padding: 6px; font-size: 10px; }"
+            "#fir_design_status { color: #667180; font-size: 10px; }"
+            "#fir_designer_expand_button { color: #243447; background: #FFFFFF; border: 1px solid #C7CDD6; "
+            "border-radius: 5px; font-size: 15px; font-weight: 600; min-width: 26px; min-height: 26px; }"
+            "#fir_designer_expand_button:hover { color: #9B0036; border-color: #9B0036; background: #FFF5F8; }"
+        )
+
+        for editor in self._editors.values():
+            editor.textChanged.connect(self._refresh_preview)
+        self._taps_combo.currentIndexChanged.connect(self._refresh_preview)
+        self._view_combo.currentIndexChanged.connect(self._change_view)
+        self._apply_btn.clicked.connect(self._apply_design)
+        self._refresh_preview()
+
+    def _collect_specs(self):
+        specs = {}
+        for key, editor in self._editors.items():
+            value = editor.preview_quantity_value()
+            if value is None:
+                raise ValueError(f"{editor.accessibleName()}输入无效")
+            specs[key] = float(value)
+        specs["taps"] = int(self._taps_combo.currentData())
+        return FIRDesignModel.validate(specs)
+
+    def specifications(self):
+        try:
+            return self._collect_specs()
+        except ValueError:
+            return dict(FIRDesignModel.DEFAULT_SPECS)
+
+    def design_result(self):
+        return dict(self._result) if self._result is not None else None
+
+    def set_specifications(self, specifications):
+        specs = FIRDesignModel.normalized_specs(specifications)
+        for key, editor in self._editors.items():
+            editor.blockSignals(True)
+            editor.set_quantity_value(specs[key])
+            editor.blockSignals(False)
+        self._taps_combo.blockSignals(True)
+        index = self._taps_combo.findData(specs["taps"])
+        if index >= 0:
+            self._taps_combo.setCurrentIndex(index)
+        self._taps_combo.blockSignals(False)
+        self._refresh_preview()
+
+    def _refresh_preview(self, *_):
+        try:
+            self._result = FIRDesignModel.design(self._collect_specs())
+            self._canvas.set_design_result(self._result)
+            self._metrics_label.setText(
+                f"通带纹波  {self._result['passband_ripple_db']:.2f} dB   ·   "
+                f"阻带抑制  {self._result['stopband_attenuation_db']:.1f} dB\n"
+                f"过渡带  {self._format_frequency(self._result['transition_width_hz'])}   ·   "
+                f"群时延  {self._result['group_delay_seconds'] * 1e9:.1f} ns   ·   "
+                f"归一化  {self._result['normalization']:.3f}"
+            )
+            self._status_label.setText("FPGA 规格有效 · 预览已同步")
+            self._status_label.setStyleSheet("color: #1F7A64;")
+            self._apply_btn.setEnabled(True)
+        except Exception as exc:
+            self._result = None
+            self._canvas.set_design_result(None)
+            self._metrics_label.setText("等待有效设计规格")
+            self._status_label.setText(str(exc))
+            self._status_label.setStyleSheet("color: #A4003B;")
+            self._apply_btn.setEnabled(False)
+
+    def _change_view(self, *_):
+        self._canvas.set_view_mode(self._view_combo.currentData())
+
+    def _apply_design(self):
+        if self._apply_callback is None:
+            return
+        try:
+            specs = self._collect_specs()
+            FIRDesignModel.design(specs)
+            self._apply_callback("design_lowpass", specs)
+            self._initial_values["design_lowpass"] = dict(specs)
+            self._status_label.setText("设计已提交到现有 FIR 硬件写入链路")
+            self._status_label.setStyleSheet("color: #1F7A64;")
+        except Exception as exc:
+            self._status_label.setText(f"应用失败：{exc}")
+            self._status_label.setStyleSheet("color: #A4003B;")
+
+    @staticmethod
+    def _format_frequency(value):
+        return FIRResponseCanvas._format_frequency(value)
+
+    def open_expanded_window(self):
+        if self._expanded_window is not None:
+            try:
+                if self._expanded_window.isVisible():
+                    self._expanded_window.raise_()
+                    self._expanded_window.activateWindow()
+                    return self._expanded_window
+            except RuntimeError:
+                self._expanded_window = None
+        self._expanded_window = FIRDesignerWindow(
+            self.specifications(),
+            apply_callback=self._apply_from_expanded_window,
+            parent=self.window(),
+        )
+        self._expanded_window.destroyed.connect(self._clear_expanded_window)
+        self._expanded_window.show()
+        self._expanded_window.raise_()
+        self._expanded_window.activateWindow()
+        return self._expanded_window
+
+    def _apply_from_expanded_window(self, method_name, specs):
+        if self._apply_callback is not None:
+            self._apply_callback(method_name, specs)
+        self.set_specifications(specs)
+
+    def _clear_expanded_window(self, *_):
+        self._expanded_window = None
+
+
+class FIRDesignerWindow(QDialog):
+    def __init__(self, specifications=None, apply_callback=None, parent=None):
+        super().__init__(parent)
+        self.setObjectName("fir_designer_window")
+        self.setAccessibleName("FIR 可视化设计独立窗口")
+        self.setWindowTitle("FIR Filter Designer · FPGA 工作台")
+        self.setModal(False)
+        self.setAttribute(Qt.WA_DeleteOnClose, True)
+        self.setMinimumSize(900, 580)
+        self.resize(1120, 720)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        initial = {"design_lowpass": dict(specifications or FIRDesignModel.DEFAULT_SPECS)}
+        self._designer = FIRDesignerWidget(
+            self,
+            apply_callback=apply_callback,
+            initial_values=initial,
+            compact=False,
+            allow_expand=False,
+        )
+        layout.addWidget(self._designer)
 
 class ParamDialog(QDialog):
     def __init__(self, schema: list[dict], values: dict, parent = None, apply_callback = None, companion_widget_factory = None):

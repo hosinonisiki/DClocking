@@ -39,6 +39,7 @@ from qt_module import (
     ModuleLinerTransformer,
     ParamDialog,
     PIDParamCanvas,
+    FIRDesignerWidget,
     SpecialMethodDialog,
     set_param_apply_handler,
     set_param_open_handler,
@@ -560,6 +561,9 @@ class MainWindow(QMainWindow):
             scrollbar = self.param_scroll.verticalScrollBar()
             target = max(0, panel_widget.y() - 8)
             scrollbar.setValue(target)
+            if panel_widget.findChild(FIRDesignerWidget, "fir_designer_widget") is not None:
+                panel_widget.setFocus(Qt.OtherFocusReason)
+                return
             editor = panel_widget.findChild(QLineEdit)
             if editor is not None:
                 editor.setFocus(Qt.OtherFocusReason)
@@ -634,12 +638,19 @@ class MainWindow(QMainWindow):
             card._param_widget = param_widget
 
         if special_methods:
-            special_widget = SpecialMethodDialog(
-                special_methods,
-                parent=self,
-                apply_callback=node.apply_special_method,
-                initial_values=getattr(node, "_special_method_args", {}),
-            )
+            if isinstance(node, ModuleFIRFilter):
+                special_widget = FIRDesignerWidget(
+                    parent=self,
+                    apply_callback=node.apply_special_method,
+                    initial_values=getattr(node, "_special_method_args", {}),
+                )
+            else:
+                special_widget = SpecialMethodDialog(
+                    special_methods,
+                    parent=self,
+                    apply_callback=node.apply_special_method,
+                    initial_values=getattr(node, "_special_method_args", {}),
+                )
             special_widget.setWindowFlags(Qt.Widget)
             card_layout.addWidget(special_widget)
             card._special_widget = special_widget

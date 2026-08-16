@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QLineEdit, QWidget
 from tests.qt_test_support import ensure_app
 from FPGA_Agent.main import create_window as create_integrated_window
 from qt_UI1 import create_window as create_ordinary_window
-from qt_module import ModulePID, ModuleScaler
+from qt_module import FIRDesignerWidget, ModuleFIRFilter, ModulePID, ModuleScaler
 from qt_ui_mainwindow import MainWindow
 
 
@@ -104,6 +104,21 @@ class UiFunctionalRegressionTests(unittest.TestCase):
         self.assertIsNotNone(panel)
         self.assertEqual(self.window.inspector_tabs.currentIndex(), 1)
         self.assertTrue(panel.isVisibleTo(self.window))
+
+    def test_fir_node_opens_visual_designer_in_parameter_inspector(self):
+        node = ModuleFIRFilter("FIR滤波器", 0, QPointF(0, 0))
+        self.window.scene.addItem(node)
+
+        self.assertTrue(self.window._open_param_panel(node))
+        self.app.processEvents()
+
+        panel_key = f"{node.name}@{node.component_name}:{node.index}"
+        panel = self.window._param_panels.get(panel_key)
+        designer = panel.findChild(FIRDesignerWidget, "fir_designer_widget")
+        self.assertIsNotNone(designer)
+        self.assertIsNotNone(designer.design_result())
+        self.assertTrue(designer._apply_btn.isEnabled())
+        self.assertEqual(self.window.param_scroll.verticalScrollBar().value(), 0)
 
     def test_pid_consecutive_native_clicks_reveal_parameter_editor(self):
         other, _ = self.add_scaler_pair()
