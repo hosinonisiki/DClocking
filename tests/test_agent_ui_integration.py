@@ -4,6 +4,7 @@ import sys
 from unittest.mock import patch
 
 from PySide6.QtCore import QSettings, Qt
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QTextBrowser
 
 from tests.qt_test_support import ensure_app
@@ -68,6 +69,51 @@ class AgentUiIntegrationTests(unittest.TestCase):
         message = chat._msg_container.findChildren(QTextBrowser)[0]
         self.assertNotIn("##", message.toPlainText())
         self.assertNotIn("**", message.toPlainText())
+
+    def test_message_bubbles_fit_short_content_without_internal_scrollbars(self):
+        chat = AgentChatWidget(self.window)
+        self.window.register_agent_dock(chat)
+        chat.show()
+        chat.add_user_message("短消息")
+        chat.add_assistant_message("简短回复")
+        self.app.processEvents()
+
+        messages = chat._msg_container.findChildren(QTextBrowser)
+        self.assertEqual(len(messages), 2)
+        for message in messages:
+            self.assertLess(message.height(), 100)
+            self.assertEqual(
+                message.verticalScrollBarPolicy(),
+                Qt.ScrollBarAlwaysOff,
+            )
+
+        short_assistant_height = messages[1].height()
+        chat.add_assistant_message("这是一段用于验证自适应高度的长回复。" * 20)
+        self.app.processEvents()
+        messages = chat._msg_container.findChildren(QTextBrowser)
+        self.assertGreater(messages[2].height(), short_assistant_height)
+        self.assertEqual(
+            messages[2].verticalScrollBarPolicy(),
+            Qt.ScrollBarAlwaysOff,
+        )
+
+    def test_enter_sends_and_shift_enter_inserts_a_newline(self):
+        chat = AgentChatWidget(self.window)
+        submitted = []
+        chat.user_message_submitted.connect(submitted.append)
+
+        chat._input.setPlainText("立即发送")
+        QTest.keyClick(chat._input, Qt.Key_Return)
+        self.app.processEvents()
+        self.assertEqual(submitted, ["立即发送"])
+        self.assertEqual(chat._input.toPlainText(), "")
+
+        chat._input.setPlainText("第一行")
+        chat._input.moveCursor(chat._input.textCursor().MoveOperation.End)
+        QTest.keyClick(chat._input, Qt.Key_Return, Qt.ShiftModifier)
+        self.app.processEvents()
+        self.assertEqual(submitted, ["立即发送"])
+        self.assertEqual(chat._input.toPlainText(), "第一行\n")
 
     def test_agent_visibility_and_dock_state_restore_after_registration(self):
         chat = AgentChatWidget(self.window)

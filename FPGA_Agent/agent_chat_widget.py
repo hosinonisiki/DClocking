@@ -115,17 +115,16 @@ class AgentChatWidget(QDockWidget):
         bubble = QTextBrowser()
         bubble.setStyleSheet(USER_BUBBLE_STYLE)
         bubble.setPlainText(text)
-        bubble.setMaximumWidth(280)
-        bubble.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+        self._prepare_message_bubble(bubble, 280)
         self._add_bubble(bubble, align_right=True)
+        self._schedule_message_bubble_fit(bubble)
 
     def add_assistant_message(self, markdown_text: str):
         """Add an assistant message bubble (left-aligned, markdown rendered)."""
         bubble = QTextBrowser()
         bubble.setStyleSheet(ASSISTANT_BUBBLE_STYLE)
         bubble.setOpenExternalLinks(True)
-        bubble.setMaximumWidth(300)
-        bubble.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+        self._prepare_message_bubble(bubble, 300)
 
         try:
             import markdown
@@ -138,6 +137,7 @@ class AgentChatWidget(QDockWidget):
         else:
             bubble.setHtml(html)
         self._add_bubble(bubble, align_right=False)
+        self._schedule_message_bubble_fit(bubble)
 
     def add_system_message(self, text: str):
         """Add a centered system info message."""
@@ -188,13 +188,37 @@ class AgentChatWidget(QDockWidget):
         self.user_message_submitted.emit(text)
 
     def eventFilter(self, obj, event):
-        """Handle Shift+Enter to send."""
+        """Send with Enter while preserving Shift+Enter for a newline."""
         if obj is self._input and event.type() == QEvent.KeyPress:
-            if (event.key() == Qt.Key_Return and
-                    event.modifiers() == Qt.ShiftModifier):
+            if (
+                event.key() in (Qt.Key_Return, Qt.Key_Enter)
+                and not (event.modifiers() & Qt.ShiftModifier)
+            ):
                 self._send_message()
                 return True
         return super().eventFilter(obj, event)
+
+    @staticmethod
+    def _prepare_message_bubble(bubble: QTextBrowser, width: int) -> None:
+        """Configure a message surface that grows vertically with its document."""
+        bubble.setFixedWidth(width)
+        bubble.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        bubble.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        bubble.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+    def _schedule_message_bubble_fit(self, bubble: QTextBrowser) -> None:
+        """Fit after layout has established the styled viewport dimensions."""
+        QTimer.singleShot(0, lambda: self._fit_message_bubble(bubble))
+
+    @staticmethod
+    def _fit_message_bubble(bubble: QTextBrowser) -> None:
+        if bubble is None or bubble.viewport().width() <= 0:
+            return
+        document = bubble.document()
+        document.setTextWidth(float(bubble.viewport().width()))
+        document_height = int(document.documentLayout().documentSize().height() + 0.999)
+        chrome_height = max(0, bubble.height() - bubble.viewport().height())
+        bubble.setFixedHeight(max(44, document_height + chrome_height))
 
     def _add_bubble(self, widget, align_right: bool):
         row = QHBoxLayout()
