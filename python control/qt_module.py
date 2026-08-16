@@ -3,7 +3,8 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QGraphicsItem, QGraphicsPathItem, QGraphicsTextItem,
                                QSplitter, QGraphicsEllipseItem, QDialog, QFormLayout,
                                QSpinBox, QDoubleSpinBox, QLineEdit,
-                               QCheckBox, QPushButton, QToolTip, QComboBox, QMessageBox, QLabel)
+                               QCheckBox, QPushButton, QToolButton, QToolTip, QComboBox,
+                               QMessageBox, QLabel, QSizePolicy)
 # 导入PySide6的QtCore模块中的相关类
 from PySide6.QtCore import Qt, QMimeData, QPointF, QRectF, Signal, QObject, QByteArray, QPoint
 # 导入PySide6.QtGui模块中的相关类
@@ -388,14 +389,71 @@ class PIDParamCanvas(QWidget):
     _DIRECT_KEYS = {"gain_p", "gain_i", "gain_d", "leak_digit"}
     _MAX_PLOT_FREQUENCY_HZ = 125_000_000.0
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, allow_expand=True, compact=True):
         super().__init__(parent)
         self._parameters = {}
         self._changed_key = None
+        self._expanded_window = None
         self._response = self.calculate_response({}, self._logspace(1.0, 100_000_000.0, 180))
-        self.setMinimumSize(340, 205)
-        self.setFixedHeight(220)
+        if compact:
+            self.setMinimumSize(340, 205)
+            self.setFixedHeight(220)
+        else:
+            self.setMinimumSize(600, 360)
+            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setToolTip("依据 FPGA PID 定标实时计算：P、I、D 分量及其复数合成幅频响应")
+
+        self._expand_button = None
+        if allow_expand:
+            self._expand_button = QToolButton(self)
+            self._expand_button.setObjectName("pid_response_expand_button")
+            self._expand_button.setAccessibleName("放大 PID 实时曲线")
+            self._expand_button.setToolTip("在独立窗口中查看实时曲线")
+            self._expand_button.setText("↗")
+            self._expand_button.setCursor(Qt.PointingHandCursor)
+            self._expand_button.setFixedSize(26, 26)
+            self._expand_button.setStyleSheet(
+                "QToolButton { color: #243447; background: #FFFFFF; border: 1px solid #C7CDD6; "
+                "border-radius: 5px; font-size: 15px; font-weight: 600; padding: 0; }"
+                "QToolButton:hover { color: #9B0036; border-color: #9B0036; background: #FFF5F8; }"
+                "QToolButton:pressed { background: #F3DDE5; }"
+            )
+            self._expand_button.clicked.connect(self.open_expanded_window)
+            self._position_expand_button()
+
+    def _position_expand_button(self):
+        if self._expand_button is not None:
+            self._expand_button.move(max(0, self.width() - self._expand_button.width() - 9), 6)
+            self._expand_button.raise_()
+
+    def resizeEvent(self, event):
+        self._position_expand_button()
+        super().resizeEvent(event)
+
+    def open_expanded_window(self):
+        if self._expanded_window is not None:
+            try:
+                if self._expanded_window.isVisible():
+                    self._expanded_window.raise_()
+                    self._expanded_window.activateWindow()
+                    return self._expanded_window
+            except RuntimeError:
+                self._expanded_window = None
+
+        window = PIDResponseWindow(
+            self._parameters,
+            changed_key=self._changed_key,
+            parent=self.window(),
+        )
+        window.destroyed.connect(self._clear_expanded_window)
+        self._expanded_window = window
+        window.show()
+        window.raise_()
+        window.activateWindow()
+        return window
+
+    def _clear_expanded_window(self, *_):
+        self._expanded_window = None
 
     @staticmethod
     def _finite_float(value, default=0.0):
@@ -611,6 +669,11 @@ class PIDParamCanvas(QWidget):
             changed_key=changed_key,
         )
         self.update()
+        if self._expanded_window is not None:
+            try:
+                self._expanded_window.set_parameters(self._parameters, changed_key=changed_key)
+            except RuntimeError:
+                self._expanded_window = None
 
     def response_data(self):
         return dict(self._response)
@@ -658,7 +721,7 @@ class PIDParamCanvas(QWidget):
         painter.setFont(body_font)
         painter.setPen(QColor("#7B8492"))
         painter.drawText(
-            QRectF(rect.right() - 110, rect.top() + 7, 98, 16),
+            QRectF(rect.right() - 150, rect.top() + 7, 110, 16),
             Qt.AlignRight | Qt.AlignVCenter,
             "LIVE · FPGA MODEL",
         )
@@ -789,6 +852,30 @@ class PIDParamCanvas(QWidget):
             "对数频率 (Hz)",
         )
         painter.end()
+
+
+class PIDResponseWindow(QDialog):
+    """Resizable standalone view kept in sync with the PID parameter canvas."""
+
+    def __init__(self, parameters=None, changed_key=None, parent=None):
+        super().__init__(parent)
+        self.setObjectName("pid_response_window")
+        self.setAccessibleName("PID 实时频率响应独立窗口")
+        self.setWindowTitle("PID 实时频率响应 · 独立窗口")
+        self.setModal(False)
+        self.setAttribute(Qt.WA_DeleteOnClose, True)
+        self.setMinimumSize(640, 400)
+        self.resize(900, 560)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+        self._canvas = PIDParamCanvas(self, allow_expand=False, compact=False)
+        self._canvas.setObjectName("pid_response_expanded_canvas")
+        layout.addWidget(self._canvas, 1)
+        self.set_parameters(parameters or {}, changed_key=changed_key)
+
+    def set_parameters(self, parameters, changed_key=None):
+        self._canvas.set_parameters(parameters, changed_key=changed_key)
 
 class ParamDialog(QDialog):
     def __init__(self, schema: list[dict], values: dict, parent = None, apply_callback = None, companion_widget_factory = None):
