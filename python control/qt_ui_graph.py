@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QGraphicsPathItem,
     QGraphicsEllipseItem,
 )
+import time
 
 from qt_module import (
     PortItem,
@@ -728,6 +729,9 @@ class DiagramView(QGraphicsView):
         self._drag_start_pos = None
         self._is_dragging_view = False
         self._view_drag_start_pos = None
+        self._last_clicked_node = None
+        self._last_node_click_at = 0.0
+        self._last_node_click_pos = None
         self.scale_factor = 1.0
 
         self.setAcceptDrops(True)
@@ -822,6 +826,47 @@ class DiagramView(QGraphicsView):
                     return True
         return False
 
+    def _node_at_view_position(self, view_pos):
+        scene_pos = self.mapToScene(view_pos.toPoint())
+        for item in self.scene().items(scene_pos):
+            if isinstance(item, NodeItem):
+                return item
+            parent_node = getattr(item, "parent_node", None)
+            if isinstance(parent_node, NodeItem):
+                return parent_node
+        return None
+
+    def _is_consecutive_node_click(self, node, view_pos):
+        now = time.monotonic()
+        point = view_pos.toPoint()
+        elapsed_ms = (now - self._last_node_click_at) * 1000.0
+        close_enough = (
+            self._last_node_click_pos is not None
+            and (point - self._last_node_click_pos).manhattanLength()
+            <= QApplication.startDragDistance()
+        )
+        is_double = (
+            node is self._last_clicked_node
+            and close_enough
+            and elapsed_ms <= QApplication.doubleClickInterval()
+        )
+        self._last_clicked_node = None if is_double else node
+        self._last_node_click_at = 0.0 if is_double else now
+        self._last_node_click_pos = None if is_double else point
+        return is_double
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            node = self._node_at_view_position(event.position())
+            if node is not None:
+                self._last_clicked_node = None
+                self._last_node_click_at = 0.0
+                self._last_node_click_pos = None
+                node.activate_parameter_editor()
+                event.accept()
+                return
+        super().mouseDoubleClickEvent(event)
+
     def dragEnterEvent(self, event):
         if event.mimeData().hasText():
             event.acceptProposedAction()
@@ -877,9 +922,16 @@ class DiagramView(QGraphicsView):
                 if isinstance(it, NodeItem):
                     self._drag_candidate_node = it
                     self._drag_start_pos = event.position().toPoint()
+                    consecutive_click = self._is_consecutive_node_click(it, event.position())
                     super().mousePressEvent(event)
+                    if consecutive_click:
+                        it.activate_parameter_editor()
+                        event.accept()
                     return
 
+            self._last_clicked_node = None
+            self._last_node_click_at = 0.0
+            self._last_node_click_pos = None
             if not self._is_near_node(scene_pos, margin=10) and not self._is_near_port(scene_pos, margin=10):
                 self._is_dragging_view = True
                 self._view_drag_start_pos = event.position().toPoint()
@@ -902,6 +954,9 @@ class DiagramView(QGraphicsView):
         if (event.buttons() & Qt.LeftButton) and self._drag_candidate_node and self._drag_start_pos:
             dist = (event.position().toPoint() - self._drag_start_pos).manhattanLength()
             if dist >= QApplication.startDragDistance():
+                self._last_clicked_node = None
+                self._last_node_click_at = 0.0
+                self._last_node_click_pos = None
                 gp = event.globalPosition().toPoint()
                 top_left = self.viewport().mapToGlobal(self.viewport().rect().topLeft())
                 bottom_right = self.viewport().mapToGlobal(self.viewport().rect().bottomRight())

@@ -105,6 +105,37 @@ class UiFunctionalRegressionTests(unittest.TestCase):
         self.assertEqual(self.window.inspector_tabs.currentIndex(), 1)
         self.assertTrue(panel.isVisibleTo(self.window))
 
+    def test_pid_consecutive_native_clicks_reveal_parameter_editor(self):
+        other, _ = self.add_scaler_pair()
+        self.assertTrue(self.window._open_param_panel(other))
+
+        node = ModulePID("PID控制器", 0, QPointF(0, 0))
+        self.window.scene.addItem(node)
+        self.app.processEvents()
+        viewport_pos = self.window.view.mapFromScene(node.scenePos())
+
+        # Desktop automation and some native input paths deliver a rapid pair
+        # of ordinary clicks instead of a QMouseEvent.MouseButtonDblClick.
+        QTest.mouseClick(
+            self.window.view.viewport(),
+            Qt.LeftButton,
+            Qt.NoModifier,
+            viewport_pos,
+        )
+        QTest.mouseClick(
+            self.window.view.viewport(),
+            Qt.LeftButton,
+            Qt.NoModifier,
+            viewport_pos,
+        )
+        self.app.processEvents()
+
+        panel_key = f"{node.name}@{node.component_name}:{node.index}"
+        panel = self.window._param_panels.get(panel_key)
+        self.assertIsNotNone(panel)
+        self.assertEqual(self.window.inspector_tabs.currentIndex(), 1)
+        self.assertTrue(panel.isVisibleTo(self.window))
+
     def test_second_same_type_node_activates_its_parameter_editor(self):
         first = ModulePID("PID控制器", 0, QPointF(-180, 0))
         second = ModulePID("PID控制器", 1, QPointF(180, 0))

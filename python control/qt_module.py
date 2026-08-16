@@ -1486,13 +1486,19 @@ class NodeItem(QGraphicsItem):
 
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.LeftButton:
-            if _dispatch_param_open(self):
+            if self.activate_parameter_editor():
                 event.accept()
                 return
-            self.open_param_dialog()
-            event.accept()
-            return
         super().mouseDoubleClickEvent(event)
+
+    def activate_parameter_editor(self) -> bool:
+        """Open this node's parameter UI through the integrated or modal path."""
+        if _dispatch_param_open(self):
+            return True
+        if not self.param_schema() and not self.special_methods_schema():
+            return False
+        self.open_param_dialog()
+        return True
 
     def param_schema(self) -> list[dict]:
         return []
