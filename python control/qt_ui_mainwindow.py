@@ -582,6 +582,8 @@ class MainWindow(QMainWindow):
         if not schema and not special_methods:
             return False
 
+        self.inspector_tabs.setCurrentIndex(1)
+
         panel_key = f"{node.name}@{node.component_name}:{node.index}"
         existing = self._param_panels.get(panel_key)
         if existing is not None:

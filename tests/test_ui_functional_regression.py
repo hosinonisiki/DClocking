@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from PySide6.QtCore import QPoint, QPointF, QRect, QSettings
+from PySide6.QtCore import QPoint, QPointF, QRect, QSettings, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QWidget
 
@@ -72,6 +72,38 @@ class UiFunctionalRegressionTests(unittest.TestCase):
         self.assertEqual(
             self.window.view._alloc_index("线性缩放器"), target_index
         )
+
+    def test_node_click_reaches_scene_selection(self):
+        node, _ = self.add_scaler_pair()
+        viewport_pos = self.window.view.mapFromScene(node.scenePos())
+
+        QTest.mouseClick(
+            self.window.view.viewport(),
+            Qt.LeftButton,
+            Qt.NoModifier,
+            viewport_pos,
+        )
+        self.app.processEvents()
+
+        self.assertTrue(node.isSelected())
+
+    def test_node_double_click_reveals_parameter_editor(self):
+        node, _ = self.add_scaler_pair()
+        viewport_pos = self.window.view.mapFromScene(node.scenePos())
+
+        QTest.mouseDClick(
+            self.window.view.viewport(),
+            Qt.LeftButton,
+            Qt.NoModifier,
+            viewport_pos,
+        )
+        self.app.processEvents()
+
+        panel_key = f"{node.name}@{node.component_name}:{node.index}"
+        panel = self.window._param_panels.get(panel_key)
+        self.assertIsNotNone(panel)
+        self.assertEqual(self.window.inspector_tabs.currentIndex(), 1)
+        self.assertTrue(panel.isVisibleTo(self.window))
 
     def test_configuration_helpers_round_trip_direct_params_and_edges(self):
         source, target = self.add_scaler_pair()

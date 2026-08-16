@@ -877,7 +877,7 @@ class DiagramView(QGraphicsView):
                 if isinstance(it, NodeItem):
                     self._drag_candidate_node = it
                     self._drag_start_pos = event.position().toPoint()
-                    event.accept()
+                    super().mousePressEvent(event)
                     return
 
             if not self._is_near_node(scene_pos, margin=10) and not self._is_near_port(scene_pos, margin=10):
