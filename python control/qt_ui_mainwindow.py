@@ -1662,6 +1662,7 @@ class MainWindow(QMainWindow):
                             "name": item.name,
                             "component_name": item.component_name,
                             "index": int(item.index),
+                            "display_ordinal": int(item.display_ordinal),
                             "definition_id": item.definition_id,
                             "embedded_definition": item.definition,
                             "pos": {"x": float(item.pos().x()), "y": float(item.pos().y())},
@@ -1729,6 +1730,7 @@ class MainWindow(QMainWindow):
                     definition,
                     pos,
                     instance_index=int(node_cfg.get("index", 0)),
+                    display_ordinal=node_cfg.get("display_ordinal"),
                 )
             except Exception as exc:
                 self._report_config_error(

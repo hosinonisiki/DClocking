@@ -349,15 +349,31 @@ class CustomCompositeLibrary(QObject):
 class CustomCompositeNode(NodeItem):
     """Visible black-box proxy backed by allocated hidden runtime modules."""
 
-    def __init__(self, definition, instance_index, position, runtime_nodes):
+    def __init__(
+        self,
+        definition,
+        instance_index,
+        position,
+        runtime_nodes,
+        display_ordinal=1,
+    ):
         self.definition = copy.deepcopy(definition)
         self.definition_id = str(definition.get("id", ""))
+        self.definition_identity = self.definition_id or (
+            f"name:{str(definition.get('name', '')).strip().casefold()}"
+        )
+        self.display_ordinal = max(1, int(display_ordinal))
         self.runtime_nodes = dict(runtime_nodes)
         inputs = list(definition.get("inputs", []))
         outputs = list(definition.get("outputs", []))
         name = f"UCMP{instance_index + 1}"
         super().__init__(name, "自定义组合模块", instance_index, position, len(inputs), len(outputs))
-        self.display_name = str(definition.get("name", "自定义组合模块"))
+        self.base_display_name = str(definition.get("name", "自定义组合模块"))
+        self.display_name = (
+            self.base_display_name
+            if self.display_ordinal == 1
+            else f"{self.base_display_name}{self.display_ordinal}"
+        )
         self.inputs = [item.get("key", f"IN{idx + 1}") for idx, item in enumerate(inputs)]
         self.outputs = [item.get("key", f"OUT{idx + 1}") for idx, item in enumerate(outputs)]
         self.inputs_display_name = [item.get("label", f"输入{idx + 1}") for idx, item in enumerate(inputs)]

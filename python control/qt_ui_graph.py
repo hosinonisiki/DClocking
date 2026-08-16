@@ -822,7 +822,36 @@ class DiagramView(QGraphicsView):
     def set_custom_composite_provider(self, provider):
         self._custom_composite_provider = provider if callable(provider) else None
 
-    def instantiate_custom_composite(self, definition, position, instance_index=None):
+    @staticmethod
+    def _custom_definition_identity(definition):
+        definition_id = str(definition.get("id", "")).strip()
+        if definition_id:
+            return definition_id
+        return f"name:{str(definition.get('name', '')).strip().casefold()}"
+
+    def _allocate_custom_display_ordinal(self, definition, requested=None):
+        identity = self._custom_definition_identity(definition)
+        used = {
+            int(getattr(item, "display_ordinal", 0))
+            for item in self.scene().items()
+            if getattr(item, "definition_identity", None) == identity
+        }
+        if requested is not None:
+            requested = max(1, int(requested))
+            if requested not in used:
+                return requested
+        ordinal = 1
+        while ordinal in used:
+            ordinal += 1
+        return ordinal
+
+    def instantiate_custom_composite(
+        self,
+        definition,
+        position,
+        instance_index=None,
+        display_ordinal=None,
+    ):
         if not isinstance(definition, dict):
             raise ValueError("自定义组合模块定义无效")
         node_specs = definition.get("nodes", [])
@@ -932,9 +961,19 @@ class DiagramView(QGraphicsView):
             else:
                 instance_index = int(instance_index)
                 self._custom_instance_counter = max(self._custom_instance_counter, instance_index + 1)
+            display_ordinal = self._allocate_custom_display_ordinal(
+                definition,
+                requested=display_ordinal,
+            )
             from qt_custom_composite import CustomCompositeNode
 
-            black_box = CustomCompositeNode(definition, instance_index, position, runtime_nodes)
+            black_box = CustomCompositeNode(
+                definition,
+                instance_index,
+                position,
+                runtime_nodes,
+                display_ordinal=display_ordinal,
+            )
             self._apply_mode_to_node(black_box)
             self.scene().addItem(black_box)
 

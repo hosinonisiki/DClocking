@@ -182,6 +182,27 @@ class CustomCompositeTests(unittest.TestCase):
         self.assertEqual(tree.topLevelItemCount(), 3)
         details.deleteLater()
 
+    def test_repeated_black_box_names_receive_definition_scoped_ordinals(self):
+        scene = DiagramScene(NodeSignals())
+        view = DiagramView(scene)
+        definition = self._definition("双级反馈控制器")
+
+        first = view.instantiate_custom_composite(definition, QPointF(100, 80))
+        second = view.instantiate_custom_composite(definition, QPointF(420, 80))
+
+        self.assertEqual(first.display_name, "双级反馈控制器")
+        self.assertEqual(first.display_ordinal, 1)
+        self.assertEqual(second.display_name, "双级反馈控制器2")
+        self.assertEqual(second.display_ordinal, 2)
+
+        second.release_runtime(view, scene)
+        scene.removeItem(second)
+        replacement = view.instantiate_custom_composite(
+            definition, QPointF(420, 240)
+        )
+        self.assertEqual(replacement.display_name, "双级反馈控制器2")
+        self.assertEqual(replacement.display_ordinal, 2)
+
     def test_workbench_serializes_and_saves_user_graph(self):
         library = CustomCompositeLibrary(self.library_path)
         workbench = CustomCompositeWorkbench(library)
@@ -282,6 +303,32 @@ class CustomCompositeTests(unittest.TestCase):
         window._restore_edges(config["edges"], node_map)
         self.assertEqual(len(routed), 1)
         self.assertIn(restored.runtime_nodes["n1"].name, routed[0][2])
+        window.close()
+        self.app.processEvents()
+
+    def test_configuration_preserves_repeated_black_box_display_ordinals(self):
+        settings = QSettings(f"{self.temp_dir.name}/ordinal.ini", QSettings.IniFormat)
+        window = MainWindow(
+            settings=settings,
+            custom_composite_path=self.library_path,
+        )
+        saved = window.custom_composite_library.save_definition(
+            self._definition("双级反馈控制器")
+        )
+        window.view.instantiate_custom_composite(saved, QPointF(100, 100))
+        window.view.instantiate_custom_composite(saved, QPointF(420, 100))
+        config = window._build_config_dict()
+        self.assertEqual(
+            sorted(node["display_ordinal"] for node in config["nodes"]),
+            [1, 2],
+        )
+
+        window._clear_canvas()
+        restored = [window._create_node_from_config(node) for node in config["nodes"]]
+        self.assertEqual(
+            sorted(node.display_name for node in restored),
+            ["双级反馈控制器", "双级反馈控制器2"],
+        )
         window.close()
         self.app.processEvents()
 
