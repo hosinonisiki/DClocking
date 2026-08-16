@@ -96,6 +96,24 @@ class ToolExecutor:
                     "purpose": mod.get("purpose", ""),
                     "contains": mod.get("sub_modules", []),
                 })
+            custom_library = getattr(self._bridge._mw, "custom_composite_library", None)
+            if custom_library is not None:
+                for definition in custom_library.definitions():
+                    available.append({
+                        "name": definition["name"],
+                        "category": "custom_composite",
+                        "purpose": definition.get("description", "用户自定义黑盒组合模块"),
+                        "contains": [
+                            node.get("component_name", "")
+                            for node in definition.get("nodes", [])
+                        ],
+                        "num_inputs": len(definition.get("inputs", [])),
+                        "num_outputs": len(definition.get("outputs", [])),
+                        "exposed_parameters": [
+                            field.get("key")
+                            for field in definition.get("parameters", [])
+                        ],
+                    })
             result["available_modules"] = available
 
         if scope in ("on_canvas", "both"):

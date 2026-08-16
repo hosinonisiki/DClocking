@@ -632,6 +632,17 @@ class DiagramScene(QGraphicsScene):
             return f"{base_name}[{int(getattr(node, 'index', 0))}]"
         return base_name
 
+    def _runtime_endpoint_identity(self, port):
+        node = port.parent_node if hasattr(port, "parent_node") and port.parent_node else None
+        if node is not None:
+            resolver = getattr(node, "runtime_port_reference", None)
+            if callable(resolver):
+                resolved = resolver(port.port_type, int(port.index))
+                if isinstance(resolved, (tuple, list)) and len(resolved) == 2:
+                    return str(resolved[0]), int(resolved[1])
+            return node.name, int(port.index)
+        return port.name, int(port.index)
+
     def create_connection(self, start_port, end_port):
         if not self._is_valid_connection(start_port, end_port):
             return False
@@ -648,12 +659,10 @@ class DiagramScene(QGraphicsScene):
         if end_node:
             end_node.edges.append(edge)
 
-        src_name = start_port.parent_node.name if hasattr(start_port, "parent_node") and start_port.parent_node else start_port.name
+        src_name, src_port_idx = self._runtime_endpoint_identity(start_port)
         src_log_name = self._runtime_node_label(start_port)
-        src_port_idx = start_port.index
-        dst_name = end_port.parent_node.name if hasattr(end_port, "parent_node") and end_port.parent_node else end_port.name
+        dst_name, dst_port_idx = self._runtime_endpoint_identity(end_port)
         dst_log_name = self._runtime_node_label(end_port)
-        dst_port_idx = end_port.index
 
         direction = "反向(绕行)" if edge._is_reverse_connection() else "正向"
         print(f"✅ 连线建立: [{src_log_name}:Out{src_port_idx+1}] --> [{dst_log_name}:In{dst_port_idx+1}] ({direction}, 颜色: {edge.color})")
@@ -677,12 +686,10 @@ class DiagramScene(QGraphicsScene):
             return
 
         edge = input_port.get_connection()
-        src_name = edge.start_port.parent_node.name if hasattr(edge.start_port, "parent_node") and edge.start_port.parent_node else edge.start_port.name
+        src_name, src_port_idx = self._runtime_endpoint_identity(edge.start_port)
         src_log_name = self._runtime_node_label(edge.start_port)
-        src_port_idx = edge.start_port.index
-        dst_name = edge.end_port.parent_node.name if hasattr(edge.end_port, "parent_node") and edge.end_port.parent_node else edge.end_port.name
+        dst_name, dst_port_idx = self._runtime_endpoint_identity(edge.end_port)
         dst_log_name = self._runtime_node_label(edge.end_port)
-        dst_port_idx = edge.end_port.index
         edge_color = edge.color
 
         edge.remove()
@@ -733,6 +740,8 @@ class DiagramView(QGraphicsView):
         self._last_node_click_at = 0.0
         self._last_node_click_pos = None
         self.scale_factor = 1.0
+        self._custom_composite_provider = None
+        self._custom_instance_counter = 0
 
         self.setAcceptDrops(True)
         self.sync_scene_to_viewport()
@@ -810,6 +819,147 @@ class DiagramView(QGraphicsView):
         if hasattr(node, "free_mode"):
             node.free_mode = not developer_mode
 
+    def set_custom_composite_provider(self, provider):
+        self._custom_composite_provider = provider if callable(provider) else None
+
+    def instantiate_custom_composite(self, definition, position, instance_index=None):
+        if not isinstance(definition, dict):
+            raise ValueError("自定义组合模块定义无效")
+        node_specs = definition.get("nodes", [])
+        if not isinstance(node_specs, list) or not node_specs:
+            raise ValueError("自定义组合模块没有内部节点")
+
+        required = {}
+        for spec in node_specs:
+            component_name = spec.get("component_name")
+            if component_name not in self.module_factory:
+                raise ValueError(f"未知内部模块：{component_name}")
+            required[component_name] = required.get(component_name, 0) + 1
+        for component_name, count in required.items():
+            maximum = self._maxnum.get(component_name, 0)
+            if maximum is not None and maximum > 0:
+                available = maximum - len(self._used_indices.get(component_name, set()))
+                if count > available:
+                    raise ValueError(f"{component_name} 可用实例不足（需要 {count}，剩余 {available}）")
+
+        runtime_nodes = {}
+        allocated = []
+        black_box = None
+        emitted_routes = []
+        try:
+            for spec in node_specs:
+                component_name = spec["component_name"]
+                idx = self._alloc_index(component_name)
+                if idx is None:
+                    raise ValueError(f"超出 {component_name} 模块数量上限")
+                allocated.append((component_name, idx))
+                node = self.module_factory[component_name](component_name, idx, QPointF(0.0, 0.0))
+                self._apply_mode_to_node(node)
+                node._custom_local_id = str(spec.get("local_id"))
+                direct_params = spec.get("direct_params", {})
+                if isinstance(direct_params, dict) and direct_params:
+                    node._stage_param_cache_update(direct_params)
+                    node._commit_pending_cache_update()
+                special_methods = spec.get("special_methods", {})
+                if isinstance(special_methods, dict):
+                    node._special_method_args = {
+                        str(method): dict(args or {})
+                        for method, args in special_methods.items()
+                        if method
+                    }
+                runtime_nodes[node._custom_local_id] = node
+
+            resolved_internal_edges = []
+            for edge in definition.get("edges", []):
+                src = edge.get("src", {})
+                dst = edge.get("dst", {})
+                src_node = runtime_nodes.get(src.get("node_id"))
+                dst_node = runtime_nodes.get(dst.get("node_id"))
+                if src_node is None or dst_node is None:
+                    raise ValueError("内部连线引用的模块不存在")
+                src_port_index = int(src.get("port_index", -1))
+                dst_port_index = int(dst.get("port_index", -1))
+                if not (
+                    0 <= src_port_index < len(src_node.out_ports)
+                    and 0 <= dst_port_index < len(dst_node.in_ports)
+                ):
+                    raise ValueError("内部连线端口越界")
+                resolved_internal_edges.append(
+                    (src_node, src_port_index, dst_node, dst_port_index)
+                )
+
+            for port_type, specs in (
+                ("input", definition.get("inputs", [])),
+                ("output", definition.get("outputs", [])),
+            ):
+                for spec in specs:
+                    runtime_node = runtime_nodes.get(spec.get("node_id"))
+                    port_index = int(spec.get("port_index", -1))
+                    ports = (
+                        runtime_node.in_ports
+                        if runtime_node is not None and port_type == "input"
+                        else runtime_node.out_ports
+                        if runtime_node is not None
+                        else []
+                    )
+                    if not (0 <= port_index < len(ports)):
+                        raise ValueError(f"黑盒{port_type}接口映射端口越界")
+
+            for parameter in definition.get("parameters", []):
+                mapping = parameter.get("mapping", {})
+                runtime_node = runtime_nodes.get(mapping.get("node_id"))
+                if runtime_node is None:
+                    raise ValueError("黑盒参数映射的内部模块不存在")
+                target_key = mapping.get("target_key")
+                if mapping.get("kind") == "special":
+                    method_name = mapping.get("method_name")
+                    valid_targets = {
+                        field.get("key")
+                        for method in runtime_node.special_methods_schema()
+                        if method.get("name") == method_name
+                        for field in method.get("params", [])
+                    }
+                else:
+                    valid_targets = {
+                        field.get("key") for field in runtime_node.param_schema()
+                    }
+                if target_key not in valid_targets:
+                    raise ValueError(f"黑盒参数映射无效：{target_key}")
+
+            if instance_index is None:
+                instance_index = self._custom_instance_counter
+                self._custom_instance_counter += 1
+            else:
+                instance_index = int(instance_index)
+                self._custom_instance_counter = max(self._custom_instance_counter, instance_index + 1)
+            from qt_custom_composite import CustomCompositeNode
+
+            black_box = CustomCompositeNode(definition, instance_index, position, runtime_nodes)
+            self._apply_mode_to_node(black_box)
+            self.scene().addItem(black_box)
+
+            for src_node, src_port_index, dst_node, dst_port_index in resolved_internal_edges:
+                self.scene().signals.connection_created.emit(
+                    src_node.name,
+                    src_port_index,
+                    dst_node.name,
+                    dst_port_index,
+                )
+                emitted_routes.append(
+                    (src_node.name, src_port_index, dst_node.name, dst_port_index)
+                )
+            return black_box
+        except Exception:
+            for src_name, src_port_index, dst_name, dst_port_index in reversed(emitted_routes):
+                self.scene().signals.connection_removed.emit(
+                    src_name, src_port_index, dst_name, dst_port_index
+                )
+            if black_box is not None and black_box.scene() is self.scene():
+                self.scene().removeItem(black_box)
+            for component_name, idx in allocated:
+                self._free_index(component_name, idx)
+            raise
+
     def _is_near_node(self, scene_pos, margin=10):
         for item in self.scene().items():
             if isinstance(item, NodeItem):
@@ -876,7 +1026,21 @@ class DiagramView(QGraphicsView):
             event.acceptProposedAction()
 
     def dropEvent(self, event):
-        component_name = event.mimeData().text()
+        mime_data = event.mimeData()
+        if mime_data.hasFormat("application/x-dclocking-custom-composite"):
+            definition_id = bytes(mime_data.data("application/x-dclocking-custom-composite")).decode("utf-8")
+            definition = self._custom_composite_provider(definition_id) if self._custom_composite_provider else None
+            if definition is None:
+                print("❌ 自定义组合模块定义不存在")
+                return
+            try:
+                self.instantiate_custom_composite(definition, self.mapToScene(event.position().toPoint()))
+                event.acceptProposedAction()
+            except Exception as exc:
+                print(f"❌ 自定义组合模块实例化失败: {exc}")
+            return
+
+        component_name = mime_data.text()
         position = self.mapToScene(event.position().toPoint())
 
         if component_name in self.composite_modules:
@@ -1062,6 +1226,9 @@ class DiagramView(QGraphicsView):
         def remove_next_edge(i=0):
             if i >= len(edges):
                 if node.scene():
+                    release_runtime = getattr(node, "release_runtime", None)
+                    if callable(release_runtime):
+                        release_runtime(self, self.scene())
                     self._free_index(node.component_name, int(node.index))
                     node.scene().removeItem(node)
                 node.edges.clear()
@@ -1072,9 +1239,15 @@ class DiagramView(QGraphicsView):
 
             edge = edges[i]
             if edge and edge.start_port and edge.end_port:
-                src_name = edge.start_port.parent_node.name if getattr(edge.start_port, "parent_node", None) else edge.start_port.name
-                dst_name = edge.end_port.parent_node.name if getattr(edge.end_port, "parent_node", None) else edge.end_port.name
-                self.scene().signals.connection_removed.emit(src_name, edge.start_port.index, dst_name, edge.end_port.index)
+                src_name, src_index = self.scene()._runtime_endpoint_identity(
+                    edge.start_port
+                )
+                dst_name, dst_index = self.scene()._runtime_endpoint_identity(
+                    edge.end_port
+                )
+                self.scene().signals.connection_removed.emit(
+                    src_name, src_index, dst_name, dst_index
+                )
                 edge.remove()
 
             QTimer.singleShot(delay_ms, lambda: remove_next_edge(i + 1))
@@ -1150,7 +1323,7 @@ class DiagramView(QGraphicsView):
 
 
 class ComponentPalette(QListWidget):
-    def __init__(self):
+    def __init__(self, include_builtin_composites=True, include_custom_section=True):
         super().__init__()
         self.setObjectName("component_palette")
         self.setMinimumWidth(176)
@@ -1178,7 +1351,13 @@ class ComponentPalette(QListWidget):
         ]
         composite_items = ["正弦波发生器", "数字控制振荡器"]
         self._add_section("非组合模块", normal_items)
-        self._add_section("组合模块", composite_items)
+        if include_builtin_composites:
+            self._add_section("组合模块", composite_items)
+        self._custom_header = None
+        self._custom_children = []
+        if include_custom_section:
+            self._custom_header, self._custom_children = self._add_section("自定义组合模块", [])
+            self.set_custom_composites([])
 
     def _add_section(self, title, items):
         header = QListWidgetItem(title)
@@ -1194,6 +1373,40 @@ class ComponentPalette(QListWidget):
             self.addItem(item)
             children.append(item)
         self._sections.append((header, children))
+        return header, children
+
+    def set_custom_composites(self, definitions):
+        if self._custom_header is None:
+            return
+        for item in list(self._custom_children):
+            row = self.row(item)
+            if row >= 0:
+                self.takeItem(row)
+        self._custom_children.clear()
+        definitions = list(definitions or [])
+        if not definitions:
+            item = QListWidgetItem("尚未创建自定义组合")
+            item.setFlags(Qt.ItemIsEnabled)
+            item.setForeground(QColor(UiColors.TEXT_MUTED))
+            item.setData(Qt.UserRole, {"kind": "empty-custom-library"})
+            self.addItem(item)
+            self._custom_children.append(item)
+        else:
+            for definition in definitions:
+                item = QListWidgetItem(str(definition.get("name", "未命名组合")))
+                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled)
+                item.setToolTip(str(definition.get("description", "")))
+                item.setData(
+                    Qt.UserRole,
+                    {
+                        "kind": "custom-composite",
+                        "id": str(definition.get("id", "")),
+                        "name": str(definition.get("name", "")),
+                    },
+                )
+                self.addItem(item)
+                self._custom_children.append(item)
+        self.filter_items("")
 
     def filter_items(self, query: str) -> None:
         normalized = str(query or "").strip().casefold()
@@ -1230,6 +1443,12 @@ class ComponentPalette(QListWidget):
 
         mime_data = QMimeData()
         mime_data.setText(item.text())
+        metadata = item.data(Qt.UserRole)
+        if isinstance(metadata, dict) and metadata.get("kind") == "custom-composite":
+            mime_data.setData(
+                "application/x-dclocking-custom-composite",
+                QByteArray(str(metadata.get("id", "")).encode("utf-8")),
+            )
 
         drag = QDrag(self)
         drag.setMimeData(mime_data)

@@ -36,6 +36,33 @@ class CanvasBridge:
             scene = self._scene
             view = self._view
 
+            # User-authored composites are represented by one visible black box
+            # while their allocated runtime nodes stay hidden behind the proxy.
+            custom_library = getattr(self._mw, "custom_composite_library", None)
+            custom_definition = (
+                custom_library.find_by_name(component_name)
+                if custom_library is not None
+                else None
+            )
+            if custom_definition is not None:
+                if position is None:
+                    position = self._next_auto_position()
+                node = view.instantiate_custom_composite(
+                    custom_definition,
+                    QPointF(position[0], position[1]),
+                )
+                if params:
+                    node.set_params(params)
+                return {
+                    "success": True,
+                    "node_name": node.name,
+                    "display_name": node.display_name,
+                    "component_name": node.component_name,
+                    "composite": True,
+                    "custom": True,
+                    "position": list(position),
+                }
+
             # Composite modules
             if component_name in view.composite_modules:
                 composite_cls = view.composite_modules[component_name]

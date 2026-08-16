@@ -47,6 +47,12 @@ from qt_module import (
 )
 from qt_Port import Port
 from qt_ui_graph import NodeSignals, BorderPort, EdgeItem, DiagramScene, DiagramView, ComponentPalette
+from qt_custom_composite import (
+    CustomCompositeDetailsWidget,
+    CustomCompositeLibrary,
+    CustomCompositeNode,
+    CustomCompositeWorkbench,
+)
 from qt_ui_theme import UiColors, apply_application_theme
 from qt_ui_utils import (
     ensure_port_methods,
@@ -83,7 +89,7 @@ class _StreamProxy(QObject):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, settings=None):
+    def __init__(self, settings=None, custom_composite_path=None):
         super().__init__()
         self._settings = settings or QSettings("DClocking", "PrecisionWorkstation")
         self._last_log_height = 160
@@ -112,6 +118,10 @@ class MainWindow(QMainWindow):
         self.save_cfg_btn = QPushButton("保存配置")
         self.load_cfg_btn = QPushButton("加载配置")
         self.clear_btn = QPushButton("清空画布")
+        self.custom_composite_btn = QPushButton("自定义组合工作台")
+        self.custom_composite_btn.setObjectName("custom_composite_workbench_button")
+        self.custom_composite_btn.setAccessibleName("打开自定义组合模块工作台")
+        self.custom_composite_btn.setToolTip("创建、编辑和保存用户自定义黑盒组合模块")
         self._serial_was_open = False
         self.connect_btn.pressed.connect(self._capture_serial_state)
         serial_bar = QWidget(self)
@@ -131,6 +141,7 @@ class MainWindow(QMainWindow):
         serial_layout.addWidget(self.save_cfg_btn)
         serial_layout.addWidget(self.load_cfg_btn)
         serial_layout.addWidget(self.clear_btn)
+        serial_layout.addWidget(self.custom_composite_btn)
         self.agent_toggle_btn = QToolButton(self)
         self.agent_toggle_btn.setObjectName("agent_toggle_button")
         self.agent_toggle_btn.setText("AI Agent")
@@ -153,6 +164,11 @@ class MainWindow(QMainWindow):
         self.view = DiagramView(self.scene)
         self.view.setObjectName("canvas_frame")
         self.palette = ComponentPalette()
+        self.custom_composite_library = CustomCompositeLibrary(custom_composite_path, parent=self)
+        self._custom_composite_workbench = None
+        self.view.set_custom_composite_provider(self.custom_composite_library.get)
+        self.custom_composite_library.changed.connect(self._refresh_custom_composite_palette)
+        self._refresh_custom_composite_palette()
         self._param_panels = {}
         self._build_side_panel()
         self._build_log_panel()
@@ -162,6 +178,7 @@ class MainWindow(QMainWindow):
         self.save_cfg_btn.clicked.connect(self.save_configuration)
         self.load_cfg_btn.clicked.connect(self.load_configuration)
         self.clear_btn.clicked.connect(self.confirm_clear_canvas)
+        self.custom_composite_btn.clicked.connect(self.open_custom_composite_workbench)
         self.connect_btn.clicked.connect(
             lambda: QTimer.singleShot(0, self._refresh_connection_presentation)
         )
@@ -173,6 +190,20 @@ class MainWindow(QMainWindow):
 
         set_param_apply_handler(self._apply_param_to_hardware)
         set_param_open_handler(self._open_param_panel)
+
+    def _refresh_custom_composite_palette(self):
+        self.palette.set_custom_composites(self.custom_composite_library.definitions())
+
+    def open_custom_composite_workbench(self):
+        if self._custom_composite_workbench is None:
+            self._custom_composite_workbench = CustomCompositeWorkbench(
+                self.custom_composite_library,
+                parent=self,
+            )
+        self._custom_composite_workbench.show()
+        self._custom_composite_workbench.raise_()
+        self._custom_composite_workbench.activateWindow()
+        return self._custom_composite_workbench
 
     def _build_workstation_shell(self, command_bar):
         main_widget = QWidget(self)
@@ -596,7 +627,7 @@ class MainWindow(QMainWindow):
 
         schema = node.param_schema() if hasattr(node, "param_schema") else []
         special_methods = node.special_methods_schema() if hasattr(node, "special_methods_schema") else []
-        if not schema and not special_methods:
+        if not schema and not special_methods and not isinstance(node, CustomCompositeNode):
             return False
 
         self.inspector_tabs.setCurrentIndex(1)
@@ -624,6 +655,11 @@ class MainWindow(QMainWindow):
         title_row.addStretch()
         title_row.addWidget(close_btn)
         card_layout.addLayout(title_row)
+
+        if isinstance(node, CustomCompositeNode):
+            details_widget = CustomCompositeDetailsWidget(node, parent=card)
+            card_layout.addWidget(details_widget)
+            card._custom_details_widget = details_widget
 
         if schema:
             companion_widget_factory = None
@@ -1565,9 +1601,11 @@ class MainWindow(QMainWindow):
                 end_port = getattr(edge, "end_port", None)
                 if start_port is None or end_port is None:
                     continue
-                src_name = start_port.parent_node.name if hasattr(start_port, "parent_node") and start_port.parent_node else start_port.name
-                dst_name = end_port.parent_node.name if hasattr(end_port, "parent_node") and end_port.parent_node else end_port.name
-                self.signals.connection_removed.emit(src_name, int(start_port.index), dst_name, int(end_port.index))
+                src_name, src_index = self.scene._runtime_endpoint_identity(start_port)
+                dst_name, dst_index = self.scene._runtime_endpoint_identity(end_port)
+                self.signals.connection_removed.emit(
+                    src_name, src_index, dst_name, dst_index
+                )
 
         for edge in existing_edges:
             edge.remove()
@@ -1593,10 +1631,14 @@ class MainWindow(QMainWindow):
         for item in list(self.scene.items()):
             if isinstance(item, NodeItem):
                 if item.scene():
+                    release_runtime = getattr(item, "release_runtime", None)
+                    if callable(release_runtime):
+                        release_runtime(self.view, self.scene)
                     item.scene().removeItem(item)
 
         for key in self.view._used_indices:
             self.view._used_indices[key].clear()
+        self.view._custom_instance_counter = 0
         if hasattr(self, "route_status_label"):
             self._refresh_ui_status()
 
@@ -1613,6 +1655,21 @@ class MainWindow(QMainWindow):
 
         for item in self.scene.items():
             if isinstance(item, NodeItem):
+                if isinstance(item, CustomCompositeNode):
+                    nodes.append(
+                        {
+                            "kind": "custom_composite",
+                            "name": item.name,
+                            "component_name": item.component_name,
+                            "index": int(item.index),
+                            "definition_id": item.definition_id,
+                            "embedded_definition": item.definition,
+                            "pos": {"x": float(item.pos().x()), "y": float(item.pos().y())},
+                            "direct_params": item.get_params(),
+                            "special_methods": {},
+                        }
+                    )
+                    continue
                 nodes.append(
                     {
                         "name": item.name,
@@ -1654,6 +1711,30 @@ class MainWindow(QMainWindow):
 
     def _create_node_from_config(self, node_cfg):
         component_name = node_cfg.get("component_name")
+        if node_cfg.get("kind") == "custom_composite" or component_name == "自定义组合模块":
+            # Prefer the embedded snapshot so old canvas configurations remain
+            # reproducible after the reusable library definition is edited.
+            definition = node_cfg.get("embedded_definition")
+            if not isinstance(definition, dict):
+                definition = self.custom_composite_library.get(
+                    node_cfg.get("definition_id")
+                )
+            if not isinstance(definition, dict):
+                self._report_config_error("[config] missing custom composite definition")
+                return None
+            try:
+                pos_cfg = node_cfg.get("pos", {})
+                pos = QPointF(float(pos_cfg.get("x", 0.0)), float(pos_cfg.get("y", 0.0)))
+                return self.view.instantiate_custom_composite(
+                    definition,
+                    pos,
+                    instance_index=int(node_cfg.get("index", 0)),
+                )
+            except Exception as exc:
+                self._report_config_error(
+                    f"[config] create custom composite failed: {exc}"
+                )
+                return None
         cls = self.view.module_factory.get(component_name)
         if cls is None:
             self._report_config_error(
@@ -1709,21 +1790,21 @@ class MainWindow(QMainWindow):
             if end_node:
                 end_node.edges.append(edge)
 
-            src_name = start_node.name if start_node else src_port.name
-            dst_name = end_node.name if end_node else dst_port.name
-            src_port_num = resolve_port_number(src_name, src_port.index, "out")
-            dst_port_num = resolve_port_number(dst_name, dst_port.index, "in")
+            src_name, src_index = self.scene._runtime_endpoint_identity(src_port)
+            dst_name, dst_index = self.scene._runtime_endpoint_identity(dst_port)
+            src_port_num = resolve_port_number(src_name, src_index, "out")
+            dst_port_num = resolve_port_number(dst_name, dst_index, "in")
             if src_port_num is None or dst_port_num is None:
                 self._report_config_error(
-                    f"[config] skip unresolved route: {src_name}:{src_port.index} -> "
-                    f"{dst_name}:{dst_port.index}"
+                    f"[config] skip unresolved route: {src_name}:{src_index} -> "
+                    f"{dst_name}:{dst_index}"
                 )
                 continue
 
             route_applied = self._apply_routing(
                 dst_port_num,
                 src_port_num,
-                f"{src_name}:Out{src_port.index + 1} -> {dst_name}:In{dst_port.index + 1}",
+                f"{src_name}:Out{src_index + 1} -> {dst_name}:In{dst_index + 1}",
                 upload_immediately=not batch_upload,
                 error_reporter=(
                     self._report_config_error if batch_upload else None

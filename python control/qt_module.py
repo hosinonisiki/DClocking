@@ -2190,6 +2190,22 @@ class ParamDialog(QDialog):
                 w.setChecked(bool(values.get(key, field.get("default", False))))
                 w.toggled.connect(lambda _checked=False, k=key: self._apply_field(k))
                 self._editors[key] = (ftype, w)
+            elif ftype == "choice":
+                w = QComboBox()
+                for option in field.get("options", []):
+                    if isinstance(option, dict):
+                        option_value = option.get("value")
+                        w.addItem(str(option.get("label", option_value)), option_value)
+                    else:
+                        w.addItem(str(option), option)
+                initial_value = values.get(key, field.get("default"))
+                initial_index = w.findData(initial_value)
+                if initial_index >= 0:
+                    w.setCurrentIndex(initial_index)
+                w.currentIndexChanged.connect(
+                    lambda _index=-1, k=key: self._apply_field(k)
+                )
+                self._editors[key] = (ftype, w)
             else:
                 w = QLineEdit()
                 w.setText(str(values.get(key, field.get("default", ""))))
@@ -2201,6 +2217,10 @@ class ParamDialog(QDialog):
                 w.textChanged.connect(lambda _text, k=key: self._refresh_companion(k))
             elif isinstance(w, QCheckBox):
                 w.toggled.connect(lambda _checked, k=key: self._refresh_companion(k))
+            elif isinstance(w, QComboBox):
+                w.currentIndexChanged.connect(
+                    lambda _index, k=key: self._refresh_companion(k)
+                )
 
         for key in self._editors.keys():
             try:
@@ -2218,6 +2238,8 @@ class ParamDialog(QDialog):
             return int(value) if ftype == "int_qty" and float(value).is_integer() else float(value)
         if ftype in {"bool", "flip_toggle"}:
             return bool(widget.isChecked())
+        if ftype == "choice":
+            return widget.currentData()
         if ftype == "flip_pulse":
             return None
         return widget.text()
@@ -2278,6 +2300,14 @@ class ParamDialog(QDialog):
         if ftype == "flip_pulse":
             return
 
+        if ftype == "choice":
+            index = widget.findData(value)
+            if index >= 0:
+                widget.blockSignals(True)
+                widget.setCurrentIndex(index)
+                widget.blockSignals(False)
+            return
+
         if ftype in {"int_qty", "float_qty"}:
             return
 
@@ -2320,6 +2350,8 @@ class ParamDialog(QDialog):
             return bool(w.isChecked())
         if ftype == "flip_pulse":
             return None
+        if ftype == "choice":
+            return w.currentData()
         return w.text()
 
     def _set_toggle_button_text(self, button: QPushButton, label: str, checked: bool):
@@ -2397,6 +2429,12 @@ class ParamDialog(QDialog):
                     self._set_toggle_button_text(widget, label, checked)
                 elif ftype == "flip_pulse":
                     pass
+                elif ftype == "choice":
+                    index = widget.findData(value)
+                    if index >= 0:
+                        widget.blockSignals(True)
+                        widget.setCurrentIndex(index)
+                        widget.blockSignals(False)
                 elif ftype in {"int_qty", "float_qty"}:
                     if widget.should_defer_external_update(value):
                         widget.defer_external_value(value)
@@ -2823,6 +2861,14 @@ class NodeItem(QGraphicsItem):
 
     def activate_parameter_editor(self) -> bool:
         """Open this node's parameter UI through the integrated or modal path."""
+        scene = self.scene()
+        local_handler = getattr(scene, "param_open_handler", None) if scene is not None else None
+        if callable(local_handler):
+            try:
+                if bool(local_handler(self)):
+                    return True
+            except Exception as exc:
+                print(f"[param] local open panel failed: {exc}")
         if _dispatch_param_open(self):
             return True
         if not self.param_schema() and not self.special_methods_schema():
