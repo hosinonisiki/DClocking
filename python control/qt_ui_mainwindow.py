@@ -40,6 +40,7 @@ from qt_module import (
     ParamDialog,
     PIDParamCanvas,
     FIRDesignerWidget,
+    IIRDesignerWidget,
     SpecialMethodDialog,
     set_param_apply_handler,
     set_param_open_handler,
@@ -561,7 +562,10 @@ class MainWindow(QMainWindow):
             scrollbar = self.param_scroll.verticalScrollBar()
             target = max(0, panel_widget.y() - 8)
             scrollbar.setValue(target)
-            if panel_widget.findChild(FIRDesignerWidget, "fir_designer_widget") is not None:
+            if (
+                panel_widget.findChild(FIRDesignerWidget, "fir_designer_widget") is not None
+                or panel_widget.findChild(IIRDesignerWidget, "iir_designer_widget") is not None
+            ):
                 panel_widget.setFocus(Qt.OtherFocusReason)
                 return
             editor = panel_widget.findChild(QLineEdit)
@@ -640,6 +644,12 @@ class MainWindow(QMainWindow):
         if special_methods:
             if isinstance(node, ModuleFIRFilter):
                 special_widget = FIRDesignerWidget(
+                    parent=self,
+                    apply_callback=node.apply_special_method,
+                    initial_values=getattr(node, "_special_method_args", {}),
+                )
+            elif isinstance(node, ModuleIIRFilter):
+                special_widget = IIRDesignerWidget(
                     parent=self,
                     apply_callback=node.apply_special_method,
                     initial_values=getattr(node, "_special_method_args", {}),
