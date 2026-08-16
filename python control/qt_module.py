@@ -336,6 +336,21 @@ class QuantityLineEdit(QLineEdit):
         self._refresh_view()
         return self._raw_value_from_display(self.core.get_value())
 
+    def preview_quantity_value(self):
+        """Parse the visible text without committing it or changing editor state."""
+        text = self.text().strip()
+        unit = self._format.unit
+        numeric_text = text[:-len(unit)] if unit and text.endswith(unit) else text
+        if numeric_text in {"inf", "+inf"}:
+            return self._raw_value_from_display(float("inf"))
+        if numeric_text == "-inf":
+            return self._raw_value_from_display(float("-inf"))
+
+        result, value, _formalized = self._format.match(text)
+        if result is None:
+            return None
+        return self._raw_value_from_display(value)
+
     def setEnabled(self, enabled):
         self.core.set_enabled(bool(enabled))
         super().setEnabled(enabled)
@@ -368,10 +383,256 @@ class QuantityLineEdit(QLineEdit):
         super().focusOutEvent(event)
 
 class PIDParamCanvas(QWidget):
+    """Live Bode magnitude preview using the same scaling as ``ModulePID``."""
+
+    _DIRECT_KEYS = {"gain_p", "gain_i", "gain_d", "leak_digit"}
+    _MAX_PLOT_FREQUENCY_HZ = 125_000_000.0
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(300, 110)
-        self.setFixedHeight(125)
+        self._parameters = {}
+        self._changed_key = None
+        self._response = self.calculate_response({}, self._logspace(1.0, 100_000_000.0, 180))
+        self.setMinimumSize(340, 205)
+        self.setFixedHeight(220)
+        self.setToolTip("依据 FPGA PID 定标实时计算：P、I、D 分量及其复数合成幅频响应")
+
+    @staticmethod
+    def _finite_float(value, default=0.0):
+        try:
+            return float(value)
+        except (TypeError, ValueError, OverflowError):
+            return float(default)
+
+    @staticmethod
+    def _signed(value, fallback=1.0):
+        number = PIDParamCanvas._finite_float(value, 0.0)
+        if number > 0:
+            return 1.0
+        if number < 0:
+            return -1.0
+        return float(fallback)
+
+    @staticmethod
+    def _amplitude_to_db(amplitude):
+        try:
+            magnitude = abs(float(amplitude))
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if magnitude <= 0.0:
+            return None
+        if math.isinf(magnitude):
+            return float("inf")
+        return 20.0 * math.log10(magnitude)
+
+    @staticmethod
+    def _db_to_amplitude(gain_db):
+        gain_db = PIDParamCanvas._finite_float(gain_db, -160.0)
+        if math.isnan(gain_db):
+            return 0.0
+        if gain_db == float("-inf"):
+            return 0.0
+        if gain_db == float("inf"):
+            return 1e30
+        return 10.0 ** (max(-600.0, min(600.0, gain_db)) / 20.0)
+
+    @staticmethod
+    def _logspace(low, high, count):
+        low = max(float(low), 1e-12)
+        high = max(float(high), low * 1.0001)
+        if count <= 1:
+            return (low,)
+        start = math.log10(low)
+        step = (math.log10(high) - start) / (count - 1)
+        return tuple(10.0 ** (start + step * index) for index in range(count))
+
+    @classmethod
+    def _channel_model(cls, parameters, changed_key=None):
+        parameters = parameters if isinstance(parameters, dict) else {}
+        has_indirect = any(
+            key in parameters
+            for key in ("overall_gain", "pi_corner", "pd_corner", "saturation_turning_frequency")
+        )
+        use_direct = changed_key in cls._DIRECT_KEYS or not has_indirect
+
+        if use_direct:
+            gain_p = cls._finite_float(parameters.get("gain_p"), 0.0)
+            gain_i = cls._finite_float(parameters.get("gain_i"), 0.0)
+            gain_d = cls._finite_float(parameters.get("gain_d"), 0.0)
+            p_amplitude = gain_p / (2.0**16)
+            i_numerator = gain_i * 125_000_000.0 / (2.0 * math.pi * (2.0**32))
+            d_slope = gain_d * 2.0 * math.pi / (250_000_000.0 * (2.0**16))
+
+            if "leak_digit" in parameters:
+                leak_digit = cls._finite_float(parameters.get("leak_digit"), 0.0)
+                leak_frequency = (
+                    125_000_000.0 / (leak_digit * 256.0 * 2.0 * math.pi)
+                    if leak_digit > 0.0
+                    else 0.0
+                )
+            else:
+                leak_frequency = max(
+                    0.0,
+                    cls._finite_float(parameters.get("saturation_turning_frequency"), 0.0),
+                )
+        else:
+            overall_gain = cls._finite_float(parameters.get("overall_gain"), -160.0)
+            p_magnitude = cls._db_to_amplitude(overall_gain)
+            p_sign = cls._signed(parameters.get("gain_p"), 1.0)
+            i_sign = cls._signed(parameters.get("gain_i"), p_sign)
+            d_sign = cls._signed(parameters.get("gain_d"), p_sign)
+            pi_corner = max(0.0, cls._finite_float(parameters.get("pi_corner"), 0.0))
+            pd_corner = cls._finite_float(parameters.get("pd_corner"), float("inf"))
+
+            p_amplitude = p_sign * p_magnitude
+            i_numerator = i_sign * p_magnitude * pi_corner
+            d_slope = d_sign * p_magnitude / pd_corner if pd_corner > 0.0 and math.isfinite(pd_corner) else 0.0
+
+            if changed_key == "saturation_gain" and pi_corner > 0.0:
+                saturation_gain = cls._finite_float(parameters.get("saturation_gain"), float("inf"))
+                if math.isfinite(saturation_gain):
+                    leak_frequency = pi_corner * cls._db_to_amplitude(overall_gain - saturation_gain)
+                else:
+                    leak_frequency = 0.0
+            else:
+                leak_frequency = max(
+                    0.0,
+                    cls._finite_float(parameters.get("saturation_turning_frequency"), 0.0),
+                )
+
+        p_magnitude = abs(p_amplitude)
+        pi_corner = abs(i_numerator / p_amplitude) if p_amplitude != 0.0 else None
+        pd_corner = abs(p_amplitude / d_slope) if d_slope != 0.0 else None
+        saturation_gain = (
+            cls._amplitude_to_db(abs(i_numerator) / leak_frequency)
+            if leak_frequency > 0.0 and i_numerator != 0.0
+            else None
+        )
+        return {
+            "source": "direct" if use_direct else "indirect",
+            "p_amplitude": p_amplitude,
+            "i_numerator": i_numerator,
+            "d_slope": d_slope,
+            "overall_gain_db": cls._amplitude_to_db(p_magnitude),
+            "pi_corner_hz": pi_corner,
+            "pd_corner_hz": pd_corner,
+            "leak_frequency_hz": leak_frequency,
+            "saturation_gain_db": saturation_gain,
+        }
+
+    @classmethod
+    def calculate_response(cls, parameters, frequencies_hz, changed_key=None):
+        """Return P/I/D and combined magnitude responses in dB.
+
+        The equations mirror ``ModulePID``: P is Q16, I runs at 125 MHz
+        with a leaky pole, and D uses the 250 MHz sample difference scaling.
+        """
+        model = cls._channel_model(parameters, changed_key=changed_key)
+        frequencies = tuple(float(frequency) for frequency in frequencies_hz)
+        proportional_db = []
+        integral_db = []
+        derivative_db = []
+        total_db = []
+
+        p_amplitude = model["p_amplitude"]
+        i_numerator = model["i_numerator"]
+        d_slope = model["d_slope"]
+        leak_frequency = model["leak_frequency_hz"]
+
+        for frequency in frequencies:
+            if frequency <= 0.0 or not math.isfinite(frequency):
+                proportional_db.append(None)
+                integral_db.append(None)
+                derivative_db.append(None)
+                total_db.append(None)
+                continue
+
+            p_channel = complex(p_amplitude, 0.0)
+            i_channel = (
+                i_numerator / complex(leak_frequency, frequency)
+                if i_numerator != 0.0
+                else 0j
+            )
+            d_channel = complex(0.0, d_slope * frequency)
+            combined = p_channel + i_channel + d_channel
+
+            proportional_db.append(cls._amplitude_to_db(abs(p_channel)))
+            integral_db.append(cls._amplitude_to_db(abs(i_channel)))
+            derivative_db.append(cls._amplitude_to_db(abs(d_channel)))
+            total_db.append(cls._amplitude_to_db(abs(combined)))
+
+        return {
+            "frequencies_hz": frequencies,
+            "proportional_db": tuple(proportional_db),
+            "integral_db": tuple(integral_db),
+            "derivative_db": tuple(derivative_db),
+            "total_db": tuple(total_db),
+            "overall_gain_db": model["overall_gain_db"],
+            "pi_corner_hz": model["pi_corner_hz"],
+            "pd_corner_hz": model["pd_corner_hz"],
+            "leak_frequency_hz": model["leak_frequency_hz"],
+            "saturation_gain_db": model["saturation_gain_db"],
+            "source": model["source"],
+        }
+
+    @classmethod
+    def _frequency_range(cls, parameters, changed_key=None):
+        model = cls._channel_model(parameters, changed_key=changed_key)
+        markers = [
+            marker
+            for marker in (
+                model["leak_frequency_hz"],
+                model["pi_corner_hz"],
+                model["pd_corner_hz"],
+            )
+            if marker is not None and marker > 0.0 and math.isfinite(marker)
+        ]
+        if not markers:
+            return 1.0, 100_000_000.0
+
+        low = max(1e-3, min(markers) / 100.0)
+        high = min(cls._MAX_PLOT_FREQUENCY_HZ, max(markers) * 100.0)
+        if high <= low:
+            high = min(cls._MAX_PLOT_FREQUENCY_HZ, low * 10_000.0)
+        if high / low < 10_000.0:
+            expansion = math.sqrt(10_000.0 / (high / low))
+            low = max(1e-3, low / expansion)
+            high = min(cls._MAX_PLOT_FREQUENCY_HZ, high * expansion)
+        return low, max(high, low * 10.0)
+
+    def set_parameters(self, parameters, changed_key=None):
+        self._parameters = dict(parameters or {})
+        self._changed_key = changed_key
+        low, high = self._frequency_range(self._parameters, changed_key=changed_key)
+        frequencies = self._logspace(low, high, 200)
+        self._response = self.calculate_response(
+            self._parameters,
+            frequencies,
+            changed_key=changed_key,
+        )
+        self.update()
+
+    def response_data(self):
+        return dict(self._response)
+
+    @staticmethod
+    def _format_frequency(value):
+        if value is None or not math.isfinite(value):
+            return "—"
+        for scale, suffix in ((1e9, "GHz"), (1e6, "MHz"), (1e3, "kHz")):
+            if abs(value) >= scale:
+                return f"{value / scale:.3g}{suffix}"
+        return f"{value:.3g}Hz"
+
+    @staticmethod
+    def _clamped_db(value):
+        if value is None or math.isnan(value):
+            return None
+        if value == float("inf"):
+            return 180.0
+        if value == float("-inf"):
+            return -180.0
+        return max(-180.0, min(180.0, float(value)))
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -386,54 +647,147 @@ class PIDParamCanvas(QWidget):
         title_font.setPointSize(8)
         painter.setFont(title_font)
         painter.setPen(QColor("#243447"))
-        painter.drawText(QRectF(rect.left() + 10, rect.top() + 6, rect.width() - 20, 18), Qt.AlignLeft | Qt.AlignVCenter, "PID Schematic")
+        painter.drawText(
+            QRectF(rect.left() + 12, rect.top() + 7, rect.width() - 24, 16),
+            Qt.AlignLeft | Qt.AlignVCenter,
+            "PID 实时频率响应",
+        )
 
         body_font = QFont()
         body_font.setPointSize(6)
         painter.setFont(body_font)
-        painter.setPen(QColor("#8A94A6"))
+        painter.setPen(QColor("#7B8492"))
+        painter.drawText(
+            QRectF(rect.right() - 110, rect.top() + 7, 98, 16),
+            Qt.AlignRight | Qt.AlignVCenter,
+            "LIVE · FPGA MODEL",
+        )
 
-        plot_rect = QRectF(rect.left() + 18, rect.top() + 26, rect.width() - 36, rect.height() - 40)
+        plot_rect = QRectF(rect.left() + 45, rect.top() + 46, rect.width() - 60, rect.height() - 75)
+        painter.fillRect(plot_rect, QColor("#FFFFFF"))
         painter.setPen(QPen(QColor("#D7DCE4"), 1))
-        painter.drawRoundedRect(plot_rect, 6, 6)
+        painter.drawRect(plot_rect)
 
-        x0 = plot_rect.left() + 14
-        x1 = plot_rect.left() + plot_rect.width() * 0.26
-        x2 = plot_rect.left() + plot_rect.width() * 0.48
-        x3 = plot_rect.left() + plot_rect.width() * 0.72
-        x4 = plot_rect.right() - 14
+        response = self._response
+        frequencies = response.get("frequencies_hz", ())
+        if not frequencies:
+            painter.end()
+            return
 
-        y_high = plot_rect.top() + 14
-        y_mid = plot_rect.center().y() + 2
+        all_values = [0.0]
+        for name in ("proportional_db", "integral_db", "derivative_db", "total_db"):
+            all_values.extend(
+                value
+                for value in (self._clamped_db(item) for item in response.get(name, ()))
+                if value is not None
+            )
+        data_min = min(all_values)
+        data_max = max(all_values)
+        y_min = max(-180.0, math.floor((data_min - 8.0) / 20.0) * 20.0)
+        y_max = min(180.0, math.ceil((data_max + 8.0) / 20.0) * 20.0)
+        if y_max - y_min < 40.0:
+            center = (y_max + y_min) / 2.0
+            y_min = max(-180.0, center - 20.0)
+            y_max = min(180.0, center + 20.0)
+        if y_max <= y_min:
+            y_min, y_max = -20.0, 20.0
 
-        painter.setPen(QPen(QColor("#2F6BFF"), 3))
-        painter.drawLine(QPointF(x0, y_high), QPointF(x1, y_high))
-        painter.drawLine(QPointF(x1, y_high), QPointF(x2, y_mid))
-        painter.drawLine(QPointF(x2, y_mid), QPointF(x3, y_mid))
-        painter.drawLine(QPointF(x3, y_mid), QPointF(x4, y_high))
+        low_frequency = frequencies[0]
+        high_frequency = frequencies[-1]
+        log_low = math.log10(low_frequency)
+        log_span = max(1e-9, math.log10(high_frequency) - log_low)
 
-        painter.setPen(QPen(QColor("#AAB4C2"), 1, Qt.DashLine))
-        painter.drawLine(QPointF(plot_rect.left() + 6, y_high), QPointF(x1, y_high))
-        painter.drawLine(QPointF(plot_rect.left() + 6, y_mid), QPointF(x3, y_mid))
-        painter.drawLine(QPointF(x1, y_high), QPointF(x1, plot_rect.bottom() - 6))
-        painter.drawLine(QPointF(x2, y_mid), QPointF(x2, plot_rect.bottom() - 6))
-        painter.drawLine(QPointF(x3, y_mid), QPointF(x3, plot_rect.bottom() - 6))
+        def map_x(frequency):
+            return plot_rect.left() + (math.log10(frequency) - log_low) / log_span * plot_rect.width()
 
-        painter.setPen(QColor("#5C6678"))
-        painter.drawText(QRectF(x0 - 4, y_high - 16, 54, 12), Qt.AlignLeft | Qt.AlignVCenter, "饱和增益")
-        painter.drawText(QRectF((x2 + x3) / 2 - 14, y_mid - 16, 28, 12), Qt.AlignCenter | Qt.AlignVCenter, "增益")
+        def map_y(gain_db):
+            gain_db = self._clamped_db(gain_db)
+            if gain_db is None:
+                return None
+            return plot_rect.bottom() - (gain_db - y_min) / (y_max - y_min) * plot_rect.height()
 
-        painter.drawText(QRectF(x1 - 32, plot_rect.bottom() - 4, 64, 12), Qt.AlignCenter | Qt.AlignVCenter, "饱和拐点频率")
-        painter.drawText(QRectF(x2 - 16, plot_rect.bottom() - 16, 32, 12), Qt.AlignCenter | Qt.AlignVCenter, "PI拐点")
-        painter.drawText(QRectF(x3 - 16, plot_rect.bottom() - 16, 32, 12), Qt.AlignCenter | Qt.AlignVCenter, "PD拐点")
+        painter.setPen(QPen(QColor("#E6E9EE"), 1, Qt.DotLine))
+        for index in range(5):
+            fraction = index / 4.0
+            y = plot_rect.bottom() - fraction * plot_rect.height()
+            gain = y_min + fraction * (y_max - y_min)
+            painter.drawLine(QPointF(plot_rect.left(), y), QPointF(plot_rect.right(), y))
+            painter.setPen(QColor("#6C7685"))
+            painter.drawText(
+                QRectF(rect.left() + 2, y - 6, 39, 12),
+                Qt.AlignRight | Qt.AlignVCenter,
+                f"{gain:.0f}",
+            )
+            painter.setPen(QPen(QColor("#E6E9EE"), 1, Qt.DotLine))
 
-        painter.setPen(QColor("#8A94A6"))
-        painter.drawText(QRectF(plot_rect.left(), plot_rect.bottom() + 2, plot_rect.width(), 10), Qt.AlignCenter | Qt.AlignVCenter, "Frequency")
-        painter.save()
-        painter.translate(plot_rect.left() - 7, plot_rect.center().y())
-        painter.rotate(-90)
-        painter.drawText(QRectF(-plot_rect.height() / 2, -16, plot_rect.height(), 10), Qt.AlignCenter | Qt.AlignVCenter, "Gain")
-        painter.restore()
+        first_decade = math.ceil(log_low)
+        last_decade = math.floor(math.log10(high_frequency))
+        for exponent in range(first_decade, last_decade + 1):
+            frequency = 10.0**exponent
+            x = map_x(frequency)
+            painter.drawLine(QPointF(x, plot_rect.top()), QPointF(x, plot_rect.bottom()))
+            if last_decade - first_decade <= 7 or (exponent - first_decade) % 2 == 0:
+                painter.setPen(QColor("#6C7685"))
+                painter.drawText(
+                    QRectF(x - 24, plot_rect.bottom() + 3, 48, 12),
+                    Qt.AlignCenter | Qt.AlignVCenter,
+                    self._format_frequency(frequency),
+                )
+                painter.setPen(QPen(QColor("#E6E9EE"), 1, Qt.DotLine))
+
+        marker_specs = (
+            ("leak_frequency_hz", "泄漏", QColor("#A670D6")),
+            ("pi_corner_hz", "PI", QColor("#E9953E")),
+            ("pd_corner_hz", "PD", QColor("#25A8A2")),
+        )
+        for key, label, color in marker_specs:
+            frequency = response.get(key)
+            if frequency is None or not math.isfinite(frequency) or not (low_frequency <= frequency <= high_frequency):
+                continue
+            x = map_x(frequency)
+            painter.setPen(QPen(color, 1, Qt.DashLine))
+            painter.drawLine(QPointF(x, plot_rect.top()), QPointF(x, plot_rect.bottom()))
+            painter.setPen(color)
+            painter.drawText(QRectF(x - 18, plot_rect.top() + 2, 36, 11), Qt.AlignCenter, label)
+
+        def draw_series(key, color, width, style=Qt.SolidLine):
+            painter.setPen(QPen(color, width, style, Qt.RoundCap, Qt.RoundJoin))
+            path = QPainterPath()
+            active = False
+            for frequency, gain_db in zip(frequencies, response.get(key, ())):
+                y = map_y(gain_db)
+                if y is None:
+                    active = False
+                    continue
+                point = QPointF(map_x(frequency), y)
+                if not active:
+                    path.moveTo(point)
+                    active = True
+                else:
+                    path.lineTo(point)
+            painter.drawPath(path)
+
+        draw_series("proportional_db", QColor("#7D8795"), 1, Qt.DashLine)
+        draw_series("integral_db", QColor("#E9953E"), 1)
+        draw_series("derivative_db", QColor("#25A8A2"), 1)
+        draw_series("total_db", QColor("#1769FF"), 2)
+
+        legend = (("总响应", "#1769FF"), ("P", "#7D8795"), ("I", "#E9953E"), ("D", "#25A8A2"))
+        legend_x = rect.left() + 12
+        for label, color in legend:
+            painter.setPen(QPen(QColor(color), 2))
+            painter.drawLine(QPointF(legend_x, rect.top() + 34), QPointF(legend_x + 12, rect.top() + 34))
+            painter.setPen(QColor("#586273"))
+            painter.drawText(QRectF(legend_x + 15, rect.top() + 27, 35, 14), Qt.AlignLeft | Qt.AlignVCenter, label)
+            legend_x += 52
+
+        painter.setPen(QColor("#7B8492"))
+        painter.drawText(QRectF(rect.left() + 2, plot_rect.top() - 1, 38, 12), Qt.AlignRight, "dB")
+        painter.drawText(
+            QRectF(plot_rect.left(), rect.bottom() - 14, plot_rect.width(), 11),
+            Qt.AlignCenter | Qt.AlignVCenter,
+            "对数频率 (Hz)",
+        )
         painter.end()
 
 class ParamDialog(QDialog):
@@ -446,6 +800,7 @@ class ParamDialog(QDialog):
         self._committed_values = {}
         self._enter_committed_keys = set()
         self._companion_widget = None
+        self._companion_refresh_suspended = False
 
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 12, 12, 12)
@@ -512,12 +867,45 @@ class ParamDialog(QDialog):
                 self._editors[key] = (ftype, w)
 
             layout.addRow(label, w)
+            if isinstance(w, QLineEdit):
+                w.textChanged.connect(lambda _text, k=key: self._refresh_companion(k))
+            elif isinstance(w, QCheckBox):
+                w.toggled.connect(lambda _checked, k=key: self._refresh_companion(k))
 
         for key in self._editors.keys():
             try:
                 self._committed_values[key] = self._value_from_editor(key)
             except Exception:
                 continue
+        self._refresh_companion()
+
+    def _preview_value_from_editor(self, key: str):
+        ftype, widget = self._editors[key]
+        if ftype in {"int_qty", "float_qty"}:
+            value = widget.preview_quantity_value()
+            if value is None:
+                raise ValueError("Invalid quantity input")
+            return int(value) if ftype == "int_qty" and float(value).is_integer() else float(value)
+        if ftype in {"bool", "flip_toggle"}:
+            return bool(widget.isChecked())
+        if ftype == "flip_pulse":
+            return None
+        return widget.text()
+
+    def _refresh_companion(self, changed_key=None) -> None:
+        if self._companion_refresh_suspended or self._companion_widget is None:
+            return
+        setter = getattr(self._companion_widget, "set_parameters", None)
+        if not callable(setter):
+            return
+
+        preview_values = dict(self._committed_values)
+        for key in self._editors:
+            try:
+                preview_values[key] = self._preview_value_from_editor(key)
+            except Exception:
+                continue
+        setter(preview_values, changed_key=changed_key)
 
     def _bind_text_events(self, key: str, widget: QLineEdit) -> None:
         widget.returnPressed.connect(lambda k=key: self._apply_field_on_enter(k))
@@ -658,37 +1046,42 @@ class ParamDialog(QDialog):
         if not isinstance(values, dict):
             return
 
-        for key, value in values.items():
-            editor = self._editors.get(key)
-            if editor is None:
-                continue
-
-            ftype, widget = editor
-            if ftype == "bool":
-                widget.blockSignals(True)
-                widget.setChecked(bool(value))
-                widget.blockSignals(False)
-            elif ftype == "flip_toggle":
-                checked = bool(value)
-                widget.blockSignals(True)
-                widget.setChecked(checked)
-                widget.blockSignals(False)
-                label = self._fields.get(key, {}).get("label", key)
-                self._set_toggle_button_text(widget, label, checked)
-            elif ftype == "flip_pulse":
-                pass
-            elif ftype in {"int_qty", "float_qty"}:
-                if widget.should_defer_external_update(value):
-                    widget.defer_external_value(value)
-                    self._committed_values[key] = value
+        self._companion_refresh_suspended = True
+        try:
+            for key, value in values.items():
+                editor = self._editors.get(key)
+                if editor is None:
                     continue
-                widget.set_quantity_value(0 if value is None else value)
-            else:
-                widget.setText("" if value is None else str(value))
 
-            self._committed_values[key] = value
+                ftype, widget = editor
+                if ftype == "bool":
+                    widget.blockSignals(True)
+                    widget.setChecked(bool(value))
+                    widget.blockSignals(False)
+                elif ftype == "flip_toggle":
+                    checked = bool(value)
+                    widget.blockSignals(True)
+                    widget.setChecked(checked)
+                    widget.blockSignals(False)
+                    label = self._fields.get(key, {}).get("label", key)
+                    self._set_toggle_button_text(widget, label, checked)
+                elif ftype == "flip_pulse":
+                    pass
+                elif ftype in {"int_qty", "float_qty"}:
+                    if widget.should_defer_external_update(value):
+                        widget.defer_external_value(value)
+                        self._committed_values[key] = value
+                        continue
+                    widget.set_quantity_value(0 if value is None else value)
+                else:
+                    widget.setText("" if value is None else str(value))
+
+                self._committed_values[key] = value
+        finally:
+            self._companion_refresh_suspended = False
 
         self._enter_committed_keys.clear()
+        self._refresh_companion()
 
 class SpecialMethodDialog(QDialog):
     def __init__(self, methods: list[dict], parent=None, apply_callback=None, initial_values=None):
