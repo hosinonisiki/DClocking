@@ -190,7 +190,8 @@ IBUFDS core_clk_ibufds (
 //  );    
 
          
-    board_ku060_adda_top  u_adda_top(  
+    board_ku060_adda_top  u_adda_top( 
+        .rst    (sys_rst), 
         .ads54j60_A_n(ads54j60_A_n),
         .ads54j60_A_p(ads54j60_A_p),
         .ads54j60_B_n(ads54j60_B_n),
@@ -221,7 +222,7 @@ IBUFDS core_clk_ibufds (
         .sysrefclk_p(sysrefclk_p),        
 //        .coreclk_n(coreclk_n),
 //        .coreclk_p(coreclk_p),
-        .coreclk(core_clk),
+        .coreclk(sys_clk),
    // LMK048 ad9144_cs
         .lmk048_clk        (lmk048_clk),
         .lmk048_cs         (lmk048_cs),
