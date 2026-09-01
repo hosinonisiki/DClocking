@@ -393,8 +393,10 @@ assign ads54j60_adc_valid       =  ads54j60_fifo_valid       ;
  ///////////////////////////////////////////////////
   ///// ad9144 data  
   //////////////////////////////////////////////////
-  
-
+  wire    [63:0]  	 tx_tdata_RF   	   ;   
+  wire    [63:0]  	 tx_tdata_RF1   	   ; 
+  wire    [63:0]  	 tx_tdata_RF2   	   ; 
+  wire    [63:0]  	 tx_tdata_RF3   	   ; 
 dac_fifo_16in64out dac_fifo_16in64out_ch0 (
   .rst          (   rst                  ),
   .wr_clk       (   coreclk                       ), // input wire wr_clk
@@ -402,7 +404,7 @@ dac_fifo_16in64out dac_fifo_16in64out_ch0 (
   .din          (   ad9144_tx_data_ch0		   ), // input wire [15 : 0] din
   .wr_en        (   ad9144_tx_valid                    ), // input wire wr_en
   .rd_en        (   !ad9144_fifo_empty         ), // input wire rd_en
-  .dout         (   ad9144_tx_data_tdata_ch0       ), // output wire [63 : 0] dout
+  .dout         (   tx_tdata_RF       ), // output wire [63 : 0] dout
   .full         (            				   ), // output wire full
   .empty        (   ad9144_fifo_empty           )
 );
@@ -415,7 +417,7 @@ dac_fifo_16in64out dac_fifo_16in64out_ch1 (
   .din          (   ad9144_tx_data_ch1		   ), // input wire [15 : 0] din
   .wr_en        (   ad9144_tx_valid                    ), // input wire wr_en
   .rd_en        (   !ad9144_fifo_empty         ), // input wire rd_en
-  .dout         (   ad9144_tx_data_tdata_ch1       ), // output wire [63: 0] dout
+  .dout         (   tx_tdata_RF1       ), // output wire [63: 0] dout
   .full         (            				   ), // output wire full
   .empty        (              )
 );
@@ -427,7 +429,7 @@ dac_fifo_16in64out dac_fifo_16in64out_ch2 (
   .din          (   ad9144_tx_data_ch2		   ), // input wire [15 : 0] din
   .wr_en        (   ad9144_tx_valid                    ), // input wire wr_en
   .rd_en        (   !ad9144_fifo_empty         ), // input wire rd_en
-  .dout         (   ad9144_tx_data_tdata_ch2       ), // output wire [63 : 0] dout
+  .dout         (   tx_tdata_RF2      ), // output wire [63 : 0] dout
   .full         (            				   ), // output wire full
   .empty        (              )
 );
@@ -439,87 +441,87 @@ dac_fifo_16in64out dac_fifo_16in64out_ch3 (
   .din          (   ad9144_tx_data_ch3		   ), // input wire [15 : 0] din
   .wr_en        (   ad9144_tx_valid                    ), // input wire wr_en
   .rd_en        (   !ad9144_fifo_empty         ), // input wire rd_en
-  .dout         (   ad9144_tx_data_tdata_ch3       ), // output wire [63 : 0] dout
+  .dout         (   tx_tdata_RF3       ), // output wire [63 : 0] dout
   .full         (            				   ), // output wire full
   .empty        (              )
 );
 /////////////////////////////////////test////////////////////
-/*wire [63:0]   carrier_fcw ;
-wire [9:0]   vio_send_power_atten ;
-vio_ftw vio_ftw_u (
-  .clk(ad9144_core_clk_o),                // input wire clk
-  .probe_out0(carrier_fcw),
-   .probe_out1(vio_send_power_atten)
-);
- 
-  wire    [16*4-1:0]  	 tx_tdata_RF   	   ;   
-//doppler_gen doppler_gen(
-//	.rx_DPL_clk           					  	(	ad9144_core_clk_o ),
-//	.rx_DPL_rst           					  	(	0			        ),
-//	.rx_carrier_fcw           					(	carrier_fcw			),
-//	.rx_DPL_ce            					  	(	1'b1				),
-//	.tx_DPL_DoutBus_xb                          (	tx_tdata_RF		)
+//wire [63:0]   carrier_fcw ;
+//wire [9:0]   vio_send_power_atten ;
+//vio_ftw vio_ftw_u (
+//  .clk(ad9144_core_clk_o),                // input wire clk
+//  .probe_out0(carrier_fcw),
+//   .probe_out1(vio_send_power_atten)
 //);
+ 
+//  wire    [16*4-1:0]  	 tx_tdata_RF   	   ;   
+////doppler_gen doppler_gen(
+////	.rx_DPL_clk           					  	(	ad9144_core_clk_o ),
+////	.rx_DPL_rst           					  	(	0			        ),
+////	.rx_carrier_fcw           					(	carrier_fcw			),
+////	.rx_DPL_ce            					  	(	1'b1				),
+////	.tx_DPL_DoutBus_xb                          (	tx_tdata_RF		)
+////);
 
-Mod_TOP mod_source   (
-	.dac_clk         		(	ad9144_core_clk_o	           ),
-	.carrier_fcw		    (	carrier_fcw                        ),
-	.send_power_atten		(	vio_send_power_atten           ),
-	.source_doutRF			(	tx_tdata_RF                    )
+//Mod_TOP mod_source   (
+//	.dac_clk         		(	ad9144_core_clk_o	           ),
+//	.carrier_fcw		    (	carrier_fcw                        ),
+//	.send_power_atten		(	vio_send_power_atten           ),
+//	.source_doutRF			(	tx_tdata_RF                    )
 
-	 );
+//	 );
 
 assign ad9144_tx_data_tdata_ch0 = {
 	      
-	       tx_tdata_RF[ 4 *16-9 : 4 *16-16],   //  data3[7:0]
-	       tx_tdata_RF[ 3 *16-9 : 3 *16-16],   //  data2[7:0]	      
-	       tx_tdata_RF[ 2 *16-9 : 2 *16-16],   //  data1[7:0]
 	       tx_tdata_RF[ 1 *16-9 : 1 *16-16],   //  data0[7:0]
+	       tx_tdata_RF[ 2 *16-9 : 2 *16-16],   //  data1[7:0]	      
+	       tx_tdata_RF[ 3 *16-9 : 3 *16-16],   //  data2[7:0]
+	       tx_tdata_RF[ 4 *16-9 : 4 *16-16],   //  data3[7:0]
 	       
-	       tx_tdata_RF[ 4 *16-1 : 4 *16-8 ],   //  data3[15:8]
-	       tx_tdata_RF[ 3 *16-1 : 3 *16-8 ],   //  data2[15:8]      
-	       tx_tdata_RF[ 2 *16-1 : 2 *16-8 ],   //  data1[15:8]
-	       tx_tdata_RF[ 1 *16-1 : 1 *16-8 ]    //  data0[15:8]
+	       tx_tdata_RF[ 1 *16-1 : 1 *16-8 ],   //  data0[15:8]
+	       tx_tdata_RF[ 2 *16-1 : 2 *16-8 ],   //  data1[15:8]      
+	       tx_tdata_RF[ 3 *16-1 : 3 *16-8 ],   //  data2[15:8]
+	       tx_tdata_RF[ 4 *16-1 : 4 *16-8 ]    //  data3[15:8]
 
 				    } ;   
 assign ad9144_tx_data_tdata_ch1 = {
 	      
-	       tx_tdata_RF[ 4 *16-9 : 4 *16-16],   //  data3[7:0]
-	       tx_tdata_RF[ 3 *16-9 : 3 *16-16],   //  data2[7:0]	      
-	       tx_tdata_RF[ 2 *16-9 : 2 *16-16],   //  data1[7:0]
-	       tx_tdata_RF[ 1 *16-9 : 1 *16-16],   //  data0[7:0]
+	       tx_tdata_RF1[ 1 *16-9 : 1 *16-16],   //  data0[7:0]
+	       tx_tdata_RF1[ 2 *16-9 : 2 *16-16],   //  data1[7:0]	      
+	       tx_tdata_RF1[ 3 *16-9 : 3 *16-16],   //  data2[7:0]
+	       tx_tdata_RF1[ 4 *16-9 : 4 *16-16],   //  data3[7:0]
 	       
-	       tx_tdata_RF[ 4 *16-1 : 4 *16-8 ],   //  data3[15:8]
-	       tx_tdata_RF[ 3 *16-1 : 3 *16-8 ],   //  data2[15:8]      
-	       tx_tdata_RF[ 2 *16-1 : 2 *16-8 ],   //  data1[15:8]
-	       tx_tdata_RF[ 1 *16-1 : 1 *16-8 ]    //  data0[15:8]
+	       tx_tdata_RF1[ 1 *16-1 : 1 *16-8 ],   //  data0[15:8]
+	       tx_tdata_RF1[ 2 *16-1 : 2 *16-8 ],   //  data1[15:8]      
+	       tx_tdata_RF1[ 3 *16-1 : 3 *16-8 ],   //  data2[15:8]
+	       tx_tdata_RF1[ 4 *16-1 : 4 *16-8 ]    //  data3[15:8]
 
 				    } ;   
 assign ad9144_tx_data_tdata_ch2 = {
 	      
-	       tx_tdata_RF[ 4 *16-9 : 4 *16-16],   //  data3[7:0]
-	       tx_tdata_RF[ 3 *16-9 : 3 *16-16],   //  data2[7:0]	      
-	       tx_tdata_RF[ 2 *16-9 : 2 *16-16],   //  data1[7:0]
-	       tx_tdata_RF[ 1 *16-9 : 1 *16-16],   //  data0[7:0]
+	       tx_tdata_RF2[ 1 *16-9 : 1 *16-16],   //  data0[7:0]
+	       tx_tdata_RF2[ 2 *16-9 : 2 *16-16],   //  data1[7:0]	      
+	       tx_tdata_RF2[ 3 *16-9 : 3 *16-16],   //  data2[7:0]
+	       tx_tdata_RF2[ 4 *16-9 : 4 *16-16],   //  data3[7:0]
 	       
-	       tx_tdata_RF[ 4 *16-1 : 4 *16-8 ],   //  data3[15:8]
-	       tx_tdata_RF[ 3 *16-1 : 3 *16-8 ],   //  data2[15:8]      
-	       tx_tdata_RF[ 2 *16-1 : 2 *16-8 ],   //  data1[15:8]
-	       tx_tdata_RF[ 1 *16-1 : 1 *16-8 ]    //  data0[15:8]
+	       tx_tdata_RF2[ 1 *16-1 : 1 *16-8 ],   //  data0[15:8]
+	       tx_tdata_RF2[ 2 *16-1 : 2 *16-8 ],   //  data1[15:8]      
+	       tx_tdata_RF2[ 3 *16-1 : 3 *16-8 ],   //  data2[15:8]
+	       tx_tdata_RF2[ 4 *16-1 : 4 *16-8 ]    //  data3[15:8]
 				    } ;   
 assign ad9144_tx_data_tdata_ch3 = {
 	      
-	       tx_tdata_RF[ 4 *16-9 : 4 *16-16],   //  data3[7:0]
-	       tx_tdata_RF[ 3 *16-9 : 3 *16-16],   //  data2[7:0]	      
-	       tx_tdata_RF[ 2 *16-9 : 2 *16-16],   //  data1[7:0]
-	       tx_tdata_RF[ 1 *16-9 : 1 *16-16],   //  data0[7:0]
+	       tx_tdata_RF3[ 1 *16-9 : 1 *16-16],   //  data0[7:0]
+	       tx_tdata_RF3[ 2 *16-9 : 2 *16-16],   //  data1[7:0]	      
+	       tx_tdata_RF3[ 3 *16-9 : 3 *16-16],   //  data2[7:0]
+	       tx_tdata_RF3[ 4 *16-9 : 4 *16-16],   //  data3[7:0]
 	       
-	       tx_tdata_RF[ 4 *16-1 : 4 *16-8 ],   //  data3[15:8]
-	       tx_tdata_RF[ 3 *16-1 : 3 *16-8 ],   //  data2[15:8]      
-	       tx_tdata_RF[ 2 *16-1 : 2 *16-8 ],   //  data1[15:8]
-	       tx_tdata_RF[ 1 *16-1 : 1 *16-8 ]    //  data0[15:8]
+	       tx_tdata_RF3[ 1 *16-1 : 1 *16-8 ],   //  data0[15:8]
+	       tx_tdata_RF3[ 2 *16-1 : 2 *16-8 ],   //  data1[15:8]      
+	       tx_tdata_RF3[ 3 *16-1 : 3 *16-8 ],   //  data2[15:8]
+	       tx_tdata_RF3[ 4 *16-1 : 4 *16-8 ]    //  data3[15:8]
 
-				    } ;  */ 
+				    } ;
 /////////////////////////////////////////////////////////////////////////////				    
  ila_1 ila1_data (
 	.clk(coreclk), // input wire clk

@@ -133,43 +133,43 @@ module wrapper_KU060_custom(
 ////clk
 //wire gty_128_clk;
 // IBUFDS_GTEY #(
-//    .REFCLK_HROW_CK_SEL(2'b00),        // HROWÊ±ÖÓÑ¡Ôñ£¬Í¨³£ÉèÎª00
-//    .CLKCM_CFG("TRUE"),                 // Ê±ÖÓÐ£ÕýÅäÖÃ
-//    .CLKRCV_TRST("TRUE"),               // ½ÓÊÕÆ÷²âÊÔ
-//    .CLKRCV_DLY_B(1'b0),                // ½ÓÊÕÑÓ³Ù
-//    .REFCLK_SRC("REF_PLL"),             // ²Î¿¼Ê±ÖÓÔ´Ñ¡Ôñ
-//    .SIM_DEVICE("ULTRASCALE_PLUS")      // ·ÂÕæÓÃ£¬¸ù¾ÝÊµ¼ÊÐ¾Æ¬ÐÞ¸Ä
+//    .REFCLK_HROW_CK_SEL(2'b00),        // HROWÊ±ï¿½ï¿½Ñ¡ï¿½ï¿½Í¨ï¿½ï¿½ï¿½ï¿½Îª00
+//    .CLKCM_CFG("TRUE"),                 // Ê±ï¿½ï¿½Ð£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+//    .CLKRCV_TRST("TRUE"),               // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+//    .CLKRCV_DLY_B(1'b0),                // ï¿½ï¿½ï¿½ï¿½ï¿½Ó³ï¿½
+//    .REFCLK_SRC("REF_PLL"),             // ï¿½Î¿ï¿½Ê±ï¿½ï¿½Ô´Ñ¡ï¿½ï¿½
+//    .SIM_DEVICE("ULTRASCALE_PLUS")      // ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½Ð¾Æ¬ï¿½Þ¸ï¿½
 //) gty_ibufds_inst (
-//    .O          (gty_128_clk),    // µ¥¶ËÊ±ÖÓÊä³ö
-//    .ODIV2      (),                     // ¶þ·ÖÆµÊä³ö£¨²»ÐèÒª¿ÉÐü¿Õ£©
-//    .I          (gty128_clk_p),         // ²î·ÖÊäÈëP
-//    .IB         (gty128_clk_n)          // ²î·ÖÊäÈëN
+//    .O          (gty_128_clk),    // ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½
+//    .ODIV2      (),                     // ï¿½ï¿½ï¿½ï¿½Æµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½Õ£ï¿½
+//    .I          (gty128_clk_p),         // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½P
+//    .IB         (gty128_clk_n)          // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½N
 //);
 
 //wire global_clk;
 //BUFG_GT bufg_gt_inst (
-//    .O          (global_clk),           // È«¾ÖÊ±ÖÓÊä³ö
-//    .CE         (1'b1),                 // Ê±ÖÓÊ¹ÄÜ£¨¸ßÓÐÐ§£©
-//    .CEMASK     (1'b0),                 // CEÆÁ±Î
-//    .CLR        (1'b0),                 // Òì²½ÇåÁã
-//    .CLRMASK    (1'b0),                 // CLRÆÁ±Î
-//    .DIV        (3'b000),               // ·ÖÆµÏµÊý£º000=²»·ÖÆµ£¬001=2·ÖÆµ...
-//    .I          (gty_128_clk)     // Ê±ÖÓÊäÈë
+//    .O          (global_clk),           // È«ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½
+//    .CE         (1'b1),                 // Ê±ï¿½ï¿½Ê¹ï¿½Ü£ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½
+//    .CEMASK     (1'b0),                 // CEï¿½ï¿½ï¿½ï¿½
+//    .CLR        (1'b0),                 // ï¿½ì²½ï¿½ï¿½ï¿½ï¿½
+//    .CLRMASK    (1'b0),                 // CLRï¿½ï¿½ï¿½ï¿½
+//    .DIV        (3'b000),               // ï¿½ï¿½ÆµÏµï¿½ï¿½ï¿½ï¿½000=ï¿½ï¿½ï¿½ï¿½Æµï¿½ï¿½001=2ï¿½ï¿½Æµ...
+//    .I          (gty_128_clk)     // Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //);
 
 //IBUFDS #(
-//    .DIFF_TERM("FALSE"),        // HR Bank ²»Ö§³Ö£¬±ØÐëÉèÎª FALSE
+//    .DIFF_TERM("FALSE"),        // HR Bank ï¿½ï¿½Ö§ï¿½Ö£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îª FALSE
 //    .IBUF_LOW_PWR("TRUE"),
-//    .IOSTANDARD("DIFF_SSTL18_I") // ¸Ä»Ø²»´ø _DCI µÄ±ê×¼
+//    .IOSTANDARD("DIFF_SSTL18_I") // ï¿½Ä»Ø²ï¿½ï¿½ï¿½ _DCI ï¿½Ä±ï¿½×¼
 //)core_clk_ibufds (
-//    .O  (core_clk_in_buf),        // ×ª»»ºóµÄµ¥¶ËÊ±ÖÓ
-//    .I  (coreclk_p),             // ²î·ÖÕý¶Ë£¨P£©
-//    .IB (coreclk_n)              // ²î·Ö¸º¶Ë£¨N£©
+//    .O  (core_clk_in_buf),        // ×ªï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+//    .I  (coreclk_p),             // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½Pï¿½ï¿½
+//    .IB (coreclk_n)              // ï¿½ï¿½Ö¸ï¿½ï¿½Ë£ï¿½Nï¿½ï¿½
 //);
 IBUFDS core_clk_ibufds (
-    .O  (core_clk_in_buf),        // ×ª»»ºóµÄµ¥¶ËÊ±ÖÓ
-    .I  (coreclk_p),             // ²î·ÖÕý¶Ë£¨P£©
-    .IB (coreclk_n)              // ²î·Ö¸º¶Ë£¨N£©
+    .O  (core_clk_in_buf),        // ×ªï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+    .I  (coreclk_p),             // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½Pï¿½ï¿½
+    .IB (coreclk_n)              // ï¿½ï¿½Ö¸ï¿½ï¿½Ë£ï¿½Nï¿½ï¿½
 );
  BUFG core_clk_in_bufg (
     .I (core_clk_in_buf),
@@ -231,7 +231,7 @@ IBUFDS core_clk_ibufds (
         .lmk048_ld1        (lmk048_ld1),
         .lmk048_ld2        (lmk048_ld2),
 
-        // ADC ADS54J60 SPI ½Ó¿Ú
+        // ADC ADS54J60 SPI ï¿½Ó¿ï¿½
         .ads54j60_sclk     (ads54j60_sclk),
         .ads54j60_sdio     (ads54j60_sdio),
         .ads54j60_cs       (ads54j60_cs),
@@ -239,7 +239,7 @@ IBUFDS core_clk_ibufds (
         .ads54j60_syncse   (ads54j60_syncse),
         .ads54j60_reset    (ads54j60_reset),
 
-        // ADC ADS54J69 SPI ½Ó¿Ú
+        // ADC ADS54J69 SPI ï¿½Ó¿ï¿½
         .ads54j69_sclk     (ads54j69_sclk),
         .ads54j69_sdio     (ads54j69_sdio),
         .ads54j69_cs       (ads54j69_cs),
@@ -247,7 +247,7 @@ IBUFDS core_clk_ibufds (
         .ads54j69_syncse   (ads54j69_syncse),
         .ads54j69_reset    (ads54j69_reset),
 
-        // DAC AD9144 SPI ½Ó¿Ú
+        // DAC AD9144 SPI ï¿½Ó¿ï¿½
         .ad9144_sclk       (ad9144_sclk),
         .ad9144_miso       (ad9144_miso),
         .ad9144_mosi       (ad9144_mosi),
@@ -256,16 +256,16 @@ IBUFDS core_clk_ibufds (
         .ad9144_tx_en0     (ad9144_tx_en0),
         .ad9144_tx_en1     (ad9144_tx_en1),
 
-        // Í¬²½ÊäÈë
+        // Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         .da_sync_out0_p    (da_sync_out0_p),
         .da_sync_out0_n    (da_sync_out0_n),
         .da_sync_out1_p    (da_sync_out1_p),
         .da_sync_out1_n    (da_sync_out1_n),
 
-        // ÉäÆµÊ¹ÄÜ
+        // ï¿½ï¿½ÆµÊ¹ï¿½ï¿½
         .rf_out_en         (rf_out_en),
 
-        // ÓÃ»§LED
+        // ï¿½Ã»ï¿½LED
 //        .user_led          (user_led),
         .ads54j69_adc_data_ch0(ads54j69_adc_data_ch0),
         .ads54j69_adc_data_ch1(ads54j69_adc_data_ch1),
@@ -280,7 +280,7 @@ IBUFDS core_clk_ibufds (
         .ad9144_tx_data_ch1(ad9144_tx_data_ch1),
         .ad9144_tx_data_ch2(ad9144_tx_data_ch2),
         .ad9144_tx_data_ch3(ad9144_tx_data_ch3),        
-        .ad9144_tx_valid (ad9144_tx_valid)                                                       
+        .ad9144_tx_valid (1'b1)                                                       
       
 );  
     wire [63:0] adc_in;
@@ -298,29 +298,29 @@ IBUFDS core_clk_ibufds (
     wire  spi_io_tri;
        
  top #(
-    .ADC_channel_count(4),    // ADC Í¨µÀÊý£¬¿ÉÐÞ¸Ä
-    .DAC_channel_count(4)    // DAC Í¨µÀÊý£¬¿ÉÐÞ¸Ä
+    .ADC_channel_count(4),    // ADC Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Þ¸ï¿½
+    .DAC_channel_count(4)    // DAC Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Þ¸ï¿½
 ) u_top (
-        .clk    (sys_clk),           // ÊäÈëÊ±ÖÓ
-        .rst    (sys_rst),           // ¸´Î»
-        .txd    (uart_txd),           // ´®¿Ú·¢ËÍ
-        .rxd    (uart_rxd),           // ´®¿Ú½ÓÊÕ
-        .err    (err),           // ´íÎóÖ¸Ê¾
+        .clk    (sys_clk),           // ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+        .rst    (sys_rst),           // ï¿½ï¿½Î»
+        .txd    (uart_txd),           // ï¿½ï¿½ï¿½Ú·ï¿½ï¿½ï¿½
+        .rxd    (uart_rxd),           // ï¿½ï¿½ï¿½Ú½ï¿½ï¿½ï¿½
+        .err    (err),           // ï¿½ï¿½ï¿½ï¿½Ö¸Ê¾
 
-        .mosi   (spi_mosi),          // SPI Ö÷³ö´ÓÈë
-        .miso   (spi_miso),          // SPI Ö÷Èë´Ó³ö
-        .sclk   (spi_sclk),          // SPI Ê±ÖÓ
-        .ss     (spi_ss),            // 16 Î»´ÓÉè±¸Ñ¡Ôñ (ss[0]..ss[15])
-        .io_tri (spi_io_tri),        // ÈýÌ¬¿ØÖÆ
+        .mosi   (spi_mosi),          // SPI ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+        .miso   (spi_miso),          // SPI ï¿½ï¿½ï¿½ï¿½Ó³ï¿½
+        .sclk   (spi_sclk),          // SPI Ê±ï¿½ï¿½
+        .ss     (spi_ss),            // 16 Î»ï¿½ï¿½ï¿½è±¸Ñ¡ï¿½ï¿½ (ss[0]..ss[15])
+        .io_tri (spi_io_tri),        // ï¿½ï¿½Ì¬ï¿½ï¿½ï¿½ï¿½
 
-        .adc_in (adc_in),        // ADC ÊäÈë£¬Î»¿í = ADC_channel_count
-        .dac_out({dac_out[3],dac_out[2],dac_out[1],dac_out[0]})        // DAC Êä³ö£¬Î»¿í = DAC_channel_count
+        .adc_in (adc_in),        // ADC ï¿½ï¿½ï¿½ë£¬Î»ï¿½ï¿½ = ADC_channel_count
+        .dac_out({dac_out[3],dac_out[2],dac_out[1],dac_out[0]})        // DAC ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ = DAC_channel_count
 );
 
 assign user_led[0] = ~sys_mmcm_sel; 
 assign user_led[1] = ~(uart_rxd & uart_txd); 
 assign user_led[2] = err;
-assign user_led[3] = ~(&spi_ss);              // ¼ì²âÊÇ·ñÓÐÈÎºÎSPIÆ¬Ñ¡±»Ñ¡ÖÐ
+assign user_led[3] = ~(&spi_ss);              // ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Îºï¿½SPIÆ¬Ñ¡ï¿½ï¿½Ñ¡ï¿½ï¿½
 assign user_led[4] = sys_rst;
 
 
@@ -331,14 +331,14 @@ assign user_led[4] = sys_rst;
 //    .IBUF_LOW_PWR("TRUE"),     // Low power="TRUE", Highest performance="FALSE" 
 //    .IOSTANDARD("LVDS")     // Specify the input I/O standard
 //) sys_clk_ibufds (
-//    .O  (sys_clk_in_buf),        // ×ª»»ºóµÄµ¥¶ËÊ±ÖÓ
-//    .I  (sysclk_p),             // ²î·ÖÕý¶Ë£¨P£©
-//    .IB (sysclk_n)              // ²î·Ö¸º¶Ë£¨N£©
+//    .O  (sys_clk_in_buf),        // ×ªï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+//    .I  (sysclk_p),             // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½Pï¿½ï¿½
+//    .IB (sysclk_n)              // ï¿½ï¿½Ö¸ï¿½ï¿½Ë£ï¿½Nï¿½ï¿½
 //);
 IBUFDS sys_clk_ibufds (
-    .O  (sys_clk_in_buf),        // ×ª»»ºóµÄµ¥¶ËÊ±ÖÓ
-    .I  (sysclk_p),             // ²î·ÖÕý¶Ë£¨P£©
-    .IB (sysclk_n)              // ²î·Ö¸º¶Ë£¨N£©
+    .O  (sys_clk_in_buf),        // ×ªï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+    .I  (sysclk_p),             // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½Pï¿½ï¿½
+    .IB (sysclk_n)              // ï¿½ï¿½Ö¸ï¿½ï¿½Ë£ï¿½Nï¿½ï¿½
 );
  BUFG sys_clk_in_bufg (
     .I (sys_clk_in_buf),
@@ -352,8 +352,8 @@ IBUFDS sys_clk_ibufds (
         .reset (sys_mmcm_rst),
         
         .locked ( sys_clk_locked),
-        .clk_in1 ( sys_clk_in),
-        .clk_in2 ( ),
+        .clk_in1 ( core_clk), // Use 250MHz LMK clk source for jesd204 synchronization
+        .clk_in2 ( ), // Fill in when 250MHz OSC is back alive
         .clk_in_sel ( sys_mmcm_sel )//'1' for sys_clk, '0' for ref_clk
     );   
 //  sys_clk_mmcm1  sys_clk_mmcm1_inst   (
@@ -397,21 +397,21 @@ IBUFDS sys_clk_ibufds (
         .O ( sys_mmcm_sel_cmd_buf),
         .I ( sys_mmcm_sel_cmd_raw)
     );    
-// Àý»¯ debouncer£¨°´¼üÏû¶¶Ä£¿é£©
+// ï¿½ï¿½ï¿½ï¿½ debouncerï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½é£©
 debouncer #(
-    .debounce_time (10),       // 10ms Ïû¶¶Ê±¼ä
-    .default_output(1'b1)      // Ä¬ÈÏÊä³ö¸ßµçÆ½£¨°´¼üÐü¿Õ¸ß£©
+    .debounce_time (10),       // 10ms ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+    .default_output(1'b1)      // Ä¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ßµï¿½Æ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¸ß£ï¿½
 ) sys_mmcm_sel_cmd_debouncer (
     .clk   (sys_clk_in),
-    .rst   (1'b0),             // Ê±ÖÓÇÐ»»ÆÚ¼ä²»¸´Î»Ïû¶¶Æ÷
+    .rst   (1'b0),             // Ê±ï¿½ï¿½ï¿½Ð»ï¿½ï¿½Ú¼ä²»ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     .keyin (sys_mmcm_sel_cmd_buf),
     .keyout(sys_mmcm_sel_cmd)
 );
 
-// Àý»¯ sys_mmcm_sel_ctrl£¨MMCM Ñ¡Ôñ¿ØÖÆÆ÷£©
+// ï¿½ï¿½ï¿½ï¿½ sys_mmcm_sel_ctrlï¿½ï¿½MMCM Ñ¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 sys_mmcm_sel_ctrl sys_mmcm_sel_ctrl_inst (
-    .clk              (sys_clk_in),        // ²»Ê¹ÓÃÀ´×Ô MMCM µÄÊ±ÖÓ
-    .rst              (1'b0),              // Ê±ÖÓÇÐ»»ÆÚ¼ä²»¸´Î»¿ØÖÆÆ÷
+    .clk              (sys_clk_in),        // ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ MMCM ï¿½ï¿½Ê±ï¿½ï¿½
+    .rst              (1'b0),              // Ê±ï¿½ï¿½ï¿½Ð»ï¿½ï¿½Ú¼ä²»ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     .sys_mmcm_sel_cmd (sys_mmcm_sel_cmd),
     .sys_mmcm_sel     (sys_mmcm_sel),
     .sys_mmcm_rst     (sys_mmcm_rst)
@@ -422,14 +422,14 @@ sys_mmcm_sel_ctrl sys_mmcm_sel_ctrl_inst (
    );                         
                        
   
-// Àý»¯ debouncer£¨¸´Î»Ïû¶¶Ä£¿é£©
+// ï¿½ï¿½ï¿½ï¿½ debouncerï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½Ä£ï¿½é£©
 debouncer #(
-    .debounce_time (10),        // 10ms Ïû¶¶Ê±¼ä
-    .default_output(1'b0)       // Ä¬ÈÏÊä³öµÍµçÆ½
+    .debounce_time (10),        // 10ms ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+    .default_output(1'b0)       // Ä¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Íµï¿½Æ½
 ) sys_rst_debouncer (
     .clk   (sys_clk),
-    .rst   (!sys_clk_locked),   // ÉÏµçÊ±¸´Î»ÏµÍ³£¨È¡·´Ê±ÖÓËø¶¨ÐÅºÅ£©
-    .keyin (sys_rst_raw),       // ×¢Òâ£ºÈô¶Ë¿ÚÃûÎª "input"£¬ÔÚ Verilog ÖÐÊÇ¹Ø¼ü×Ö£¬¿ÉÄÜÐèÒª×ªÒå»òÐÞ¸ÄÄ£¿é¶Ë¿ÚÃû
+    .rst   (!sys_clk_locked),   // ï¿½Ïµï¿½Ê±ï¿½ï¿½Î»ÏµÍ³ï¿½ï¿½È¡ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÅºÅ£ï¿½
+    .keyin (sys_rst_raw),       // ×¢ï¿½â£ºï¿½ï¿½ï¿½Ë¿ï¿½ï¿½ï¿½Îª "input"ï¿½ï¿½ï¿½ï¿½ Verilog ï¿½ï¿½ï¿½Ç¹Ø¼ï¿½ï¿½Ö£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òª×ªï¿½ï¿½ï¿½ï¿½Þ¸ï¿½Ä£ï¿½ï¿½Ë¿ï¿½ï¿½ï¿½
     .keyout(sys_rst_bar)
 );    
     

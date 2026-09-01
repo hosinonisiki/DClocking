@@ -189,12 +189,20 @@ doppler_gen doppler_gen(
 	wire[16*4 -1 :0 ] 	pout_atten_i	;
 	wire[16*8 -1 :0 ] 	pout_atten_q	;
 	
-	mult_18x16	mult_18x16_RF[3:0]	(
-		.A		(	reg_dout_pat_i		),
-		.B		(	data_RF_dpl_all		),
-		.CLK	(	dac_clk				),
-		.P		(	pout_atten_i		)
-	);
+	// Instantiate each multiplier separately.  An array of IP instances relies on
+	// tool-specific port-array expansion, which can fail when binding the IP
+	// wrapper; explicit slices make each core's 18x16-bit interface unambiguous.
+	genvar rf_ch;
+	generate
+		for (rf_ch = 0; rf_ch < 4; rf_ch = rf_ch + 1) begin : gen_mult_18x16_rf
+			mult_18x16 mult_18x16_RF (
+				.A   (reg_dout_pat_i),
+				.B   (data_RF_dpl_all[rf_ch*16 +: 16]),
+				.CLK (dac_clk),
+				.P   (pout_atten_i[rf_ch*16 +: 16])
+			);
+		end
+	endgenerate
 //	mult_18x16	mult_18x16_Q[7:0]	(
 //		.A		(	reg_dout_pat_i		),
 //		.B		(	mod_out_temp_Q		),
