@@ -28,6 +28,24 @@ set_property IOSTANDARD LVCMOS18 [get_ports {user_led[2]}]
 set_property IOSTANDARD LVCMOS18 [get_ports {user_led[1]}]
 set_property IOSTANDARD LVCMOS18 [get_ports {user_led[0]}]
 
+# Front-panel LEDs 1..10 (active-low through NVT2010PW)
+set_property PACKAGE_PIN C23 [get_ports {panel_led[0]}]
+set_property PACKAGE_PIN A23 [get_ports {panel_led[1]}]
+set_property PACKAGE_PIN C22 [get_ports {panel_led[2]}]
+set_property PACKAGE_PIN D21 [get_ports {panel_led[3]}]
+set_property PACKAGE_PIN B20 [get_ports {panel_led[4]}]
+set_property PACKAGE_PIN E23 [get_ports {panel_led[5]}]
+set_property PACKAGE_PIN D23 [get_ports {panel_led[6]}]
+set_property PACKAGE_PIN D24 [get_ports {panel_led[7]}]
+set_property PACKAGE_PIN C24 [get_ports {panel_led[8]}]
+set_property PACKAGE_PIN C26 [get_ports {panel_led[9]}]
+set_property IOSTANDARD LVCMOS18 [get_ports {panel_led[*]}]
+
+# Front-panel buttons 1..2 (active-low through NVT2010PW)
+set_property PACKAGE_PIN D25 [get_ports {panel_btn_n[0]}]
+set_property PACKAGE_PIN E25 [get_ports {panel_btn_n[1]}]
+set_property IOSTANDARD LVCMOS18 [get_ports {panel_btn_n[*]}]
+
 set_property PACKAGE_PIN A12 [get_ports {rf_out_en[3]}]
 set_property PACKAGE_PIN A13 [get_ports {rf_out_en[2]}]
 set_property PACKAGE_PIN C13 [get_ports {rf_out_en[1]}]

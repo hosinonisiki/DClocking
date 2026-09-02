@@ -43,7 +43,7 @@ architecture behavioral of spi_trx is
     signal sclk_edge    : std_logic; -- Indicates if sclk is at an edge
     signal sample_edge  : std_logic; -- Indicates if the coming edge is a sample edge
 
-    signal delay_cnt    : unsigned(7 downto 0); -- Delay counter.
+    signal delay_cnt    : unsigned(10 downto 0); -- 1280 cycles requires 11 bits.
 
     signal width        : unsigned(4 downto 0); -- Width of the spi transmission. 0-31 represents 1-32 bits
     signal write_count  : unsigned(4 downto 0); -- Counter for write bits. 0-31 represents 1-32 bits
@@ -65,7 +65,7 @@ begin
                             state <= s_delay_high;
                         end if;
                     when s_delay_high =>
-                        if delay_cnt = to_unsigned(1280, 8) then -- 5us delay at 250MHz clk
+                        if delay_cnt = to_unsigned(1280, delay_cnt'length) then -- 5.12us at 250MHz clk
                             state <= s_load;
                         end if;
                     when s_load =>
@@ -79,7 +79,7 @@ begin
                             state <= s_delay_low;
                         end if;
                     when s_delay_low =>
-                        if delay_cnt = to_unsigned(1280, 8) then -- 5us delay at 250MHz clk
+                        if delay_cnt = to_unsigned(1280, delay_cnt'length) then -- 5.12us at 250MHz clk
                             state <= s_idle;
                         end if;
                     when others =>
@@ -188,7 +188,7 @@ begin
     begin
         if rising_edge(clk) then
             if state = s_delay_high or state = s_delay_low then
-                delay_cnt <= delay_cnt + x"01";
+                delay_cnt <= delay_cnt + 1;
             else
                 delay_cnt <= (others => '0');
             end if;

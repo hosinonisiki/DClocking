@@ -1,6 +1,17 @@
 import spi as sp
 import time
 
+# LMK04828 is fabric SPI slave 0 (UART device P1C1).
+def set_LMK04828_PLL1_reference(spi, external):
+    lmk = sp.SpiChip("P1C1", spi)
+    # R0x147: manual mode, CLKin0 = 0x0A; CLKin1 = 0x1A.
+    return lmk.write("01471A" if external else "01470A")
+
+
+def read_LMK04828_PLL1_lock(spi):
+    lmk = sp.SpiChip("P1C1", spi)
+    return (int(lmk.read("8182"), 16) & 0x02) != 0
+
 def init_ADS54J60(spi, port, chip):
     print("Configuring ADS54J60 on fmc port {}, chip {}".format(port, chip))
     name = "P{}C{}".format(port, chip)
@@ -116,7 +127,7 @@ def init_AD9144(spi, port, chip):  #1G
     chip.write("046CFF")#Deskew lanes
     chip.write("047601")#Deskew lanes
     chip.write("047DFF")#Enable lanes
-	#step 4 PHYSICAL LAYER
+    #step 4 PHYSICAL LAYER
     chip.write("02AAB7")#SERDES interface termination setting
     chip.write("02AB87")#SERDES interface termination setting
     chip.write("02B1B7")#SERDES interface termination setting
@@ -152,20 +163,20 @@ def init_AD9144(spi, port, chip):  #1G
     chip.write("030607") # LMFCDel
     chip.write("030707") # LMFCDel
     chip.write("003A01") # sync mode = one-shot sync
-	chip.write("003A81") #sync mode = one-shot sync
+    chip.write("003A81") #sync mode = one-shot sync
     chip.write("003AC1") #sync mode = one-shot sync
 	
-	chip.write("00E903")#GENERAL_JRX_CTRL_0
-	chip.write("00EDA2")#GENERAL_JRX_CTRL_0	
+    chip.write("00E903")#GENERAL_JRX_CTRL_0
+    chip.write("00EDA2")#GENERAL_JRX_CTRL_0
     time.sleep(0.5)
-	chip.write("030001")#GENERAL_JRX_CTRL_0			
-	time.sleep(0.5)
+    chip.write("030001")#GENERAL_JRX_CTRL_0
+    time.sleep(0.5)
     chip.write("05201c")
     chip.write("0521ff")
     chip.write("05227f")
     chip.write("0523ff")
     chip.write("05247f")
-	time.sleep(0.5)
+    time.sleep(0.5)
 	
 	
 def init_dac0_jesd204c(spi, port, chip):
@@ -325,7 +336,7 @@ def init_lmk04828(spi, port, chip):
     chip.write("0171AA") #  
     chip.write("017202") #  
     chip.write("017C15") #  	
-	chip.write("017D33")
+    chip.write("017D33")
     chip.write("016600") #  
     chip.write("016705") #  
     chip.write("0168DC") #  	
@@ -468,7 +479,7 @@ def init_lmk04828_ext_ref(spi, port, chip):
     chip.write("0171AA") #  
     chip.write("017202") #  
     chip.write("017C15") #  	
-	chip.write("017D33")
+    chip.write("017D33")
     chip.write("016600") #  
     chip.write("016705") #  
     chip.write("0168DC") #  	
@@ -492,5 +503,3 @@ def init_lmk04828_ext_ref(spi, port, chip):
     chip.write("1FFF53") 
  
    
-
-

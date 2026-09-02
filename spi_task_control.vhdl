@@ -14,7 +14,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 use work.mypak.all;
-use work.PZ_KU060_config.all; -- Switch between different config packages
+use work.KU060_custom_config.all;
 
 entity spi_task_control is
     port(
@@ -131,7 +131,7 @@ begin
     process(clk)
     begin
         if rising_edge(clk) then
-                powerup_hold_cnt <= powerup_hold_cnt + x"00000001";
+            powerup_hold_cnt <= powerup_hold_cnt + x"00000001";
         end if;
     end process;
     powerup_hold_done <= '1' when powerup_hold_cnt = powerup_hold_time else '0';
@@ -148,7 +148,9 @@ begin
     process(clk)
     begin
         if rising_edge(clk) then
-            if state = s_query and query_lut_idx = to_unsigned(query_lut_size, 8) then
+            if rst = '1' then
+                query_lut_idx <= (others => '0');
+            elsif state = s_query and query_lut_idx = to_unsigned(query_lut_size, 8) then
                 query_lut_idx <= (others => '0');
             elsif state = s_query_listen and trx_dval_in = '1' then
                 query_lut_idx <= query_lut_idx + x"01";
@@ -159,7 +161,9 @@ begin
     process(clk)
     begin
         if rising_edge(clk) then
-            if query_start = '0' then
+            if rst = '1' then
+                query_cnt <= (others => '0');
+            elsif query_start = '0' then
                 query_cnt <= query_cnt + x"00000001";
             else
                 query_cnt <= (others => '0');
@@ -170,7 +174,9 @@ begin
     process(clk) 
     begin
         if rising_edge(clk) then
-            if query_done = '1' then
+            if rst = '1' then
+                query_start <= '0';
+            elsif query_done = '1' then
                 query_start <= '0';
             elsif query_cnt = query_interval then
                 query_start <= '1';
@@ -182,7 +188,9 @@ begin
     process(clk)
     begin
         if rising_edge(clk) then
-            if trx_spi_en = '1' then
+            if rst = '1' then
+                trx_spi_en <= '0';
+            elsif trx_spi_en = '1' then
                 trx_spi_en <= '0';
             elsif trx_idle_in = '1' then
                 case state is
@@ -222,7 +230,10 @@ begin
     process(clk)
     begin
         if rising_edge(clk) then
-            if state = s_forward_listen and trx_dval_in = '1' then
+            if rst = '1' then
+                cmd_dout <= (others => '0');
+                cmd_dval_out <= '0';
+            elsif state = s_forward_listen and trx_dval_in = '1' then
                 cmd_dout <= trx_din;
                 cmd_dval_out <= '1';
             else
@@ -235,7 +246,9 @@ begin
     process(clk)
     begin
         if rising_edge(clk) then
-            if state = s_query_listen and trx_dval_in = '1' then
+            if rst = '1' then
+                query_result_out <= (others => '0');
+            elsif state = s_query_listen and trx_dval_in = '1' then
                 if (trx_din and query_lut(to_integer(query_lut_idx))(63 downto 32)) = query_lut(to_integer(query_lut_idx))(31 downto 0) then
                     query_result_out(to_integer(query_lut_idx)) <= '1';
                 else
