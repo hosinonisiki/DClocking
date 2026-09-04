@@ -45,6 +45,20 @@ class AgentUiIntegrationTests(unittest.TestCase):
         self.app.processEvents()
         self.assertFalse(chat.isVisible())
 
+    def test_legacy_qt_ui1_entrypoint_registers_agent_workbench(self):
+        from qt_UI1 import create_window
+
+        legacy_window = create_window(settings=self.settings)
+        legacy_window.show()
+        self.app.processEvents()
+        try:
+            self.assertIsNotNone(legacy_window._agent_dock)
+            self.assertIsNotNone(legacy_window._agent_action)
+            self.assertFalse(legacy_window.agent_toggle_btn.isHidden())
+            self.assertFalse(legacy_window.agent_fab.isHidden())
+        finally:
+            legacy_window.close()
+
     def test_hiding_agent_does_not_destroy_messages(self):
         chat = AgentChatWidget(self.window)
         self.window.register_agent_dock(chat)
