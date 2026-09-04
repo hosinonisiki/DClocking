@@ -61,7 +61,7 @@ module wrapper_KU060_custom(
     //spi lmk04828
     output  	    lmk048_clk		,
     output  		lmk048_cs		,
-    output   		lmk048_mosi		,
+    inout   		lmk048_mosi		,
     output    	    lmk048_sync 	,
     input    	    lmk048_ld1 		,
     input    	    lmk048_ld2 		,
@@ -93,6 +93,11 @@ module wrapper_KU060_custom(
     input 			da_sync_out1_n  ,
     output  [3:0]   rf_out_en,
     output  [5:0]   user_led,
+
+    // Front-panel interface (active-low through NVT2010PW)
+    input   [1:0]   panel_btn_n,
+    output  [9:0]   panel_led,
+
     output          uart_txd,  
     input           uart_rxd
 );
@@ -124,57 +129,102 @@ module wrapper_KU060_custom(
     wire sys_clk_250M;
     wire sys_clk_500M;
     wire sys_mmcm_sel_cmd_buf;
+    wire sys_mmcm_sel_cmd_0;
     wire sys_mmcm_sel_cmd;
     wire sys_mmcm_sel;
     wire sys_rst_raw;
     wire sys_rst_bar;
     wire sys_mmcm_rst;
+
+    wire panel_btn0_raw_n;
+    wire panel_btn1_raw_n;
+    wire btn0_n;
+    wire btn1_n;
+    wire core_clk_in_buf;
+    wire core_clk;
+
+    // core_clk is 250 MHz. Ownership changes once, 20 s after MMCM lock.
+    localparam [32:0] SPI_HANDOFF_DELAY_CYCLES = 33'd5000000000;
+    reg [32:0] spi_handoff_cnt = 33'd0;
+    reg        spi_owner = 1'b0;
+    wire       top_rst;
+    wire       spi_mosi;
+    wire       spi_miso;
+    wire       spi_sclk;
+    wire [0:15] spi_ss;
+    wire       spi_io_tri;
+    wire [0:3] spi_query_result;
+    wire       soft_lmk048_clk;
+    wire       soft_lmk048_cs;
+    wire       soft_lmk048_mosi;
+    wire       soft_ads54j60_sclk;
+    wire       soft_ads54j60_sdio;
+    wire       soft_ads54j60_cs;
+    wire       soft_ads54j69_sclk;
+    wire       soft_ads54j69_sdio;
+    wire       soft_ads54j69_cs;
+    wire       soft_ad9144_sclk;
+    wire       soft_ad9144_mosi;
+    wire       soft_ad9144_cs;
     
 ////clk
 //wire gty_128_clk;
 // IBUFDS_GTEY #(
-//    .REFCLK_HROW_CK_SEL(2'b00),        // HROWÊ±ÖÓÑ¡Ôñ£¬Í¨³£ÉèÎª00
-//    .CLKCM_CFG("TRUE"),                 // Ê±ÖÓÐ£ÕýÅäÖÃ
-//    .CLKRCV_TRST("TRUE"),               // ½ÓÊÕÆ÷²âÊÔ
-//    .CLKRCV_DLY_B(1'b0),                // ½ÓÊÕÑÓ³Ù
-//    .REFCLK_SRC("REF_PLL"),             // ²Î¿¼Ê±ÖÓÔ´Ñ¡Ôñ
-//    .SIM_DEVICE("ULTRASCALE_PLUS")      // ·ÂÕæÓÃ£¬¸ù¾ÝÊµ¼ÊÐ¾Æ¬ÐÞ¸Ä
+//    .REFCLK_HROW_CK_SEL(2'b00),        // HROWÊ±ï¿½ï¿½Ñ¡ï¿½ï¿½Í¨ï¿½ï¿½ï¿½ï¿½Îª00
+//    .CLKCM_CFG("TRUE"),                 // Ê±ï¿½ï¿½Ð£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+//    .CLKRCV_TRST("TRUE"),               // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+//    .CLKRCV_DLY_B(1'b0),                // ï¿½ï¿½ï¿½ï¿½ï¿½Ó³ï¿½
+//    .REFCLK_SRC("REF_PLL"),             // ï¿½Î¿ï¿½Ê±ï¿½ï¿½Ô´Ñ¡ï¿½ï¿½
+//    .SIM_DEVICE("ULTRASCALE_PLUS")      // ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½Ð¾Æ¬ï¿½Þ¸ï¿½
 //) gty_ibufds_inst (
-//    .O          (gty_128_clk),    // µ¥¶ËÊ±ÖÓÊä³ö
-//    .ODIV2      (),                     // ¶þ·ÖÆµÊä³ö£¨²»ÐèÒª¿ÉÐü¿Õ£©
-//    .I          (gty128_clk_p),         // ²î·ÖÊäÈëP
-//    .IB         (gty128_clk_n)          // ²î·ÖÊäÈëN
+//    .O          (gty_128_clk),    // ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½
+//    .ODIV2      (),                     // ï¿½ï¿½ï¿½ï¿½Æµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½Õ£ï¿½
+//    .I          (gty128_clk_p),         // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½P
+//    .IB         (gty128_clk_n)          // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½N
 //);
 
 //wire global_clk;
 //BUFG_GT bufg_gt_inst (
-//    .O          (global_clk),           // È«¾ÖÊ±ÖÓÊä³ö
-//    .CE         (1'b1),                 // Ê±ÖÓÊ¹ÄÜ£¨¸ßÓÐÐ§£©
-//    .CEMASK     (1'b0),                 // CEÆÁ±Î
-//    .CLR        (1'b0),                 // Òì²½ÇåÁã
-//    .CLRMASK    (1'b0),                 // CLRÆÁ±Î
-//    .DIV        (3'b000),               // ·ÖÆµÏµÊý£º000=²»·ÖÆµ£¬001=2·ÖÆµ...
-//    .I          (gty_128_clk)     // Ê±ÖÓÊäÈë
+//    .O          (global_clk),           // È«ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½
+//    .CE         (1'b1),                 // Ê±ï¿½ï¿½Ê¹ï¿½Ü£ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½
+//    .CEMASK     (1'b0),                 // CEï¿½ï¿½ï¿½ï¿½
+//    .CLR        (1'b0),                 // ï¿½ì²½ï¿½ï¿½ï¿½ï¿½
+//    .CLRMASK    (1'b0),                 // CLRï¿½ï¿½ï¿½ï¿½
+//    .DIV        (3'b000),               // ï¿½ï¿½ÆµÏµï¿½ï¿½ï¿½ï¿½000=ï¿½ï¿½ï¿½ï¿½Æµï¿½ï¿½001=2ï¿½ï¿½Æµ...
+//    .I          (gty_128_clk)     // Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //);
 
 //IBUFDS #(
-//    .DIFF_TERM("FALSE"),        // HR Bank ²»Ö§³Ö£¬±ØÐëÉèÎª FALSE
+//    .DIFF_TERM("FALSE"),        // HR Bank ï¿½ï¿½Ö§ï¿½Ö£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îª FALSE
 //    .IBUF_LOW_PWR("TRUE"),
-//    .IOSTANDARD("DIFF_SSTL18_I") // ¸Ä»Ø²»´ø _DCI µÄ±ê×¼
+//    .IOSTANDARD("DIFF_SSTL18_I") // ï¿½Ä»Ø²ï¿½ï¿½ï¿½ _DCI ï¿½Ä±ï¿½×¼
 //)core_clk_ibufds (
-//    .O  (core_clk_in_buf),        // ×ª»»ºóµÄµ¥¶ËÊ±ÖÓ
-//    .I  (coreclk_p),             // ²î·ÖÕý¶Ë£¨P£©
-//    .IB (coreclk_n)              // ²î·Ö¸º¶Ë£¨N£©
+//    .O  (core_clk_in_buf),        // ×ªï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+//    .I  (coreclk_p),             // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½Pï¿½ï¿½
+//    .IB (coreclk_n)              // ï¿½ï¿½Ö¸ï¿½ï¿½Ë£ï¿½Nï¿½ï¿½
 //);
 IBUFDS core_clk_ibufds (
-    .O  (core_clk_in_buf),        // ×ª»»ºóµÄµ¥¶ËÊ±ÖÓ
-    .I  (coreclk_p),             // ²î·ÖÕý¶Ë£¨P£©
-    .IB (coreclk_n)              // ²î·Ö¸º¶Ë£¨N£©
+    .O  (core_clk_in_buf),        // ×ªï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+    .I  (coreclk_p),             // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½Pï¿½ï¿½
+    .IB (coreclk_n)              // ï¿½ï¿½Ö¸ï¿½ï¿½Ë£ï¿½Nï¿½ï¿½
 );
  BUFG core_clk_in_bufg (
     .I (core_clk_in_buf),
     .O (core_clk)
 ); 
+
+always @(posedge core_clk) begin
+    if (!spi_owner) begin
+        if (!sys_clk_locked)
+            spi_handoff_cnt <= 33'd0;
+        else if (spi_handoff_cnt == SPI_HANDOFF_DELAY_CYCLES - 1'b1)
+            spi_owner <= 1'b1;
+        else
+            spi_handoff_cnt <= spi_handoff_cnt + 1'b1;
+    end
+end
+
+assign top_rst = sys_rst | ~spi_owner;
 //wire core_clk_200M;
 //  clk_wiz_0 inst_core_clk
 //  (
@@ -190,7 +240,8 @@ IBUFDS core_clk_ibufds (
 //  );    
 
          
-    board_ku060_adda_top  u_adda_top(  
+    board_ku060_adda_top  u_adda_top( 
+        .rst    (sys_rst), 
         .ads54j60_A_n(ads54j60_A_n),
         .ads54j60_A_p(ads54j60_A_p),
         .ads54j60_B_n(ads54j60_B_n),
@@ -221,50 +272,50 @@ IBUFDS core_clk_ibufds (
         .sysrefclk_p(sysrefclk_p),        
 //        .coreclk_n(coreclk_n),
 //        .coreclk_p(coreclk_p),
-        .coreclk(core_clk),
+        .coreclk(sys_clk),
    // LMK048 ad9144_cs
-        .lmk048_clk        (lmk048_clk),
-        .lmk048_cs         (lmk048_cs),
-        .lmk048_mosi       (lmk048_mosi),
+        .lmk048_clk        (soft_lmk048_clk),
+        .lmk048_cs         (soft_lmk048_cs),
+        .lmk048_mosi       (soft_lmk048_mosi),
         .lmk048_sync       (lmk048_sync),
         .lmk048_ld1        (lmk048_ld1),
         .lmk048_ld2        (lmk048_ld2),
 
-        // ADC ADS54J60 SPI ½Ó¿Ú
-        .ads54j60_sclk     (ads54j60_sclk),
-        .ads54j60_sdio     (ads54j60_sdio),
-        .ads54j60_cs       (ads54j60_cs),
+        // ADC ADS54J60 SPI ï¿½Ó¿ï¿½
+        .ads54j60_sclk     (soft_ads54j60_sclk),
+        .ads54j60_sdio     (soft_ads54j60_sdio),
+        .ads54j60_cs       (soft_ads54j60_cs),
         .ads54j60_sdin     (ads54j60_sdin),
         .ads54j60_syncse   (ads54j60_syncse),
         .ads54j60_reset    (ads54j60_reset),
 
-        // ADC ADS54J69 SPI ½Ó¿Ú
-        .ads54j69_sclk     (ads54j69_sclk),
-        .ads54j69_sdio     (ads54j69_sdio),
-        .ads54j69_cs       (ads54j69_cs),
+        // ADC ADS54J69 SPI ï¿½Ó¿ï¿½
+        .ads54j69_sclk     (soft_ads54j69_sclk),
+        .ads54j69_sdio     (soft_ads54j69_sdio),
+        .ads54j69_cs       (soft_ads54j69_cs),
         .ads54j69_sdin     (ads54j69_sdin),
         .ads54j69_syncse   (ads54j69_syncse),
         .ads54j69_reset    (ads54j69_reset),
 
-        // DAC AD9144 SPI ½Ó¿Ú
-        .ad9144_sclk       (ad9144_sclk),
+        // DAC AD9144 SPI ï¿½Ó¿ï¿½
+        .ad9144_sclk       (soft_ad9144_sclk),
         .ad9144_miso       (ad9144_miso),
-        .ad9144_mosi       (ad9144_mosi),
+        .ad9144_mosi       (soft_ad9144_mosi),
         .ad9144_irq        (ad9144_irq),
-        .ad9144_cs         (ad9144_cs),
+        .ad9144_cs         (soft_ad9144_cs),
         .ad9144_tx_en0     (ad9144_tx_en0),
         .ad9144_tx_en1     (ad9144_tx_en1),
 
-        // Í¬²½ÊäÈë
+        // Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         .da_sync_out0_p    (da_sync_out0_p),
         .da_sync_out0_n    (da_sync_out0_n),
         .da_sync_out1_p    (da_sync_out1_p),
         .da_sync_out1_n    (da_sync_out1_n),
 
-        // ÉäÆµÊ¹ÄÜ
+        // ï¿½ï¿½ÆµÊ¹ï¿½ï¿½
         .rf_out_en         (rf_out_en),
 
-        // ÓÃ»§LED
+        // ï¿½Ã»ï¿½LED
 //        .user_led          (user_led),
         .ads54j69_adc_data_ch0(ads54j69_adc_data_ch0),
         .ads54j69_adc_data_ch1(ads54j69_adc_data_ch1),
@@ -279,48 +330,79 @@ IBUFDS core_clk_ibufds (
         .ad9144_tx_data_ch1(ad9144_tx_data_ch1),
         .ad9144_tx_data_ch2(ad9144_tx_data_ch2),
         .ad9144_tx_data_ch3(ad9144_tx_data_ch3),        
-        .ad9144_tx_valid (ad9144_tx_valid)                                                       
+        .ad9144_tx_valid (1'b1)                                                       
       
-);  
-    wire [63:0] adc_in;
-    wire [15:0] dac_out[0:3];
-    assign adc_in = {ads54j60_adc_data_ch1,ads54j60_adc_data_ch0,ads54j69_adc_data_ch1,ads54j69_adc_data_ch0};
-    assign ad9144_tx_data_ch0 = dac_out[0]; 
-    assign ad9144_tx_data_ch1 = dac_out[1]; 
-    assign ad9144_tx_data_ch2 = dac_out[2];      
-    assign ad9144_tx_data_ch3 = dac_out[3]; 
+);
+
+// Board-level SPI ownership mux. Soft-core channels are 0/6/7/10.
+assign lmk048_clk  = spi_owner ? spi_sclk  : soft_lmk048_clk;
+assign lmk048_cs   = spi_owner ? spi_ss[0] : soft_lmk048_cs;
+assign lmk048_mosi = spi_owner
+                   ? (spi_io_tri ? 1'bz : spi_mosi)
+                   : soft_lmk048_mosi;
+
+assign ads54j60_sclk = spi_owner ? spi_sclk  : soft_ads54j60_sclk;
+assign ads54j60_sdio = spi_owner ? spi_mosi  : soft_ads54j60_sdio;
+assign ads54j60_cs   = spi_owner ? spi_ss[6] : soft_ads54j60_cs;
+
+assign ads54j69_sclk = spi_owner ? spi_sclk  : soft_ads54j69_sclk;
+assign ads54j69_sdio = spi_owner ? spi_mosi  : soft_ads54j69_sdio;
+assign ads54j69_cs   = spi_owner ? spi_ss[7] : soft_ads54j69_cs;
+
+assign ad9144_sclk = spi_owner ? spi_sclk   : soft_ad9144_sclk;
+assign ad9144_mosi = spi_owner ? spi_mosi   : soft_ad9144_mosi;
+assign ad9144_cs   = spi_owner ? spi_ss[10] : soft_ad9144_cs;
+
+assign spi_miso = !spi_ss[0]  ? lmk048_mosi   :
+                  !spi_ss[6]  ? ads54j60_sdin :
+                  !spi_ss[7]  ? ads54j69_sdin :
+                  !spi_ss[10] ? ad9144_miso   : 1'b0;
+wire [63:0] adc_in;
+wire [15:0] dac_out[0:3];
+assign adc_in = {ads54j60_adc_data_ch1,ads54j60_adc_data_ch0,ads54j69_adc_data_ch1,ads54j69_adc_data_ch0};
+assign ad9144_tx_data_ch0 = dac_out[0]; 
+assign ad9144_tx_data_ch1 = dac_out[1]; 
+assign ad9144_tx_data_ch2 = dac_out[2];      
+assign ad9144_tx_data_ch3 = dac_out[3]; 
     
-    wire  spi_mosi;  
-    wire  spi_miso;
-    wire  spi_sclk;
-    wire  spi_ss;
-    wire  spi_io_tri;
-       
  top #(
-    .ADC_channel_count(4),    // ADC Í¨µÀÊý£¬¿ÉÐÞ¸Ä
-    .DAC_channel_count(4)    // DAC Í¨µÀÊý£¬¿ÉÐÞ¸Ä
+    .ADC_channel_count(4),    // ADC Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Þ¸ï¿½
+    .DAC_channel_count(4)    // DAC Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Þ¸ï¿½
 ) u_top (
-        .clk    (sys_clk),           // ÊäÈëÊ±ÖÓ
-        .rst    (sys_rst),           // ¸´Î»
-        .txd    (uart_txd),           // ´®¿Ú·¢ËÍ
-        .rxd    (uart_rxd),           // ´®¿Ú½ÓÊÕ
-        .err    (err),           // ´íÎóÖ¸Ê¾
+        .clk    (sys_clk),           // ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+        .rst    (top_rst),           // Hold main logic until SPI handoff
+        .txd    (uart_txd),           // ï¿½ï¿½ï¿½Ú·ï¿½ï¿½ï¿½
+        .rxd    (uart_rxd),           // ï¿½ï¿½ï¿½Ú½ï¿½ï¿½ï¿½
+        .err    (err),           // ï¿½ï¿½ï¿½ï¿½Ö¸Ê¾
 
-        .mosi   (spi_mosi),          // SPI Ö÷³ö´ÓÈë
-        .miso   (spi_miso),          // SPI Ö÷Èë´Ó³ö
-        .sclk   (spi_sclk),          // SPI Ê±ÖÓ
-        .ss     (spi_ss),            // 16 Î»´ÓÉè±¸Ñ¡Ôñ (ss[0]..ss[15])
-        .io_tri (spi_io_tri),        // ÈýÌ¬¿ØÖÆ
+        .mosi   (spi_mosi),          // SPI ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+        .miso   (spi_miso),          // SPI ï¿½ï¿½ï¿½ï¿½Ó³ï¿½
+        .sclk   (spi_sclk),          // SPI Ê±ï¿½ï¿½
+        .ss     (spi_ss),            // 16 Î»ï¿½ï¿½ï¿½è±¸Ñ¡ï¿½ï¿½ (ss[0]..ss[15])
+        .io_tri (spi_io_tri),        // ï¿½ï¿½Ì¬ï¿½ï¿½ï¿½ï¿½
+        .query_result(spi_query_result),
 
-        .adc_in (adc_in),        // ADC ÊäÈë£¬Î»¿í = ADC_channel_count
-        .dac_out({dac_out[3],dac_out[2],dac_out[1],dac_out[0]})        // DAC Êä³ö£¬Î»¿í = DAC_channel_count
+        .adc_in (adc_in),        // ADC ï¿½ï¿½ï¿½ë£¬Î»ï¿½ï¿½ = ADC_channel_count
+        .dac_out({dac_out[3],dac_out[2],dac_out[1],dac_out[0]})        // DAC ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ = DAC_channel_count
 );
 
 assign user_led[0] = ~sys_mmcm_sel; 
 assign user_led[1] = ~(uart_rxd & uart_txd); 
 assign user_led[2] = err;
-assign user_led[3] = ~(&spi_ss);              // ¼ì²âÊÇ·ñÓÐÈÎºÎSPIÆ¬Ñ¡±»Ñ¡ÖÐ
+assign user_led[3] = ~(&spi_ss);              // ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Îºï¿½SPIÆ¬Ñ¡ï¿½ï¿½Ñ¡ï¿½ï¿½
 assign user_led[4] = sys_rst;
+
+// One active-low LED is selected at a time. LED0 is the reset state.
+assign panel_led[0] = 1'b1;
+assign panel_led[1] = sys_clk_locked;
+assign panel_led[2] = spi_owner;
+assign panel_led[3] = ~sys_mmcm_sel;
+assign panel_led[4] = spi_query_result[0]; // LMK PLL1 digital lock status
+assign panel_led[5] = ~(uart_rxd & uart_txd); 
+assign panel_led[6] = ~(&spi_ss);
+assign panel_led[7] = 1'b0; // Reserved
+assign panel_led[8] = err;
+assign panel_led[9] = sys_rst;
 
 
 
@@ -330,14 +412,14 @@ assign user_led[4] = sys_rst;
 //    .IBUF_LOW_PWR("TRUE"),     // Low power="TRUE", Highest performance="FALSE" 
 //    .IOSTANDARD("LVDS")     // Specify the input I/O standard
 //) sys_clk_ibufds (
-//    .O  (sys_clk_in_buf),        // ×ª»»ºóµÄµ¥¶ËÊ±ÖÓ
-//    .I  (sysclk_p),             // ²î·ÖÕý¶Ë£¨P£©
-//    .IB (sysclk_n)              // ²î·Ö¸º¶Ë£¨N£©
+//    .O  (sys_clk_in_buf),        // ×ªï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+//    .I  (sysclk_p),             // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½Pï¿½ï¿½
+//    .IB (sysclk_n)              // ï¿½ï¿½Ö¸ï¿½ï¿½Ë£ï¿½Nï¿½ï¿½
 //);
 IBUFDS sys_clk_ibufds (
-    .O  (sys_clk_in_buf),        // ×ª»»ºóµÄµ¥¶ËÊ±ÖÓ
-    .I  (sysclk_p),             // ²î·ÖÕý¶Ë£¨P£©
-    .IB (sysclk_n)              // ²î·Ö¸º¶Ë£¨N£©
+    .O  (sys_clk_in_buf),        // ×ªï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+    .I  (sysclk_p),             // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½Pï¿½ï¿½
+    .IB (sysclk_n)              // ï¿½ï¿½Ö¸ï¿½ï¿½Ë£ï¿½Nï¿½ï¿½
 );
  BUFG sys_clk_in_bufg (
     .I (sys_clk_in_buf),
@@ -351,8 +433,8 @@ IBUFDS sys_clk_ibufds (
         .reset (sys_mmcm_rst),
         
         .locked ( sys_clk_locked),
-        .clk_in1 ( sys_clk_in),
-        .clk_in2 ( core_clk),
+        .clk_in1 ( core_clk), // Use 250MHz LMK clk source for jesd204 synchronization
+        .clk_in2 ( ), // Fill in when 250MHz OSC is back alive
         .clk_in_sel ( sys_mmcm_sel )//'1' for sys_clk, '0' for ref_clk
     );   
 //  sys_clk_mmcm1  sys_clk_mmcm1_inst   (
@@ -396,21 +478,22 @@ IBUFDS sys_clk_ibufds (
         .O ( sys_mmcm_sel_cmd_buf),
         .I ( sys_mmcm_sel_cmd_raw)
     );    
-// Àý»¯ debouncer£¨°´¼üÏû¶¶Ä£¿é£©
+// ï¿½ï¿½ï¿½ï¿½ debouncerï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½é£©
 debouncer #(
-    .debounce_time (10),       // 10ms Ïû¶¶Ê±¼ä
-    .default_output(1'b1)      // Ä¬ÈÏÊä³ö¸ßµçÆ½£¨°´¼üÐü¿Õ¸ß£©
+    .debounce_time (10),       // 10ms ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+    .default_output(1'b1)      // Ä¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ßµï¿½Æ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¸ß£ï¿½
 ) sys_mmcm_sel_cmd_debouncer (
     .clk   (sys_clk_in),
-    .rst   (1'b0),             // Ê±ÖÓÇÐ»»ÆÚ¼ä²»¸´Î»Ïû¶¶Æ÷
+    .rst   (1'b0),             // Ê±ï¿½ï¿½ï¿½Ð»ï¿½ï¿½Ú¼ä²»ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     .keyin (sys_mmcm_sel_cmd_buf),
-    .keyout(sys_mmcm_sel_cmd)
+    .keyout(sys_mmcm_sel_cmd_0)
 );
+assign sys_mmcm_sel_cmd = sys_mmcm_sel_cmd_0 & btn0_n;
 
-// Àý»¯ sys_mmcm_sel_ctrl£¨MMCM Ñ¡Ôñ¿ØÖÆÆ÷£©
+// ï¿½ï¿½ï¿½ï¿½ sys_mmcm_sel_ctrlï¿½ï¿½MMCM Ñ¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 sys_mmcm_sel_ctrl sys_mmcm_sel_ctrl_inst (
-    .clk              (sys_clk_in),        // ²»Ê¹ÓÃÀ´×Ô MMCM µÄÊ±ÖÓ
-    .rst              (1'b0),              // Ê±ÖÓÇÐ»»ÆÚ¼ä²»¸´Î»¿ØÖÆÆ÷
+    .clk              (sys_clk_in),        // ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ MMCM ï¿½ï¿½Ê±ï¿½ï¿½
+    .rst              (1'b0),              // Ê±ï¿½ï¿½ï¿½Ð»ï¿½ï¿½Ú¼ä²»ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     .sys_mmcm_sel_cmd (sys_mmcm_sel_cmd),
     .sys_mmcm_sel     (sys_mmcm_sel),
     .sys_mmcm_rst     (sys_mmcm_rst)
@@ -421,18 +504,49 @@ sys_mmcm_sel_ctrl sys_mmcm_sel_ctrl_inst (
    );                         
                        
   
-// Àý»¯ debouncer£¨¸´Î»Ïû¶¶Ä£¿é£©
+// ï¿½ï¿½ï¿½ï¿½ debouncerï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½Ä£ï¿½é£©
 debouncer #(
-    .debounce_time (10),        // 10ms Ïû¶¶Ê±¼ä
-    .default_output(1'b0)       // Ä¬ÈÏÊä³öµÍµçÆ½
+    .debounce_time (10),        // 10ms ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+    .default_output(1'b0)       // Ä¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Íµï¿½Æ½
 ) sys_rst_debouncer (
     .clk   (sys_clk),
-    .rst   (!sys_clk_locked),   // ÉÏµçÊ±¸´Î»ÏµÍ³£¨È¡·´Ê±ÖÓËø¶¨ÐÅºÅ£©
-    .keyin (sys_rst_raw),       // ×¢Òâ£ºÈô¶Ë¿ÚÃûÎª "input"£¬ÔÚ Verilog ÖÐÊÇ¹Ø¼ü×Ö£¬¿ÉÄÜÐèÒª×ªÒå»òÐÞ¸ÄÄ£¿é¶Ë¿ÚÃû
+    .rst   (!sys_clk_locked),   // ï¿½Ïµï¿½Ê±ï¿½ï¿½Î»ÏµÍ³ï¿½ï¿½È¡ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÅºÅ£ï¿½
+    .keyin (sys_rst_raw),       // ×¢ï¿½â£ºï¿½ï¿½ï¿½Ë¿ï¿½ï¿½ï¿½Îª "input"ï¿½ï¿½ï¿½ï¿½ Verilog ï¿½ï¿½ï¿½Ç¹Ø¼ï¿½ï¿½Ö£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òª×ªï¿½ï¿½ï¿½ï¿½Þ¸ï¿½Ä£ï¿½ï¿½Ë¿ï¿½ï¿½ï¿½
     .keyout(sys_rst_bar)
-);    
+);
+
+// Front-panel buttons use the same IBUF -> debouncer path as sys_rst.
+IBUF panel_btn0_ibuf (
+    .O (panel_btn0_raw_n),
+    .I (panel_btn_n[0])
+);
+
+IBUF panel_btn1_ibuf (
+    .O (panel_btn1_raw_n),
+    .I (panel_btn_n[1])
+);
+
+debouncer #(
+    .debounce_time  (10),
+    .default_output(1'b1)
+) panel_btn0_debouncer (
+    .clk   (sys_clk_in),
+    .rst   (1'b0),
+    .keyin (panel_btn0_raw_n),
+    .keyout(btn0_n)
+);
+
+debouncer #(
+    .debounce_time  (10),
+    .default_output(1'b1)
+) panel_btn1_debouncer (
+    .clk   (sys_clk),
+    .rst   (!sys_clk_locked),
+    .keyin (panel_btn1_raw_n),
+    .keyout(btn1_n)
+);
     
- assign  sys_rst = ~ sys_rst_bar;     
+ assign  sys_rst = (~sys_rst_bar) | (~btn1_n);
  ila_0 ila_data (
 	.clk(sys_clk), // input wire clk
 	.probe0(sys_rst_raw), // input wire [63:0]  probe0  
