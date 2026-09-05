@@ -7,6 +7,7 @@ for the chat UI to consume.
 from __future__ import annotations
 
 import json
+import threading
 import time
 import traceback
 
@@ -21,6 +22,7 @@ class AgentCore(QObject):
     tool_executed = Signal(str, str, str)  # tool_name, args_json, result_json
     thinking_started = Signal()
     thinking_stopped = Signal()
+    generation_cancelled = Signal()
     error_occurred = Signal(str)
 
     def __init__(self, llm_client, tool_executor, module_registry,
@@ -41,6 +43,7 @@ class AgentCore(QObject):
 
         # Worker thread
         self._worker = None
+        self._messages_at_cancel_boundary = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -54,6 +57,11 @@ class AgentCore(QObject):
         """Process a user message — runs LLM loop in background thread."""
         from tool_definitions import TOOLS
 
+        if self._worker is not None and self._worker.isRunning():
+            return False
+        if not user_text.strip():
+            return False
+
         # Build messages
         if not self._messages:
             self._messages.append({
@@ -61,6 +69,9 @@ class AgentCore(QObject):
                 "content": self._system_prompt,
             })
         self._messages.append({"role": "user", "content": user_text})
+        # On cancellation, keep the submitted user turn but discard any
+        # incomplete assistant/tool protocol messages from that turn.
+        self._messages_at_cancel_boundary = list(self._messages)
 
         self.thinking_started.emit()
 
@@ -73,22 +84,72 @@ class AgentCore(QObject):
             max_iterations=self._max_iterations,
             bridge=self._bridge,
         )
-        self._worker.finished.connect(self._on_worker_finished)
+        # QThread.finished is the state barrier for restoring the send button.
+        # Custom signals emitted inside run() can arrive while isRunning() is
+        # still true, which makes an immediate next message disappear.
+        self._worker.finished.connect(self._on_worker_terminated)
         self._worker.tool_call_started.connect(self._on_tool_started)
         self._worker.tool_call_finished.connect(self._on_tool_finished)
-        self._worker.error.connect(self._on_error)
         self._worker.start()
+        return True
+
+    def stop_generation(self):
+        """Cancel the active LLM turn without terminating its QThread."""
+        if self._worker is None or not self._worker.isRunning():
+            return False
+        return self._worker.cancel()
+
+    def shutdown(self, timeout_ms: int | None = None) -> bool:
+        """Cancel and join the worker before its QThread can be destroyed.
+
+        LLM transport cancellation is immediate. An already-running tool call
+        is treated as an atomic operation and is allowed to return safely.
+        """
+        if self._worker is None or not self._worker.isRunning():
+            return True
+        self._worker.cancel()
+        if timeout_ms is None:
+            return self._worker.wait()
+        return self._worker.wait(timeout_ms)
 
     # ------------------------------------------------------------------
     # Slots
     # ------------------------------------------------------------------
 
-    def _on_worker_finished(self, final_text: str, messages: list[dict]):
-        """Called when the LLM loop completes."""
-        self._messages = messages
+    def _on_worker_terminated(self):
+        """Publish a worker outcome only after QThread has fully stopped."""
+        worker = self.sender()
+        if worker is not self._worker:
+            return
+        outcome = worker.outcome
+        if outcome == "completed":
+            self._messages = worker.messages
+            self._messages_at_cancel_boundary = None
+            self.thinking_stopped.emit()
+            if worker.final_text:
+                self.response_ready.emit(worker.final_text)
+            return
+        if outcome == "cancelled":
+            self._on_worker_cancelled(worker.messages)
+            return
+        self._messages_at_cancel_boundary = None
         self.thinking_stopped.emit()
-        if final_text:
-            self.response_ready.emit(final_text)
+        self.error_occurred.emit(worker.error_text or "Agent worker failed")
+
+    def _on_worker_cancelled(self, _messages: list[dict]):
+        """Restore a clean history and notify the UI after cancellation."""
+        boundary = self._messages_at_cancel_boundary
+        if boundary is not None:
+            partial_turn = _messages[len(boundary):]
+            if any(message.get("role") == "tool" for message in partial_turn):
+                # Completed atomic tool effects must remain in history so the
+                # next turn agrees with the current canvas/hardware state.
+                self._messages = _messages
+            else:
+                self._messages = boundary
+        self._messages_at_cancel_boundary = None
+        self.thinking_stopped.emit()
+        self.generation_cancelled.emit()
 
     def _on_tool_started(self, tool_name: str, args: dict):
         """Called when a tool begins execution."""
@@ -99,11 +160,6 @@ class AgentCore(QObject):
         """Called when a tool finishes."""
         # Update the last emitted signal (we re-emit with result)
         pass
-
-    def _on_error(self, error_text: str):
-        """Called on error."""
-        self.thinking_stopped.emit()
-        self.error_occurred.emit(error_text)
 
     # ------------------------------------------------------------------
     # System prompt
@@ -178,10 +234,8 @@ Internal (short) names are used in tool calls:
 class _AgentWorker(QThread):
     """Runs the LLM function-calling loop in a background thread."""
 
-    finished = Signal(str, list)        # final_text, messages
     tool_call_started = Signal(str, dict)  # tool_name, args
     tool_call_finished = Signal(str, str)  # tool_name, result_json
-    error = Signal(str)
 
     def __init__(self, llm, tools_def, tool_executor, messages,
                  max_iterations, bridge, parent=None):
@@ -192,27 +246,69 @@ class _AgentWorker(QThread):
         self._messages = messages
         self._max_iter = max_iterations
         self._bridge = bridge
+        self._cancel_event = threading.Event()
+        self._request_id = object()
+        self.outcome = None
+        self.final_text = ""
+        self.error_text = ""
+
+    @property
+    def messages(self) -> list[dict]:
+        return self._messages
+
+    def cancel(self) -> bool:
+        """Request cooperative cancellation and abort active network I/O."""
+        if self._cancel_event.is_set():
+            return False
+        self._cancel_event.set()
+        self.requestInterruption()
+        cancel_request = getattr(self._llm, "cancel_request", None)
+        if callable(cancel_request):
+            try:
+                cancel_request(self._request_id)
+            except Exception:
+                pass
+        return True
 
     def run(self):
         try:
-            final_text = self._loop()
-            self.finished.emit(final_text, self._messages)
+            self.final_text = self._loop()
+            self._raise_if_cancelled()
+            self.outcome = "completed"
+        except _AgentCancelled:
+            self._complete_cancelled_tool_protocol()
+            self.outcome = "cancelled"
         except Exception as e:
-            self.error.emit(f"Agent error: {e}\n{traceback.format_exc()}")
+            if self._cancel_event.is_set() or self.isInterruptionRequested():
+                self._complete_cancelled_tool_protocol()
+                self.outcome = "cancelled"
+            else:
+                self.outcome = "error"
+                self.error_text = (
+                    f"Agent error: {e}\n{traceback.format_exc()}"
+                )
 
     def _loop(self) -> str:
         from llm_client import LLMError
 
         for iteration in range(self._max_iter):
+            self._raise_if_cancelled()
             try:
-                response = self._llm.chat(self._messages, self._tools_def)
+                response = self._llm.chat(
+                    self._messages,
+                    self._tools_def,
+                    cancel_event=self._cancel_event,
+                    request_id=self._request_id,
+                )
             except LLMError as e:
+                self._raise_if_cancelled()
                 self._messages.append({
                     "role": "assistant",
                     "content": f"API error: {e}",
                 })
-                self.finished.emit(f"LLM API 错误: {e}", self._messages)
                 return f"❌ LLM API 错误: {e}"
+
+            self._raise_if_cancelled()
 
             # Extract assistant message
             content = response.get("content") or ""
@@ -232,6 +328,7 @@ class _AgentWorker(QThread):
 
             # Execute each tool call
             for tc in tool_calls:
+                self._raise_if_cancelled()
                 fn = tc.get("function", {})
                 tool_name = fn.get("name", "")
                 try:
@@ -250,9 +347,11 @@ class _AgentWorker(QThread):
                     "tool_call_id": tc.get("id", ""),
                     "content": result_str,
                 })
+                self._raise_if_cancelled()
 
             # Auto-layout after modifications
             if self._bridge and tool_calls:
+                self._raise_if_cancelled()
                 try:
                     self._bridge.auto_layout()
                 except Exception:
@@ -265,3 +364,46 @@ class _AgentWorker(QThread):
         )
         self._messages.append({"role": "assistant", "content": msg})
         return msg
+
+    def _raise_if_cancelled(self):
+        if self._cancel_event.is_set() or self.isInterruptionRequested():
+            raise _AgentCancelled()
+
+    def _complete_cancelled_tool_protocol(self):
+        """Close any partial tool-call protocol without executing more tools."""
+        assistant_index = None
+        tool_calls = []
+        for index in range(len(self._messages) - 1, -1, -1):
+            message = self._messages[index]
+            if message.get("role") == "user":
+                break
+            if message.get("role") == "assistant" and message.get("tool_calls"):
+                assistant_index = index
+                tool_calls = message["tool_calls"]
+                break
+        if assistant_index is None:
+            return
+
+        completed_ids = {
+            message.get("tool_call_id")
+            for message in self._messages[assistant_index + 1:]
+            if message.get("role") == "tool"
+        }
+        for tool_call in tool_calls:
+            tool_call_id = tool_call.get("id", "")
+            if tool_call_id not in completed_ids:
+                self._messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": json.dumps({
+                        "error": "Cancelled before execution"
+                    }),
+                })
+        self._messages.append({
+            "role": "assistant",
+            "content": "Generation stopped by user.",
+        })
+
+
+class _AgentCancelled(Exception):
+    """Internal control-flow exception for a user-requested cancellation."""

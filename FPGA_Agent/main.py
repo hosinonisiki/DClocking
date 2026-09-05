@@ -81,6 +81,7 @@ def create_window(settings=None):
 
     # ---- Wire signals ----
     chat.user_message_submitted.connect(agent.send_message)
+    chat.cancel_requested.connect(agent.stop_generation)
 
     agent.response_ready.connect(chat.add_assistant_message)
     agent.thinking_started.connect(lambda: chat.set_thinking(True))
@@ -88,9 +89,16 @@ def create_window(settings=None):
     agent.error_occurred.connect(
         lambda err: chat.add_system_message(f"Error: {err}")
     )
+    agent.generation_cancelled.connect(
+        lambda: chat.add_system_message("已停止生成")
+    )
     agent.tool_executed.connect(
         lambda name, args, result: chat.add_tool_call(name, args, result)
     )
+
+    app = QApplication.instance()
+    if app is not None:
+        app.aboutToQuit.connect(agent.shutdown)
 
     # ---- Welcome message ----
     chat.add_assistant_message(

@@ -28,6 +28,7 @@ class AgentChatWidget(QDockWidget):
     """Dockable chat panel for the FPGA Agent."""
 
     user_message_submitted = Signal(str)
+    cancel_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__("FPGA Agent", parent)
@@ -86,6 +87,12 @@ class AgentChatWidget(QDockWidget):
         self._thinking_label.setVisible(False)
         layout.addWidget(self._thinking_label)
 
+        self._is_thinking = False
+        self._cancel_pending = False
+        self._thinking_dots = 0
+        self._think_timer = QTimer(self)
+        self._think_timer.timeout.connect(self._update_thinking_dots)
+
         # Input area
         input_row = QHBoxLayout()
         self._input = QPlainTextEdit()
@@ -95,10 +102,13 @@ class AgentChatWidget(QDockWidget):
         self._input.installEventFilter(self)
         input_row.addWidget(self._input)
 
-        self._send_btn = QPushButton("发送")
+        self._send_btn = QPushButton("↑")
         self._send_btn.setObjectName("send_button")
+        self._send_btn.setProperty("mode", "send")
+        self._send_btn.setFixedSize(48, 48)
         self._send_btn.setAccessibleName("发送 Agent 消息")
-        self._send_btn.clicked.connect(self._send_message)
+        self._send_btn.setToolTip("发送（Enter）")
+        self._send_btn.clicked.connect(self._handle_primary_action)
         input_row.addWidget(self._send_btn)
 
         layout.addLayout(input_row)
@@ -153,16 +163,28 @@ class AgentChatWidget(QDockWidget):
         self._insert_widget(frame)
 
     def set_thinking(self, visible: bool):
-        """Show/hide the thinking indicator with animated dots."""
+        """Show thinking state and switch the primary action to cancel."""
+        self._is_thinking = visible
+        self._cancel_pending = False
         self._thinking_label.setVisible(visible)
         if visible:
             self._thinking_dots = 0
-            self._think_timer = QTimer(self)
-            self._think_timer.timeout.connect(self._update_thinking_dots)
             self._think_timer.start(400)
+            self._send_btn.setText("■")
+            self._send_btn.setProperty("mode", "stop")
+            self._send_btn.setAccessibleName("停止 Agent 生成")
+            self._send_btn.setToolTip("停止生成")
+            self._send_btn.setEnabled(True)
+            self._update_thinking_dots()
         else:
-            if hasattr(self, '_think_timer') and self._think_timer:
-                self._think_timer.stop()
+            self._think_timer.stop()
+            self._thinking_label.clear()
+            self._send_btn.setText("↑")
+            self._send_btn.setProperty("mode", "send")
+            self._send_btn.setAccessibleName("发送 Agent 消息")
+            self._send_btn.setToolTip("发送（Enter）")
+            self._send_btn.setEnabled(True)
+        self._refresh_primary_button_style()
 
     def clear_chat(self):
         """Clear all messages."""
@@ -179,7 +201,21 @@ class AgentChatWidget(QDockWidget):
     # Internals
     # ------------------------------------------------------------------
 
+    def _handle_primary_action(self):
+        if self._is_thinking:
+            if self._cancel_pending:
+                return
+            self._cancel_pending = True
+            self._thinking_label.setText("正在停止生成…")
+            self._send_btn.setEnabled(False)
+            self._send_btn.setAccessibleName("正在停止 Agent 生成")
+            self.cancel_requested.emit()
+            return
+        self._send_message()
+
     def _send_message(self):
+        if self._is_thinking:
+            return
         text = self._input.toPlainText().strip()
         if not text:
             return
@@ -194,9 +230,16 @@ class AgentChatWidget(QDockWidget):
                 event.key() in (Qt.Key_Return, Qt.Key_Enter)
                 and not (event.modifiers() & Qt.ShiftModifier)
             ):
-                self._send_message()
+                if not self._is_thinking:
+                    self._send_message()
                 return True
         return super().eventFilter(obj, event)
+
+    def _refresh_primary_button_style(self):
+        style = self._send_btn.style()
+        style.unpolish(self._send_btn)
+        style.polish(self._send_btn)
+        self._send_btn.update()
 
     @staticmethod
     def _prepare_message_bubble(bubble: QTextBrowser, width: int) -> None:
@@ -280,6 +323,8 @@ class AgentChatWidget(QDockWidget):
         return frame
 
     def _update_thinking_dots(self):
+        if self._cancel_pending:
+            return
         self._thinking_dots = ((self._thinking_dots + 1) % 4)
         self._thinking_label.setText(
             "Agent is thinking" + "." * self._thinking_dots

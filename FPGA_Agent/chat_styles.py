@@ -28,10 +28,10 @@ QPushButton#send_button {
     background-color: #85172E;
     color: #FFFFFF;
     border: none;
-    border-radius: 8px;
-    padding: 8px 16px;
+    border-radius: 24px;
+    padding: 0px;
     font-weight: bold;
-    font-size: 13px;
+    font-size: 23px;
 }
 QPushButton#send_button:hover {
     background-color: #9D1C38;
@@ -39,9 +39,16 @@ QPushButton#send_button:hover {
 QPushButton#send_button:pressed {
     background-color: #681123;
 }
+QPushButton#send_button[mode="stop"] {
+    background-color: #171A1C;
+    font-size: 17px;
+}
+QPushButton#send_button[mode="stop"]:hover {
+    background-color: #303438;
+}
 QPushButton#send_button:disabled {
-    background-color: #EEECE8;
-    color: #AAA8A3;
+    background-color: #5B5F62;
+    color: #FFFFFF;
 }
 
 QPushButton#settings_button {

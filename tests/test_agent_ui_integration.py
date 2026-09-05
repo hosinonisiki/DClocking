@@ -129,6 +129,33 @@ class AgentUiIntegrationTests(unittest.TestCase):
         self.assertEqual(submitted, ["立即发送"])
         self.assertEqual(chat._input.toPlainText(), "第一行\n")
 
+    def test_send_arrow_becomes_cancel_control_while_agent_is_thinking(self):
+        chat = AgentChatWidget(self.window)
+        submitted = []
+        cancelled = []
+        chat.user_message_submitted.connect(submitted.append)
+        chat.cancel_requested.connect(lambda: cancelled.append(True))
+
+        self.assertEqual(chat._send_btn.text(), "↑")
+        self.assertEqual(chat._send_btn.accessibleName(), "发送 Agent 消息")
+
+        chat.set_thinking(True)
+        self.app.processEvents()
+        self.assertEqual(chat._send_btn.text(), "■")
+        self.assertEqual(chat._send_btn.accessibleName(), "停止 Agent 生成")
+
+        chat._input.setPlainText("下一条消息")
+        chat._send_btn.click()
+        self.app.processEvents()
+        self.assertEqual(cancelled, [True])
+        self.assertEqual(submitted, [])
+        self.assertEqual(chat._input.toPlainText(), "下一条消息")
+
+        chat.set_thinking(False)
+        self.app.processEvents()
+        self.assertEqual(chat._send_btn.text(), "↑")
+        self.assertTrue(chat._send_btn.isEnabled())
+
     def test_agent_visibility_and_dock_state_restore_after_registration(self):
         chat = AgentChatWidget(self.window)
         self.window.register_agent_dock(chat)
