@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QWidget
@@ -155,6 +155,100 @@ class MainWindowShellTests(unittest.TestCase):
             self.window.port_ctrl.open_port()
         self.assertTrue(self.window.is_log_expanded())
         self.assertIn("wire failure", self.window.log_output.toPlainText())
+        self.assertFalse(self.window.port_ctrl.hw_controller.is_initialized())
+
+    def test_disconnect_marks_hardware_uninitialized_for_dry_run(self):
+        class FakeOpenSerial:
+            def __init__(self):
+                self.opened = True
+
+            def isOpen(self):
+                return self.opened
+
+            def close(self):
+                self.opened = False
+
+        port = FakeOpenSerial()
+        self.window.port_ctrl.serial_port = port
+        self.window.port_ctrl.qt_serial = object()
+        self.window.port_ctrl.hw_controller.ser = object()
+        self.window.router = object()
+
+        self.window.port_ctrl.open_port()
+
+        self.assertFalse(port.isOpen())
+        self.assertIsNone(self.window.port_ctrl.qt_serial)
+        self.assertFalse(self.window.port_ctrl.hw_controller.is_initialized())
+        self.assertIsNone(self.window.router)
+        self.assertIsNone(self.window.port_ctrl.get_hw_module("PID", 0))
+
+    def test_route_sync_failure_rolls_connection_back_to_disconnected(self):
+        class FakeSerial:
+            def __init__(self):
+                self.opened = False
+
+            def isOpen(self):
+                return self.opened
+
+            def open(self, _mode):
+                self.opened = True
+                return True
+
+            def clear(self):
+                pass
+
+            def close(self):
+                self.opened = False
+
+        port = FakeSerial()
+        self.window.port_ctrl.serial_port = port
+        with (
+            patch.object(self.window.port_ctrl, "setport"),
+            patch("qt_Port.QtSerial", return_value=object()),
+            patch.object(
+                self.window,
+                "sync_from_device",
+                side_effect=RuntimeError("route timeout"),
+            ),
+            patch("qt_Port.qw.QMessageBox.warning") as warning,
+        ):
+            self.window.port_ctrl.open_port()
+
+        self.assertFalse(port.isOpen())
+        self.assertIsNone(self.window.port_ctrl.qt_serial)
+        self.assertFalse(self.window.port_ctrl.hw_controller.is_initialized())
+        self.assertIsNone(self.window.router)
+        self.assertFalse(self.window.init_btn.isEnabled())
+        self.assertEqual(self.window.connect_btn.text(), "连接")
+        warning.assert_called_once()
+        self.assertIn("route timeout", self.window.log_output.toPlainText())
+
+    def test_router_cache_sync_failure_is_not_silently_ignored(self):
+        router = Mock()
+        router.sync.side_effect = RuntimeError("cache sync timeout")
+        with patch.object(self.window, "_ensure_router", return_value=router):
+            with self.assertRaisesRegex(RuntimeError, "cache sync timeout"):
+                self.window._prime_router_cache_from_device_routes([])
+
+    def test_parameter_refresh_aborts_after_one_register_exhausts_retries(self):
+        from PySide6.QtCore import QPointF
+        from qt_module import ModulePID
+
+        node = ModulePID("PID控制器", 0, QPointF())
+        original = node.get_params()
+        with (
+            patch.object(self.window.port_ctrl, "get_hw_module", return_value=object()),
+            patch.object(
+                self.window.port_ctrl,
+                "read_module_value",
+                side_effect=RuntimeError("offline after 4 attempts"),
+            ) as read_value,
+        ):
+            refreshed = self.window._refresh_node_params_from_device(node)
+
+        self.assertFalse(refreshed)
+        self.assertEqual(read_value.call_count, 1)
+        self.assertEqual(node.get_params(), original)
 
     def test_failed_batch_route_is_not_counted_or_uploaded(self):
         class BrokenRouter:

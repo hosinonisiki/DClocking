@@ -730,10 +730,14 @@ class MainWindow(QMainWindow):
 
         for key, width in self._direct_param_specs(module_type).items():
             try:
-                value = hw_module.read(key)
+                value = self.port_ctrl.read_module_value(
+                    hw_module, key, retries=4
+                )
                 refreshed[key] = self._decode_direct_value(value, width, field_map.get(key))
             except Exception as exc:
                 read_errors.append(f"{key}: {exc}")
+                print(f"[param] refresh aborted {node.name}: {read_errors[0]}")
+                return False
 
         for field in schema_fields:
             if not isinstance(field, dict):
@@ -743,12 +747,16 @@ class MainWindow(QMainWindow):
                 continue
 
             try:
-                value = hw_module.readv(key)
+                value = self.port_ctrl.read_module_value(
+                    hw_module, key, use_readv=True, retries=4
+                )
                 if field.get("type") == "bool" or field.get("ui_control") in {"flip_toggle", "flip_pulse"}:
                     value = bool(value)
                 refreshed[key] = value
             except Exception as exc:
                 read_errors.append(f"{key}: {exc}")
+                print(f"[param] refresh aborted {node.name}: {read_errors[0]}")
+                return False
 
         if not refreshed:
             if read_errors:
@@ -1258,11 +1266,8 @@ class MainWindow(QMainWindow):
     def _prime_router_cache_from_device_routes(self, routes):
         router = self._ensure_router()
         if router is None:
-            return
-        try:
-            router.sync()
-        except Exception as exc:
-            print(f"[sync] skip cache prime route : {exc}")
+            raise RuntimeError("Router is not ready after device route query")
+        router.sync()
 
     def _apply_routing(
         self,
@@ -1403,11 +1408,18 @@ class MainWindow(QMainWindow):
         field_map = self._schema_field_map(node)
         hw_module = self.port_ctrl.get_hw_module(module_type, module_index) if module_type is not None else None
         if hw_module is not None and direct_specs:
+            communication_failed = False
             for key, width in direct_specs.items():
-                try:
-                    value = hw_module.read(key)
-                    params[key] = self._decode_direct_value(value, width, field_map.get(key))
-                except Exception:
+                if not communication_failed:
+                    try:
+                        value = self.port_ctrl.read_module_value(
+                            hw_module, key, retries=4
+                        )
+                        params[key] = self._decode_direct_value(value, width, field_map.get(key))
+                        continue
+                    except Exception:
+                        communication_failed = True
+                if communication_failed:
                     if key in node_params:
                         params[key] = node_params[key]
                     else:

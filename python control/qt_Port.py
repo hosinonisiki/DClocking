@@ -144,9 +144,10 @@ class Port(QObject):
     
     def open_port(self):	#打开串口
         if self.serial_port.isOpen():
-            self.parent.connect_btn.setText(self.tr("连接"))
+            self.parent.connect_btn.setText(self.tr("连接设备"))
             self.serial_port.close()
             self.qt_serial = None
+            self.hw_controller.ser = None
             if hasattr(self.parent, "router"):
                 self.parent.router = None
             if hasattr(self.parent, "init_btn"):
@@ -162,7 +163,7 @@ class Port(QObject):
                 try:
                     self.qt_serial = QtSerial(
                         serial_instance=self.serial_port,
-                        timeout=1
+                        timeout=0.05
                     )
                     self.hw_controller.set_serial(self.qt_serial)
                     if hasattr(self.parent, "router"):
@@ -173,20 +174,29 @@ class Port(QObject):
                         try:
                             self.parent.sync_from_device()
                         except Exception as sync_exc:
+                            self.serial_port.close()
+                            self.qt_serial = None
+                            self.hw_controller.ser = None
+                            self.parent.connect_btn.setText(self.tr("连接设备"))
+                            if hasattr(self.parent, "router"):
+                                self.parent.router = None
+                            if hasattr(self.parent, "init_btn"):
+                                self.parent.init_btn.setEnabled(False)
                             if hasattr(self.parent, "_report_error"):
                                 self.parent._report_error(
-                                    f"[serial] connected but sync failed: {sync_exc}"
+                                    f"[serial] sync failed; connection rolled back: {sync_exc}"
                                 )
                             qw.QMessageBox.warning(
                                 self.parent,
                                 self.tr("同步失败"),
-                                self.tr(f"已连接串口，但同步下位机状态失败:\n{sync_exc}")
+                                self.tr(f"同步下位机状态失败，串口连接已断开:\n{sync_exc}")
                             )
                 except Exception as e:
                     # 建立 QtSerial 失败时回滚连接状态
                     self.serial_port.close()
                     self.qt_serial = None
-                    self.parent.connect_btn.setText(self.tr("连接"))
+                    self.hw_controller.ser = None
+                    self.parent.connect_btn.setText(self.tr("连接设备"))
                     if hasattr(self.parent, "init_btn"):
                         self.parent.init_btn.setEnabled(False)
                     if hasattr(self.parent, "_report_error"):
@@ -306,6 +316,20 @@ class Port(QObject):
             raise RuntimeError("Hardware controller not initialized")
         hw_module.flip_on(flip_on_key)
 
+    @staticmethod
+    def read_module_value(hw_module, key, use_readv=False, retries=4):
+        reader = hw_module.readv if use_readv else hw_module.read
+        last_exc = None
+        for _ in range(max(1, retries)):
+            try:
+                return reader(key)
+            except Exception as exc:
+                last_exc = exc
+                time.sleep(0.01)
+        raise RuntimeError(
+            f"Failed to read register {key} after {max(1, retries)} attempts: {last_exc}"
+        ) from last_exc
+
     def query_router_routes(self):
         if not self.hw_controller or not self.hw_controller.is_initialized():
             raise RuntimeError("Hardware controller not initialized")
@@ -385,9 +409,9 @@ class Port(QObject):
             if not key:
                 continue
             try:
-                value = hw_module.read(key)
+                value = self.read_module_value(hw_module, key, retries=4)
             except Exception:
-                continue
+                break
 
             if isinstance(value, (bytes, bytearray)):
                 address = hw_module.process_designator(key)

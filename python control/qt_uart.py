@@ -4,7 +4,7 @@ from PySide6.QtCore import QCoreApplication, QIODevice
 from PySide6.QtSerialPort import QSerialPort
 
 class QtSerial: 
-    def __init__(self, port=None, baudrate=115200, parity="E", stopbits=1, bytesize=8, timeout=1, serial_instance=None):
+    def __init__(self, port=None, baudrate=115200, parity="E", stopbits=1, bytesize=8, timeout=0.05, serial_instance=None):
         """
         初始化串口
         
