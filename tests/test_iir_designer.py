@@ -48,6 +48,42 @@ class IIRDesignerTests(unittest.TestCase):
         self.assertTrue(result["stable"])
         self.assertLess(result["max_pole_radius"], 1.0)
 
+    def test_frequency_views_cover_four_decades_on_a_logarithmic_grid(self):
+        result = IIRDesignModel.design(self._default_specs())
+        plot_frequencies = np.asarray(result["plot_frequencies_hz"])
+        nyquist = result["freq_sample"] / 2.0
+
+        self.assertAlmostEqual(plot_frequencies[0], nyquist * 1e-4)
+        self.assertAlmostEqual(plot_frequencies[-1], nyquist)
+        np.testing.assert_allclose(
+            np.diff(np.log10(plot_frequencies)),
+            np.diff(np.log10(plot_frequencies))[0],
+            rtol=1e-10,
+            atol=1e-12,
+        )
+        self.assertEqual(result["frequencies_hz"][0], 0.0)
+        self.assertEqual(
+            len(result["plot_group_delay_seconds"]), len(plot_frequencies)
+        )
+
+    def test_group_delay_retains_negative_deep_stopband_values(self):
+        result = IIRDesignModel.design(self._default_specs("cheby2"))
+        frequencies = np.asarray(result["plot_frequencies_hz"])
+        delays = np.asarray(result["plot_group_delay_seconds"])
+
+        deep_stopband = frequencies >= result["analysis_stop_hz"]
+        self.assertTrue(np.any(delays[deep_stopband] < 0.0))
+
+    def test_impulse_response_length_tracks_the_slowest_quantized_pole(self):
+        slow = IIRDesignModel.design(self._default_specs())
+        fast_specs = self._default_specs()
+        fast_specs["freq_pass"] = 15_000_000.0
+        fast = IIRDesignModel.design(fast_specs)
+
+        self.assertGreater(len(slow["impulse_response"]), len(fast["impulse_response"]))
+        self.assertEqual(len(fast["impulse_response"]), 96)
+        self.assertFalse(slow["impulse_response_truncated"])
+
     def test_all_existing_filter_families_generate_stable_preview(self):
         for filter_type in ("butter", "ellip", "cheby1", "cheby2", "bessel"):
             with self.subTest(filter_type=filter_type):
@@ -92,7 +128,7 @@ class IIRDesignerTests(unittest.TestCase):
         canvas.resize(760, 420)
 
         rendered = []
-        for view_mode in ("magnitude", "phase", "impulse", "zplane"):
+        for view_mode in ("magnitude", "phase", "group_delay", "impulse", "zplane"):
             canvas.set_view_mode(view_mode)
             image = QImage(canvas.size(), QImage.Format_ARGB32)
             image.fill(0)

@@ -1,5 +1,6 @@
 import unittest
 
+import numpy as np
 from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QApplication, QToolButton
 
@@ -41,6 +42,43 @@ class FIRDesignerTests(unittest.TestCase):
         self.assertAlmostEqual(result["magnitude_db"][0], 0.0, delta=0.2)
         self.assertGreater(result["stopband_attenuation_db"], 15.0)
 
+    def test_frequency_views_cover_four_decades_on_a_logarithmic_grid(self):
+        result = FIRDesignModel.design(self._default_specs())
+        plot_frequencies = np.asarray(result["plot_frequencies_hz"])
+        nyquist = result["freq_sample"] / 2.0
+
+        self.assertAlmostEqual(plot_frequencies[0], nyquist * 1e-4)
+        self.assertAlmostEqual(plot_frequencies[-1], nyquist)
+        np.testing.assert_allclose(
+            np.diff(np.log10(plot_frequencies)),
+            np.diff(np.log10(plot_frequencies))[0],
+            rtol=1e-10,
+            atol=1e-12,
+        )
+        self.assertEqual(result["frequencies_hz"][0], 0.0)
+        self.assertEqual(
+            len(result["plot_group_delay_seconds"]), len(plot_frequencies)
+        )
+        pass_mask = plot_frequencies <= result["freq_pass"]
+        self.assertAlmostEqual(
+            float(np.median(np.asarray(result["plot_group_delay_seconds"])[pass_mask])),
+            result["group_delay_seconds"],
+            delta=1e-12,
+        )
+
+    def test_nyquist_label_replaces_a_nearby_decade_label(self):
+        labels = FIRResponseCanvas._log_frequency_labels(12_500.0, 125_000_000.0)
+        texts = [text for _, text in labels]
+
+        self.assertIn("125MHz", texts)
+        self.assertNotIn("100MHz", texts)
+        self.assertTrue(
+            all(right - left >= 0.10 for left, right in zip(
+                [fraction for fraction, _ in labels],
+                [fraction for fraction, _ in labels][1:],
+            ))
+        )
+
     def test_invalid_frequency_edges_are_rejected(self):
         specs = self._default_specs()
         specs["freq_stop"] = specs["freq_sample"] / 2.0
@@ -74,7 +112,7 @@ class FIRDesignerTests(unittest.TestCase):
         canvas.resize(760, 420)
 
         rendered = []
-        for view_mode in ("magnitude", "phase", "impulse", "zplane"):
+        for view_mode in ("magnitude", "phase", "group_delay", "impulse", "zplane"):
             canvas.set_view_mode(view_mode)
             image = QImage(canvas.size(), QImage.Format_ARGB32)
             image.fill(0)

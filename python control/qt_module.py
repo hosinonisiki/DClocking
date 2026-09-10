@@ -1464,6 +1464,12 @@ class PIDResponseWindow(QDialog):
         self._canvas.set_parameters(parameters, changed_key=changed_key)
 
 
+def _log_frequency_grid(freq_sample, points):
+    """Return a four-decade plotting grid ending at Nyquist."""
+    nyquist = float(freq_sample) / 2.0
+    return np.geomspace(nyquist * 1e-4, nyquist, int(points))
+
+
 class FIRDesignModel:
     """Design and analyse the same low-pass FIR loaded by ``ModuleFIRFilter``."""
 
@@ -1534,7 +1540,7 @@ class FIRDesignModel:
         if normalization < 1.0 or normalization > max_normalization:
             raise ValueError(
                 f"归一化系数 {normalization:.3f} 超出 FPGA 范围 1–{max_normalization:g}；"
-                "请增大通带频率或调整抽头数"
+                "请减小通带频率、增大阻带频率或增加抽头数"
             )
 
         q23_scale = float((2**23) - 1)
@@ -1556,6 +1562,19 @@ class FIRDesignModel:
         passband_ripple = float(np.max(pass_values) - np.min(pass_values)) if pass_values.size else 0.0
         stopband_attenuation = float(max(0.0, -np.max(stop_values))) if stop_values.size else 0.0
 
+        plot_frequencies = _log_frequency_grid(specs["freq_sample"], 1024)
+        plot_angular = 2.0 * math.pi * plot_frequencies / specs["freq_sample"]
+        plot_response = scipy_signal.freqz(quantized, worN=plot_angular)[1]
+        plot_amplitude = np.abs(plot_response)
+        plot_magnitude_db = 20.0 * np.log10(
+            np.maximum(plot_amplitude / reference, 1e-9)
+        )
+        plot_phase_radians = np.unwrap(np.angle(plot_response))
+        plot_phase_degrees = plot_phase_radians * 180.0 / math.pi
+        plot_group_delay_seconds = (
+            -np.gradient(plot_phase_radians, plot_angular) / specs["freq_sample"]
+        )
+
         roots = np.roots(quantized) if len(quantized) > 1 else np.array([], dtype=complex)
         return {
             **specs,
@@ -1566,6 +1585,12 @@ class FIRDesignModel:
             "frequencies_hz": tuple(float(value) for value in frequencies),
             "magnitude_db": tuple(float(value) for value in magnitude_db),
             "phase_degrees": tuple(float(value) for value in phase_degrees),
+            "plot_frequencies_hz": tuple(float(value) for value in plot_frequencies),
+            "plot_magnitude_db": tuple(float(value) for value in plot_magnitude_db),
+            "plot_phase_degrees": tuple(float(value) for value in plot_phase_degrees),
+            "plot_group_delay_seconds": tuple(
+                float(value) for value in plot_group_delay_seconds
+            ),
             "zeros": tuple((float(value.real), float(value.imag)) for value in roots),
             "passband_ripple_db": passband_ripple,
             "stopband_attenuation_db": stopband_attenuation,
@@ -1580,6 +1605,7 @@ class FIRResponseCanvas(QWidget):
     VIEW_LABELS = {
         "magnitude": "幅频响应",
         "phase": "相位响应",
+        "group_delay": "群时延",
         "impulse": "冲激响应",
         "zplane": "零极点图",
     }
@@ -1618,9 +1644,68 @@ class FIRResponseCanvas(QWidget):
         return f"{value:.3g}Hz"
 
     @staticmethod
+    def _format_duration(value):
+        absolute = abs(value)
+        for scale, suffix in ((1.0, "s"), (1e-3, "ms"), (1e-6, "μs"), (1e-9, "ns")):
+            if absolute >= scale:
+                return f"{value / scale:.3g}{suffix}"
+        return f"{value / 1e-12:.3g}ps"
+
+    @staticmethod
     def _map_linear(value, low, high, pixel_low, pixel_high):
         span = max(1e-12, high - low)
         return pixel_low + (value - low) / span * (pixel_high - pixel_low)
+
+    @staticmethod
+    def _map_log(value, low, high, pixel_low, pixel_high):
+        log_low = math.log10(low)
+        span = max(1e-12, math.log10(high) - log_low)
+        return pixel_low + (math.log10(max(low, value)) - log_low) / span * (
+            pixel_high - pixel_low
+        )
+
+    @classmethod
+    def _frequency_axis(cls, result):
+        frequencies = result.get("plot_frequencies_hz", result["frequencies_hz"])
+        positive = [float(value) for value in frequencies if value > 0.0]
+        nyquist = float(result["freq_sample"]) / 2.0
+        return positive, min(positive), nyquist
+
+    @classmethod
+    def _log_frequency_labels(cls, low, high, max_labels=6):
+        candidates = [low]
+        first_decade = math.ceil(math.log10(low))
+        last_decade = math.floor(math.log10(high))
+        candidates.extend(
+            10.0**exponent
+            for exponent in range(first_decade, last_decade + 1)
+            if low < 10.0**exponent < high
+        )
+        candidates.append(high)
+        if len(candidates) > max_labels:
+            indices = np.rint(np.linspace(0, len(candidates) - 1, max_labels)).astype(int)
+            candidates = [candidates[index] for index in dict.fromkeys(indices)]
+        log_low = math.log10(low)
+        log_span = max(1e-12, math.log10(high) - log_low)
+        # Always retain both axis endpoints. Drop an adjacent decade label when
+        # it would collide with either endpoint (for example 100 and 125 MHz).
+        minimum_spacing = 0.10
+        while len(candidates) > 2:
+            first_gap = (math.log10(candidates[1]) - log_low) / log_span
+            if first_gap >= minimum_spacing:
+                break
+            del candidates[1]
+        while len(candidates) > 2:
+            last_gap = (
+                math.log10(high) - math.log10(candidates[-2])
+            ) / log_span
+            if last_gap >= minimum_spacing:
+                break
+            del candidates[-2]
+        return [
+            ((math.log10(value) - log_low) / log_span, cls._format_frequency(value))
+            for value in candidates
+        ]
 
     def _draw_frame(self, painter, rect):
         painter.fillRect(rect, QColor("#F7F8FA"))
@@ -1664,34 +1749,36 @@ class FIRResponseCanvas(QWidget):
         painter.drawRect(plot_rect)
 
     def _draw_magnitude(self, painter, plot_rect, result):
-        nyquist = result["freq_sample"] / 2.0
-        pass_fraction = result["freq_pass"] / nyquist
-        stop_fraction = result["freq_stop"] / nyquist
+        frequencies, axis_low, nyquist = self._frequency_axis(result)
+        pass_x = self._map_log(
+            result["freq_pass"], axis_low, nyquist, plot_rect.left(), plot_rect.right()
+        )
+        stop_x = self._map_log(
+            result["freq_stop"], axis_low, nyquist, plot_rect.left(), plot_rect.right()
+        )
         pass_color = QColor("#DFF3EC")
         transition_color = QColor("#FFF1D8")
         stop_color = QColor("#F3E4E9")
-        painter.fillRect(QRectF(plot_rect.left(), plot_rect.top(), plot_rect.width() * pass_fraction, plot_rect.height()), pass_color)
+        painter.fillRect(QRectF(plot_rect.left(), plot_rect.top(), pass_x - plot_rect.left(), plot_rect.height()), pass_color)
         painter.fillRect(
-            QRectF(plot_rect.left() + plot_rect.width() * pass_fraction, plot_rect.top(),
-                   plot_rect.width() * (stop_fraction - pass_fraction), plot_rect.height()),
+            QRectF(pass_x, plot_rect.top(), stop_x - pass_x, plot_rect.height()),
             transition_color,
         )
         painter.fillRect(
-            QRectF(plot_rect.left() + plot_rect.width() * stop_fraction, plot_rect.top(),
-                   plot_rect.width() * (1.0 - stop_fraction), plot_rect.height()),
+            QRectF(stop_x, plot_rect.top(), plot_rect.right() - stop_x, plot_rect.height()),
             stop_color,
         )
         self._draw_grid(
             painter,
             plot_rect,
-            [(fraction, self._format_frequency(nyquist * fraction)) for fraction in (0.0, 0.25, 0.5, 0.75, 1.0)],
+            self._log_frequency_labels(axis_low, nyquist),
             [(fraction, f"{-100 + fraction * 105:.0f}") for fraction in (0.0, 0.25, 0.5, 0.75, 1.0)],
         )
         for frequency, label, color in (
             (result["freq_pass"], "FP", QColor("#1F8F75")),
             (result["freq_stop"], "FS", QColor("#A4003B")),
         ):
-            x = self._map_linear(frequency, 0.0, nyquist, plot_rect.left(), plot_rect.right())
+            x = self._map_log(frequency, axis_low, nyquist, plot_rect.left(), plot_rect.right())
             painter.setPen(QPen(color, 1, Qt.DashLine))
             painter.drawLine(QPointF(x, plot_rect.top()), QPointF(x, plot_rect.bottom()))
             painter.setPen(color)
@@ -1699,10 +1786,11 @@ class FIRResponseCanvas(QWidget):
 
         path = QPainterPath()
         active = False
-        for frequency, magnitude in zip(result["frequencies_hz"], result["magnitude_db"]):
+        magnitudes = result.get("plot_magnitude_db", result["magnitude_db"])
+        for frequency, magnitude in zip(frequencies, magnitudes):
             clipped = max(-100.0, min(5.0, magnitude))
             point = QPointF(
-                self._map_linear(frequency, 0.0, nyquist, plot_rect.left(), plot_rect.right()),
+                self._map_log(frequency, axis_low, nyquist, plot_rect.left(), plot_rect.right()),
                 self._map_linear(clipped, -100.0, 5.0, plot_rect.bottom(), plot_rect.top()),
             )
             if not active:
@@ -1716,27 +1804,120 @@ class FIRResponseCanvas(QWidget):
         painter.drawText(QRectF(plot_rect.left() - 40, plot_rect.top() - 15, 36, 12), Qt.AlignRight, "dB")
 
     def _draw_phase(self, painter, plot_rect, result):
-        phases = result["phase_degrees"]
+        frequencies, axis_low, nyquist = self._frequency_axis(result)
+        phases = result.get("plot_phase_degrees", result["phase_degrees"])
         phase_min = math.floor(min(phases) / 180.0) * 180.0
         phase_max = max(0.0, math.ceil(max(phases) / 180.0) * 180.0)
         if phase_max <= phase_min:
             phase_max = phase_min + 360.0
-        nyquist = result["freq_sample"] / 2.0
         self._draw_grid(
             painter,
             plot_rect,
-            [(fraction, self._format_frequency(nyquist * fraction)) for fraction in (0.0, 0.25, 0.5, 0.75, 1.0)],
+            self._log_frequency_labels(axis_low, nyquist),
             [(fraction, f"{phase_min + fraction * (phase_max - phase_min):.0f}°") for fraction in (0.0, 0.25, 0.5, 0.75, 1.0)],
         )
         path = QPainterPath()
-        for index, (frequency, phase) in enumerate(zip(result["frequencies_hz"], phases)):
+        for index, (frequency, phase) in enumerate(zip(frequencies, phases)):
             point = QPointF(
-                self._map_linear(frequency, 0.0, nyquist, plot_rect.left(), plot_rect.right()),
+                self._map_log(frequency, axis_low, nyquist, plot_rect.left(), plot_rect.right()),
                 self._map_linear(phase, phase_min, phase_max, plot_rect.bottom(), plot_rect.top()),
             )
             path.moveTo(point) if index == 0 else path.lineTo(point)
         painter.setPen(QPen(QColor("#25A8A2"), 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
         painter.drawPath(path)
+
+    def _draw_group_delay(self, painter, plot_rect, result):
+        frequencies, axis_low, nyquist = self._frequency_axis(result)
+        delays = np.asarray(result["plot_group_delay_seconds"], dtype=float)
+        finite_delays = delays[np.isfinite(delays)]
+        if not finite_delays.size:
+            painter.setPen(QColor("#7B8492"))
+            painter.drawText(plot_rect, Qt.AlignCenter, "群时延不可用")
+            return
+
+        magnitudes = np.asarray(result.get("plot_magnitude_db", ()), dtype=float)
+        reliable = np.isfinite(delays)
+        if magnitudes.shape == delays.shape:
+            # Phase derivatives become ill-conditioned near deep stopband
+            # zeros. They remain in the curve, but do not dictate the scale.
+            reliable &= np.isfinite(magnitudes) & (magnitudes >= -40.0)
+        axis_delays = delays[reliable]
+        if axis_delays.size >= 20:
+            robust_min, robust_max = np.percentile(axis_delays, (1.0, 99.0))
+        elif axis_delays.size:
+            robust_min = float(np.min(axis_delays))
+            robust_max = float(np.max(axis_delays))
+        else:
+            robust_min = float(np.min(finite_delays))
+            robust_max = float(np.max(finite_delays))
+        delay_min = min(0.0, float(robust_min))
+        delay_max = max(0.0, float(robust_max))
+        delay_span = delay_max - delay_min
+        if delay_span <= 0.0:
+            delay_span = max(abs(delay_min), abs(delay_max), 1e-15)
+        padding = delay_span * 0.05
+        delay_min -= padding
+        delay_max += padding
+
+        cutoff_x = self._map_log(
+            result["freq_pass"], axis_low, nyquist, plot_rect.left(), plot_rect.right()
+        )
+        painter.fillRect(
+            QRectF(
+                plot_rect.left(),
+                plot_rect.top(),
+                cutoff_x - plot_rect.left(),
+                plot_rect.height(),
+            ),
+            QColor("#DFF3EC"),
+        )
+        y_fractions = (0.0, 0.25, 0.5, 0.75, 1.0)
+        y_labels = [
+            (
+                fraction,
+                self._format_duration(delay_min + (delay_max - delay_min) * fraction),
+            )
+            for fraction in y_fractions
+        ]
+        self._draw_grid(
+            painter,
+            plot_rect,
+            self._log_frequency_labels(axis_low, nyquist),
+            y_labels,
+        )
+
+        path = QPainterPath()
+        active = False
+        for frequency, delay in zip(frequencies, delays):
+            if not math.isfinite(delay):
+                active = False
+                continue
+            point = QPointF(
+                self._map_log(frequency, axis_low, nyquist, plot_rect.left(), plot_rect.right()),
+                self._map_linear(
+                    delay,
+                    delay_min,
+                    delay_max,
+                    plot_rect.bottom(),
+                    plot_rect.top(),
+                ),
+            )
+            if active:
+                path.lineTo(point)
+            else:
+                path.moveTo(point)
+                active = True
+        painter.setPen(QPen(QColor("#7A4CC2"), 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        painter.save()
+        painter.setClipRect(plot_rect)
+        painter.drawPath(path)
+        painter.restore()
+        painter.setPen(QColor("#6C7685"))
+        painter.drawText(
+            QRectF(plot_rect.left() - 44, plot_rect.top() - 15, 40, 12),
+            Qt.AlignRight,
+            "τg",
+        )
 
     def _draw_impulse(self, painter, plot_rect, result):
         coefficients = result["quantized_coefficients"]
@@ -1803,6 +1984,8 @@ class FIRResponseCanvas(QWidget):
             self._draw_magnitude(painter, plot_rect, self._result)
         elif self._view_mode == "phase":
             self._draw_phase(painter, plot_rect, self._result)
+        elif self._view_mode == "group_delay":
+            self._draw_group_delay(painter, plot_rect, self._result)
         elif self._view_mode == "impulse":
             self._draw_impulse(painter, plot_rect, self._result)
         else:
@@ -2191,6 +2374,22 @@ class IIRDesignModel:
         phase_radians = np.unwrap(np.angle(response))
         phase_degrees = phase_radians * 180.0 / math.pi
 
+        plot_frequencies = _log_frequency_grid(specs["freq_sample"], 1536)
+        plot_angular = 2.0 * math.pi * plot_frequencies / specs["freq_sample"]
+        plot_branch_responses = [
+            scipy_signal.freqz(b, a, worN=plot_angular)[1]
+            for b, a in zip(b_quantized, denominators)
+        ]
+        plot_response = plot_branch_responses[0] + plot_branch_responses[1]
+        plot_magnitude_db = 20.0 * np.log10(
+            np.maximum(np.abs(plot_response) / dc_reference, 1e-9)
+        )
+        plot_phase_radians = np.unwrap(np.angle(plot_response))
+        plot_phase_degrees = plot_phase_radians * 180.0 / math.pi
+        plot_group_delay_seconds = (
+            -np.gradient(plot_phase_radians, plot_angular) / specs["freq_sample"]
+        )
+
         pass_mask = frequencies <= specs["freq_pass"]
         pass_values = magnitude_db[pass_mask]
         passband_ripple = (
@@ -2216,7 +2415,19 @@ class IIRDesignModel:
         max_pole_radius = float(np.max(np.abs(poles))) if poles.size else 0.0
         stable = bool(max_pole_radius < 1.0)
 
-        impulse_input = np.zeros(96, dtype=float)
+        # Follow the slowest implemented pole until its envelope has decayed
+        # by 80 dB. Keep interactive previews bounded for marginal designs.
+        impulse_target_ratio = 1e-4
+        if 0.0 < max_pole_radius < 1.0:
+            settling_samples = math.ceil(
+                math.log(impulse_target_ratio) / math.log(max_pole_radius)
+            )
+            impulse_length = min(8192, max(96, settling_samples + 1))
+            impulse_truncated = settling_samples + 1 > impulse_length
+        else:
+            impulse_length = 8192 if max_pole_radius >= 1.0 else 96
+            impulse_truncated = max_pole_radius >= 1.0
+        impulse_input = np.zeros(impulse_length, dtype=float)
         impulse_input[0] = 1.0
         impulse_response = (
             scipy_signal.lfilter(b_quantized[0], denominators[0], impulse_input)
@@ -2246,7 +2457,15 @@ class IIRDesignModel:
             "frequencies_hz": tuple(float(value) for value in frequencies),
             "magnitude_db": tuple(float(value) for value in magnitude_db),
             "phase_degrees": tuple(float(value) for value in phase_degrees),
+            "plot_frequencies_hz": tuple(float(value) for value in plot_frequencies),
+            "plot_magnitude_db": tuple(float(value) for value in plot_magnitude_db),
+            "plot_phase_degrees": tuple(float(value) for value in plot_phase_degrees),
+            "plot_group_delay_seconds": tuple(
+                float(value) for value in plot_group_delay_seconds
+            ),
             "impulse_response": tuple(float(value) for value in impulse_response),
+            "impulse_response_truncated": impulse_truncated,
+            "impulse_response_target_db": -80.0,
             "zeros": tuple((float(value.real), float(value.imag)) for value in zeros),
             "poles": tuple((float(value.real), float(value.imag)) for value in poles),
             "stable": stable,
@@ -2296,27 +2515,31 @@ class IIRResponseCanvas(FIRResponseCanvas):
         )
 
     def _draw_magnitude(self, painter, plot_rect, result):
-        nyquist = result["freq_sample"] / 2.0
-        pass_fraction = min(1.0, result["freq_pass"] / nyquist)
-        stop_fraction = min(1.0, result["analysis_stop_hz"] / nyquist)
+        frequencies, axis_low, nyquist = self._frequency_axis(result)
+        pass_x = self._map_log(
+            result["freq_pass"], axis_low, nyquist, plot_rect.left(), plot_rect.right()
+        )
+        stop_x = self._map_log(
+            result["analysis_stop_hz"], axis_low, nyquist, plot_rect.left(), plot_rect.right()
+        )
         painter.fillRect(
-            QRectF(plot_rect.left(), plot_rect.top(), plot_rect.width() * pass_fraction, plot_rect.height()),
+            QRectF(plot_rect.left(), plot_rect.top(), pass_x - plot_rect.left(), plot_rect.height()),
             QColor("#DFF3EC"),
         )
         painter.fillRect(
             QRectF(
-                plot_rect.left() + plot_rect.width() * pass_fraction,
+                pass_x,
                 plot_rect.top(),
-                plot_rect.width() * max(0.0, stop_fraction - pass_fraction),
+                max(0.0, stop_x - pass_x),
                 plot_rect.height(),
             ),
             QColor("#FFF1D8"),
         )
         painter.fillRect(
             QRectF(
-                plot_rect.left() + plot_rect.width() * stop_fraction,
+                stop_x,
                 plot_rect.top(),
-                plot_rect.width() * max(0.0, 1.0 - stop_fraction),
+                max(0.0, plot_rect.right() - stop_x),
                 plot_rect.height(),
             ),
             QColor("#F3E4E9"),
@@ -2324,24 +2547,25 @@ class IIRResponseCanvas(FIRResponseCanvas):
         self._draw_grid(
             painter,
             plot_rect,
-            [(fraction, self._format_frequency(nyquist * fraction)) for fraction in (0.0, 0.25, 0.5, 0.75, 1.0)],
+            self._log_frequency_labels(axis_low, nyquist),
             [(fraction, f"{-100 + fraction * 105:.0f}") for fraction in (0.0, 0.25, 0.5, 0.75, 1.0)],
         )
         for frequency, label, color in (
             (result["freq_pass"], "FC", QColor("#1F8F75")),
             (result["analysis_stop_hz"], "STOP", QColor("#A4003B")),
         ):
-            x = self._map_linear(frequency, 0.0, nyquist, plot_rect.left(), plot_rect.right())
+            x = self._map_log(frequency, axis_low, nyquist, plot_rect.left(), plot_rect.right())
             painter.setPen(QPen(color, 1, Qt.DashLine))
             painter.drawLine(QPointF(x, plot_rect.top()), QPointF(x, plot_rect.bottom()))
             painter.setPen(color)
             painter.drawText(QRectF(x - 20, plot_rect.top() + 3, 40, 12), Qt.AlignCenter, label)
 
         path = QPainterPath()
-        for index, (frequency, magnitude) in enumerate(zip(result["frequencies_hz"], result["magnitude_db"])):
+        magnitudes = result.get("plot_magnitude_db", result["magnitude_db"])
+        for index, (frequency, magnitude) in enumerate(zip(frequencies, magnitudes)):
             clipped = max(-100.0, min(5.0, magnitude))
             point = QPointF(
-                self._map_linear(frequency, 0.0, nyquist, plot_rect.left(), plot_rect.right()),
+                self._map_log(frequency, axis_low, nyquist, plot_rect.left(), plot_rect.right()),
                 self._map_linear(clipped, -100.0, 5.0, plot_rect.bottom(), plot_rect.top()),
             )
             path.moveTo(point) if index == 0 else path.lineTo(point)
@@ -2368,6 +2592,13 @@ class IIRResponseCanvas(FIRResponseCanvas):
             y = self._map_linear(value, -y_limit, y_limit, plot_rect.bottom(), plot_rect.top())
             painter.drawLine(QPointF(x, zero_y), QPointF(x, y))
             painter.drawEllipse(QPointF(x, y), 1.5, 1.5)
+        if result.get("impulse_response_truncated"):
+            painter.setPen(QColor("#A4003B"))
+            painter.drawText(
+                QRectF(plot_rect.right() - 150, plot_rect.top() + 4, 144, 14),
+                Qt.AlignRight | Qt.AlignVCenter,
+                f"尾部超过 {len(samples)} 点，已截断",
+            )
 
     def _draw_zplane(self, painter, plot_rect, result):
         side = min(plot_rect.width(), plot_rect.height())
