@@ -1,7 +1,7 @@
 PID_SCHEMA = [
     # 直接参数
     {"key" : "gain_p", "label" : "P通道增益系数", "type" : "int", "min" : -(2**23), "max" : 2**23 - 1, "mode" : "direct", "free" : True, "note" : "线性增益系数。取对数后才可转换为分贝值。可通过间接参数直接设定分贝值"},
-    {"key" : "gain_i", "label" : "I通道增益系数", "type" : "int", "min" : -(2**23), "max" : 2**23 - 1, "mode" : "direct", "free" : True, "note" : "线性增益系数。取对数后才可转换为分贝值。可通过间接参数直接设定分贝值"},
+    {"key" : "gain_i", "label" : "I通道增益系数", "type" : "int", "min" : -(2**31), "max" : 2**31 - 1, "mode" : "direct", "free" : True, "note" : "线性增益系数。取对数后才可转换为分贝值。可通过间接参数直接设定分贝值"},
     {"key" : "gain_d", "label" : "D通道增益系数", "type" : "int", "min" : -(2**23), "max" : 2**23 - 1, "mode" : "direct", "free" : True, "note" : "线性增益系数。取对数后才可转换为分贝值。可通过间接参数直接设定分贝值"},
     {"key" : "setpoint", "label" : "设定值", "type" : "int", "min" : -32768, "max" : 32767, "display_voltage" : True, "mode" : "direct", "free" : True, "note" : "物理信号"},
     {"key" : "limit_integral", "label" : "积分限幅值", "type" : "int", "min" : 0, "max" : 32767, "display_voltage" : True, "mode" : "direct", "free" : True, "note" : "物理信号"},
@@ -10,10 +10,10 @@ PID_SCHEMA = [
     {"key" : "enable_auto_reset", "label" : "自动控制使能", "type" : "bool", "mode" : "direct", "free" : True, "note" : "设为1时，模块接受其它状态机模块的开关指令。设为0时，开关指令被忽略"},
 
     # 间接参数
-    {"key" : "overall_gain", "label" : "整体增益", "type" : "float", "min" : -1e6, "max" : 1e6, "unit" : "dB", "mode" : "indirect", "free" : True, "note" : "调节P通道增益，并等比例缩放I、D通道增益。若缩放后任一通道增益超出范围则报错。若初始P通道增益为0（缩放比例为无穷大），则仅调节P通道增益"},
+    {"key" : "overall_gain", "label" : "整体增益", "type" : "float", "min" : -1e6, "max" : 1e6, "unit" : "dB", "special_values" : ("-inf",), "mode" : "indirect", "free" : True, "note" : "调节P通道增益，并等比例缩放I、D通道增益。-inf关闭P、I、D通道。若缩放后任一通道增益超出范围则报错。若初始P通道增益为0（缩放比例为无穷大），则仅调节P通道增益"},
     {"key" : "pi_corner", "label" : "PI交点频率", "type" : "float", "min" : 0.0, "max" : 1e9, "unit" : "Hz", "mode" : "indirect", "free" : True, "note" : "调节I通道增益。使得PI增益曲线交点位于指定频率。若调节后I通道增益超出范围则报错"},
-    {"key" : "pd_corner", "label" : "PD交点频率", "type" : "float", "min" : 0.0, "max" : 1e9, "unit" : "Hz", "mode" : "indirect", "free" : True, "note" : "调节D通道增益。使得PD增益曲线交点位于指定频率。若调节后D通道增益超出范围则报错"},
-    {"key" : "saturation_gain", "label" : "饱和增益", "type" : "float", "min" : -1e6, "max" : 1e6, "unit" : "dB", "mode" : "indirect", "free" : True, "note" : "调节泄漏系数，使得积分通道在设定增益处饱和。若饱和增益过大，则设定为无饱和。若饱和增益过小，则设定为最大泄漏。若I通道增益为0，则报错"},
+    {"key" : "pd_corner", "label" : "PD交点频率", "type" : "float", "min" : 0.0, "max" : 1e9, "unit" : "Hz", "special_values" : ("inf",), "mode" : "indirect", "free" : True, "note" : "调节D通道增益。+inf关闭D通道；P通道增益为0时不能设置。若调节后D通道增益超出范围则报错"},
+    {"key" : "saturation_gain", "label" : "饱和增益", "type" : "float", "min" : -1e6, "max" : 1e6, "unit" : "dB", "special_values" : ("inf",), "mode" : "indirect", "free" : True, "note" : "调节泄漏系数，使得积分通道在设定增益处饱和。+inf设定为无泄漏。若饱和增益过小，则设定为最大泄漏。若I通道增益为0且输入不是+inf，则报错"},
     {"key" : "saturation_turning_frequency", "label" : "饱和拐点频率", "type" : "float", "min" : 0, "max" : 1e9, "unit" : "Hz", "mode" : "indirect", "free" : True, "note" : "调节泄漏系数，使得积分通道在设定频率处饱和。若饱和频率过小或为0，则设定为无饱和。若饱和频率过大，则设定为最大泄漏"},
 ]
 

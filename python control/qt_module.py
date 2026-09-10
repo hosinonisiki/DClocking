@@ -14,6 +14,7 @@ import re
 import numpy as np
 from scipy import signal as scipy_signal
 import IIR
+from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
 from qt_module_schema import PID_SCHEMA, ACCM_SCHEMA, SCLR_SCHEMA, FIRF_SCHEMA, LTRN_SCHEMA, PDH_SCHEMA, SCLO_SCHEMA, IIR_SCHEMA
 from quantity_entry_core import QuantityEntryCore, QuantityFormat
@@ -22,6 +23,20 @@ from qt_ui_theme import UiColors, draw_node_chrome
 _PARAM_APPLY_HANDLER = None
 _PARAM_OPEN_HANDLER = None
 _CACHE_MISSING = object()
+
+
+def _validate_special_parameter_value(field: dict, key: str, value) -> None:
+    """Reject non-finite numeric values unless the field explicitly allows them."""
+    if isinstance(value, bool) or not isinstance(value, (int, float, np.number, Decimal)):
+        return
+    number = float(value)
+    if math.isnan(number):
+        raise ValueError("NaN is not a supported parameter value")
+    if not math.isinf(number):
+        return
+    special = "-inf" if number < 0.0 else "inf"
+    if special not in set(field.get("special_values", ())):
+        raise ValueError(f"{special} is not supported for {key}")
 
 def set_param_apply_handler(handler):
     global _PARAM_APPLY_HANDLER
@@ -125,6 +140,7 @@ class QuantityLineEdit(QLineEdit):
                 digits_limit=(1, 6, 0),
                 prefix={},
                 unit=unit,
+                special_values=tuple(field.get("special_values", ())),
             )
         digits_limit = field.get("digits_limit")
         if digits_limit is not None:
@@ -133,6 +149,7 @@ class QuantityLineEdit(QLineEdit):
                 digits_limit=(int(int_limit), int(frac_limit), int(min_frac)),
                 prefix=cls._prefix_map_for_field(field),
                 unit=unit,
+                special_values=tuple(field.get("special_values", ())),
             )
 
         ftype = field.get("type", "str")
@@ -152,6 +169,7 @@ class QuantityLineEdit(QLineEdit):
             digits_limit=(int_limit, frac_limit, min_frac),
             prefix=cls._prefix_map_for_field(field),
             unit=unit,
+            special_values=tuple(field.get("special_values", ())),
         )
 
     @classmethod
@@ -531,7 +549,17 @@ class PIDParamCanvas(QWidget):
             key in parameters
             for key in ("overall_gain", "pi_corner", "pd_corner", "saturation_turning_frequency")
         )
-        use_direct = changed_key in cls._DIRECT_KEYS or not has_indirect
+        has_direct_channels = all(key in parameters for key in ("gain_p", "gain_i", "gain_d"))
+        has_nonfinite_indirect = any(
+            not math.isfinite(cls._finite_float(parameters.get(key), 0.0))
+            for key in ("overall_gain", "pi_corner", "pd_corner", "saturation_gain")
+            if key in parameters
+        )
+        use_direct = (
+            changed_key in cls._DIRECT_KEYS
+            or not has_indirect
+            or (changed_key is None and has_direct_channels and has_nonfinite_indirect)
+        )
 
         if use_direct:
             gain_p = cls._finite_float(parameters.get("gain_p"), 0.0)
@@ -835,6 +863,10 @@ class PIDParamCanvas(QWidget):
 
     @staticmethod
     def _format_frequency(value):
+        if value == float("inf"):
+            return "∞"
+        if value == float("-inf"):
+            return "−∞"
         if value is None or not math.isfinite(value):
             return "—"
         for scale, suffix in ((1e9, "GHz"), (1e6, "MHz"), (1e3, "kHz")):
@@ -1000,10 +1032,11 @@ class PIDParamCanvas(QWidget):
                 )
                 disabled_index += 1
                 painter.setPen(color)
+                state_text = "∞" if frequency is not None and math.isinf(frequency) else "关闭"
                 painter.drawText(
                     QRectF(handle.x() + 8, handle.y() - 6, 46, 12),
                     Qt.AlignLeft | Qt.AlignVCenter,
-                    f"{label} 关闭",
+                    f"{label} {state_text}",
                 )
             self._handle_positions[parameter_key] = handle
             rendered_markers.append((parameter_key, color, handle))
@@ -1073,53 +1106,91 @@ class PIDParamCanvas(QWidget):
         painter.end()
 
 
+@dataclass(frozen=True)
+class PIDSliderSpec:
+    key: str
+    title: str
+    accessible_name: str
+    scale: str
+    minimum: float
+    maximum: float
+    finite_intervals: int
+    unit: str
+    low_endpoint: float | None = None
+    high_endpoint: float | None = None
+    low_meaning: str = ""
+    high_meaning: str = ""
+
+
 class PIDManualTuningPanel(QFrame):
     """High-level PID controls that map normalized sliders to real parameters."""
 
     parameter_changed = Signal(str, float)
-    _SLIDER_STEPS = 1000
     _FREQUENCY_MIN_HZ = 0.1
     _FREQUENCY_MAX_HZ = 100_000_000.0
+    _PI_MAX_HZ = 1_000_000.0
+    _PD_MIN_HZ = 10_000.0
+    _LEAK_MAX_HZ = 125_000_000.0 / (256.0 * 2.0 * math.pi)
     _CONTROL_SPECS = (
-        (
-            "overall_gain",
-            "P · 整体增益",
-            "滑动调节 P 整体增益",
-            "linear",
-            -80.0,
-            80.0,
-            "−80 dB",
-            "+80 dB",
+        PIDSliderSpec(
+            key="overall_gain",
+            title="P · 整体增益",
+            accessible_name="滑动调节 P 整体增益",
+            scale="linear",
+            minimum=-80.0,
+            maximum=40.0,
+            finite_intervals=1200,
+            unit="dB",
+            low_endpoint=float("-inf"),
+            low_meaning="关闭 P、I、D 通道",
         ),
-        (
-            "pi_corner",
-            "I · PI 交点",
-            "滑动调节 I 通道 PI 交点频率",
-            "frequency",
-            _FREQUENCY_MIN_HZ,
-            _FREQUENCY_MAX_HZ,
-            "关闭 / 0 Hz",
-            "100 MHz",
+        PIDSliderSpec(
+            key="pi_corner",
+            title="I · PI 交点",
+            accessible_name="滑动调节 I 通道 PI 交点频率",
+            scale="log",
+            minimum=_FREQUENCY_MIN_HZ,
+            maximum=_PI_MAX_HZ,
+            finite_intervals=999,
+            unit="Hz",
+            low_endpoint=0.0,
+            low_meaning="关闭 I 通道",
         ),
-        (
-            "pd_corner",
-            "D · PD 交点",
-            "滑动调节 D 通道 PD 交点频率",
-            "frequency",
-            _FREQUENCY_MIN_HZ,
-            _FREQUENCY_MAX_HZ,
-            "关闭 / 0 Hz",
-            "100 MHz",
+        PIDSliderSpec(
+            key="pd_corner",
+            title="D · PD 交点",
+            accessible_name="滑动调节 D 通道 PD 交点频率",
+            scale="log",
+            minimum=_PD_MIN_HZ,
+            maximum=_FREQUENCY_MAX_HZ,
+            finite_intervals=999,
+            unit="Hz",
+            high_endpoint=float("inf"),
+            high_meaning="关闭 D 通道",
         ),
-        (
-            "saturation_turning_frequency",
-            "I · 泄漏拐点",
-            "滑动调节积分泄漏拐点频率",
-            "frequency",
-            _FREQUENCY_MIN_HZ,
-            _FREQUENCY_MAX_HZ,
-            "关闭 / 0 Hz",
-            "100 MHz",
+        PIDSliderSpec(
+            key="saturation_gain",
+            title="I · 饱和增益",
+            accessible_name="滑动调节积分通道饱和增益",
+            scale="linear",
+            minimum=-80.0,
+            maximum=80.0,
+            finite_intervals=1600,
+            unit="dB",
+            high_endpoint=float("inf"),
+            high_meaning="无泄漏",
+        ),
+        PIDSliderSpec(
+            key="saturation_turning_frequency",
+            title="I · 泄漏拐点",
+            accessible_name="滑动调节积分泄漏拐点频率",
+            scale="log",
+            minimum=_FREQUENCY_MIN_HZ,
+            maximum=_LEAK_MAX_HZ,
+            finite_intervals=999,
+            unit="Hz",
+            low_endpoint=0.0,
+            low_meaning="无泄漏",
         ),
     )
 
@@ -1130,7 +1201,7 @@ class PIDManualTuningPanel(QFrame):
         self._available_keys = set(available_keys or ())
         self._sliders = {}
         self._value_labels = {}
-        self._specs = {spec[0]: spec for spec in self._CONTROL_SPECS}
+        self._specs = {spec.key: spec for spec in self._CONTROL_SPECS}
         self._syncing = False
 
         root = QVBoxLayout(self)
@@ -1156,10 +1227,10 @@ class PIDManualTuningPanel(QFrame):
 
         visible_specs = [
             spec for spec in self._CONTROL_SPECS
-            if not self._available_keys or spec[0] in self._available_keys
+            if not self._available_keys or spec.key in self._available_keys
         ]
         for index, spec in enumerate(visible_specs):
-            key, title_text, accessible_name, _kind, _minimum, _maximum, low_text, high_text = spec
+            key = spec.key
             card = QFrame(self)
             card.setObjectName("pid_tuning_card")
             card_layout = QVBoxLayout(card)
@@ -1168,7 +1239,7 @@ class PIDManualTuningPanel(QFrame):
 
             label_row = QHBoxLayout()
             label_row.setContentsMargins(0, 0, 0, 0)
-            label = QLabel(title_text)
+            label = QLabel(spec.title)
             label.setObjectName("pid_tuning_label")
             value_label = QLabel("—")
             value_label.setObjectName("pid_tuning_value")
@@ -1180,9 +1251,13 @@ class PIDManualTuningPanel(QFrame):
 
             slider = QSlider(Qt.Horizontal, card)
             slider.setObjectName(f"pid_tune_{key}")
-            slider.setAccessibleName(accessible_name)
-            slider.setToolTip(f"{title_text}：拖动滑块实时更新数值与频率响应，精确值仍可在下方输入")
-            slider.setRange(0, self._SLIDER_STEPS)
+            slider.setAccessibleName(spec.accessible_name)
+            meanings = "；".join(filter(None, (spec.low_meaning, spec.high_meaning)))
+            meaning_hint = f"；{meanings}" if meanings else ""
+            slider.setToolTip(
+                f"{spec.title}：拖动实时更新数值与频率响应{meaning_hint}；精确值可在下方输入"
+            )
+            slider.setRange(0, self._maximum_position(spec))
             slider.setSingleStep(1)
             slider.setPageStep(25)
             slider.setTracking(True)
@@ -1196,9 +1271,9 @@ class PIDManualTuningPanel(QFrame):
 
             range_row = QHBoxLayout()
             range_row.setContentsMargins(0, 0, 0, 0)
-            low_label = QLabel(low_text)
+            low_label = QLabel(self._format_value(key, self._low_boundary(spec)))
             low_label.setObjectName("pid_tuning_range")
-            high_label = QLabel(high_text)
+            high_label = QLabel(self._format_value(key, self._high_boundary(spec)))
             high_label.setObjectName("pid_tuning_range")
             high_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             range_row.addWidget(low_label)
@@ -1235,54 +1310,113 @@ class PIDManualTuningPanel(QFrame):
         )
 
     @staticmethod
+    def _has_low_endpoint(spec):
+        return spec.low_endpoint is not None
+
+    @staticmethod
+    def _has_high_endpoint(spec):
+        return spec.high_endpoint is not None
+
+    @classmethod
+    def _finite_start_position(cls, spec):
+        return 1 if cls._has_low_endpoint(spec) else 0
+
+    @classmethod
+    def _finite_end_position(cls, spec):
+        return cls._finite_start_position(spec) + spec.finite_intervals
+
+    @classmethod
+    def _maximum_position(cls, spec):
+        return cls._finite_end_position(spec) + (1 if cls._has_high_endpoint(spec) else 0)
+
+    @staticmethod
+    def _low_boundary(spec):
+        return spec.low_endpoint if spec.low_endpoint is not None else spec.minimum
+
+    @staticmethod
+    def _high_boundary(spec):
+        return spec.high_endpoint if spec.high_endpoint is not None else spec.maximum
+
+    @staticmethod
+    def _endpoint_matches(value, endpoint):
+        return endpoint is not None and value == endpoint
+
+    @staticmethod
     def _format_frequency(value):
-        value = max(0.0, float(value))
+        value = float(value)
+        if math.isinf(value):
+            return ("−" if value < 0.0 else "+") + "∞ Hz"
+        value = max(0.0, value)
         if value == 0.0:
-            return "关闭 · 0 Hz"
+            return "0 Hz"
         for scale, suffix in ((1e6, "MHz"), (1e3, "kHz")):
             if value >= scale:
-                return f"{value / scale:.3g} {suffix}"
-        return f"{value:.3g} Hz"
+                return f"{value / scale:.4g} {suffix}"
+        return f"{value:.4g} Hz"
+
+    @staticmethod
+    def _finite_value(spec, fraction):
+        fraction = max(0.0, min(1.0, float(fraction)))
+        if spec.scale == "linear":
+            return spec.minimum + (spec.maximum - spec.minimum) * fraction
+        return 10.0 ** (
+            math.log10(spec.minimum)
+            + fraction * (math.log10(spec.maximum) - math.log10(spec.minimum))
+        )
+
+    @staticmethod
+    def _finite_fraction(spec, value):
+        value = max(spec.minimum, min(spec.maximum, float(value)))
+        if spec.scale == "linear":
+            return (value - spec.minimum) / (spec.maximum - spec.minimum)
+        return (
+            (math.log10(value) - math.log10(spec.minimum))
+            / (math.log10(spec.maximum) - math.log10(spec.minimum))
+        )
 
     def _position_to_value(self, key, position):
         spec = self._specs[key]
-        _key, _title, _accessible, kind, minimum, maximum, _low, _high = spec
-        position = max(0, min(self._SLIDER_STEPS, int(position)))
-        if kind == "linear":
-            value = minimum + (maximum - minimum) * position / self._SLIDER_STEPS
-            return round(value, 1)
-        if position == 0:
-            return 0.0
-        fraction = (position - 1) / max(1, self._SLIDER_STEPS - 1)
-        return 10.0 ** (
-            math.log10(minimum)
-            + fraction * (math.log10(maximum) - math.log10(minimum))
-        )
+        maximum_position = self._maximum_position(spec)
+        position = max(0, min(maximum_position, int(position)))
+
+        if self._has_low_endpoint(spec) and position == 0:
+            return spec.low_endpoint
+        if self._has_high_endpoint(spec) and position == maximum_position:
+            return spec.high_endpoint
+
+        finite_position = position - self._finite_start_position(spec)
+        fraction = finite_position / max(1, spec.finite_intervals)
+        value = self._finite_value(spec, fraction)
+        return round(value, 1) if spec.scale == "linear" else value
 
     def _value_to_position(self, key, value):
         spec = self._specs[key]
-        _key, _title, _accessible, kind, minimum, maximum, _low, _high = spec
         try:
             value = float(value)
         except (TypeError, ValueError, OverflowError):
-            value = 0.0
-        if not math.isfinite(value):
-            value = maximum if value > 0.0 else minimum
-        if kind == "linear":
-            fraction = (max(minimum, min(maximum, value)) - minimum) / (maximum - minimum)
-            return round(fraction * self._SLIDER_STEPS)
-        if value <= 0.0:
+            value = spec.low_endpoint if self._has_low_endpoint(spec) else spec.minimum
+
+        if self._endpoint_matches(value, spec.low_endpoint):
             return 0
-        value = max(minimum, min(maximum, value))
-        fraction = (
-            (math.log10(value) - math.log10(minimum))
-            / (math.log10(maximum) - math.log10(minimum))
-        )
-        return 1 + round(fraction * (self._SLIDER_STEPS - 1))
+        if self._endpoint_matches(value, spec.high_endpoint):
+            return self._maximum_position(spec)
+
+        if not math.isfinite(value):
+            value = spec.maximum if value > 0.0 else spec.minimum
+        if spec.scale == "log" and value <= 0.0:
+            value = spec.minimum
+
+        fraction = self._finite_fraction(spec, value)
+        return self._finite_start_position(spec) + round(fraction * spec.finite_intervals)
 
     def _format_value(self, key, value):
-        if self._specs[key][3] == "linear":
-            return f"{float(value):+.1f} dB"
+        spec = self._specs[key]
+        value = float(value)
+        if math.isinf(value):
+            sign = "−" if value < 0.0 else "+"
+            return f"{sign}∞ {spec.unit}"
+        if spec.unit == "dB":
+            return f"{value:+.1f} dB"
         return self._format_frequency(value)
 
     def _slider_value_changed(self, key, position):
@@ -2822,6 +2956,9 @@ class ParamDialog(QDialog):
             if si is None:
                 raise ValueError("Invalid quantity input")
             value = float(si)
+            _validate_special_parameter_value(field, key, value)
+            if math.isinf(value):
+                return value
             if min_v is not None and value < min_v:
                 raise ValueError(f"Value is below minimum {min_v}")
             if max_v is not None and value > max_v:
@@ -3603,6 +3740,9 @@ class ModulePID(NodeItem):
     def set_params(self, params: dict) -> None:
         if not params:
             return
+        field_map = {field.get("key"): field for field in self.schema}
+        for key, value in params.items():
+            _validate_special_parameter_value(field_map.get(key, {}), key, value)
         self._stage_param_cache_update(params)
         self._notify_param_change(params)
 

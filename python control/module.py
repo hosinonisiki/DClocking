@@ -156,6 +156,8 @@ class ModulePID(ModuleBase):
     # Sampling frequency involving integral is set to 125MHz at half system clock due to pipelining
     def overall_gain_func(self, data = None):
         if data != None:
+            if data == -np.inf:
+                return [(0, 0), (1, 0), (2, 0)]
             # Write, return address-data pairs
             target_gain_p = int(round(2 ** 16 * 10 ** (data / 20)))
             if target_gain_p >= 2 ** 23 or target_gain_p < -2 ** 23:
@@ -186,6 +188,8 @@ class ModulePID(ModuleBase):
         if data != None:
             # Write, return address-data pairs
             current_gain_p = int.from_bytes(self.read("gain_p"), "big", signed = True)
+            if current_gain_p == 0:
+                raise ValueError("Cannot set PI corner while gain_p is zero")
             target_gain_i = int(round(current_gain_p * data * 2 * np.pi / 125000000 * 2 ** 16))
             if target_gain_i >= 2 ** 31 or target_gain_i < -2 ** 31:
                 raise ValueError("Resulting gain_i is out of range")
@@ -196,6 +200,8 @@ class ModulePID(ModuleBase):
             def formula(data_list):
                 gain_p = int.from_bytes(data_list[0], "big", signed = True)
                 gain_i = int.from_bytes(data_list[1], "big", signed = True)
+                if gain_i == 0:
+                    return 0
                 if gain_p == 0:
                     return np.inf
                 return np.abs(gain_i / gain_p) * 125000000 / (2 * np.pi * 2 ** 16)
@@ -206,6 +212,10 @@ class ModulePID(ModuleBase):
             # Write, return address-data pairs
             if data != 0:
                 current_gain_p = int.from_bytes(self.read("gain_p"), "big", signed = True)
+                if current_gain_p == 0:
+                    raise ValueError("Cannot set PD corner while gain_p is zero")
+                if data == np.inf:
+                    return [(2, 0)]
                 target_gain_d = int(round(current_gain_p * 250000000 / (data * 2 * np.pi)))
                 if target_gain_d >= 2 ** 23 or target_gain_d < -2 ** 23:
                     raise ValueError("Resulting gain_d is out of range")
@@ -220,12 +230,16 @@ class ModulePID(ModuleBase):
                 gain_d = int.from_bytes(data_list[1], "big", signed = True)
                 if gain_d == 0:
                     return np.inf
+                if gain_p == 0:
+                    return 0
                 return np.abs(gain_p / gain_d) * 250000000 / (2 * np.pi)
             return address_list, formula
 
     def saturation_gain_func(self, data = None):
         if data != None:
             # Write, return address-data pairs
+            if data == np.inf:
+                return [(6, 0)]
             current_gain_i = int.from_bytes(self.read("gain_i"), "big", signed = True)
             if current_gain_i != 0:
                 log_target_leak_digit = int(round(np.log2((10 ** (data / 20)) * (2 ** 32) / (np.abs(current_gain_i) * 256))))
@@ -240,16 +254,14 @@ class ModulePID(ModuleBase):
                     print(f"Implemented saturation gain: {20 * np.log10(np.abs(current_gain_i) * target_leak_digit * 256 / (2 ** 32))} dB, requested: {data} dB")
                 return [(6, target_leak_digit)]
             else:
-                raise ValueError("gain_i is zero, cannot set saturation gain")
+                raise ValueError("Cannot set saturation gain while gain_i is zero")
         else:
             # Read, return address list and formula
             address_list = [1, 6]
             def formula(data_list):
                 gain_i = int.from_bytes(data_list[0], "big", signed = True)
-                if gain_i == 0:
-                    raise ValueError("gain_i is zero, cannot read saturation gain")
                 leak_digit = int.from_bytes(data_list[1], "big", signed = False)
-                if leak_digit == 0:
+                if gain_i == 0 or leak_digit == 0:
                     return np.inf
                 return 20 * np.log10(np.abs(gain_i) * leak_digit * 256 / (2 ** 32))
             return address_list, formula

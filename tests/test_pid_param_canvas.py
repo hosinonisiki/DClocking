@@ -1,13 +1,14 @@
 import math
 import unittest
 
-from PySide6.QtCore import QPoint, Qt
+from PySide6.QtCore import QPoint, QPointF, Qt
 from PySide6.QtGui import QImage
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QSlider, QToolButton
 
 from tests.qt_test_support import ensure_app
-from qt_module import PIDParamCanvas, ParamDialog
+import module as hw_module
+from qt_module import ModulePID, PIDParamCanvas, ParamDialog
 from qt_module_schema import PID_SCHEMA
 
 
@@ -146,6 +147,7 @@ class PIDParamCanvasTests(unittest.TestCase):
                 "overall_gain",
                 "pi_corner",
                 "pd_corner",
+                "saturation_gain",
                 "saturation_turning_frequency",
             )
         }
@@ -164,6 +166,191 @@ class PIDParamCanvasTests(unittest.TestCase):
         )
         self.assertEqual(applied[-1], {"overall_gain": editor_value})
         dialog.close()
+
+    def test_pid_special_values_follow_schema_write_whitelist(self):
+        schema = [field for field in PID_SCHEMA if field.get("mode") == "indirect"]
+        applied = []
+        dialog = ParamDialog(
+            schema,
+            {
+                "overall_gain": 0.0,
+                "pi_corner": 100.0,
+                "pd_corner": 10_000.0,
+                "saturation_gain": 20.0,
+                "saturation_turning_frequency": 10.0,
+            },
+            apply_callback=applied.append,
+            companion_widget_factory=lambda parent: PIDParamCanvas(parent),
+        )
+
+        allowed = (
+            ("overall_gain", "-infdB", float("-inf")),
+            ("pd_corner", "+infHz", float("inf")),
+            ("saturation_gain", "∞dB", float("inf")),
+        )
+        for key, text, expected in allowed:
+            editor = dialog._editors[key][1]
+            editor.setText(text)
+            editor._sync_core_from_widget()
+            QTest.keyClick(editor, Qt.Key_Return)
+            self.app.processEvents()
+            self.assertEqual(applied[-1][key], expected)
+
+        rejected = (
+            ("overall_gain", "infdB"),
+            ("pi_corner", "infHz"),
+            ("pi_corner", "-infHz"),
+            ("pd_corner", "-infHz"),
+            ("saturation_gain", "-infdB"),
+            ("saturation_turning_frequency", "infHz"),
+        )
+        for key, text in rejected:
+            editor = dialog._editors[key][1]
+            editor.setText(text)
+            editor._sync_core_from_widget()
+            with self.assertRaises(ValueError):
+                dialog._value_from_editor(key)
+        dialog.close()
+
+    def test_pid_tuning_slider_has_real_infinity_endpoints(self):
+        schema = [field for field in PID_SCHEMA if field.get("mode") == "indirect"]
+        applied = []
+        dialog = ParamDialog(
+            schema,
+            {
+                "overall_gain": 0.0,
+                "pi_corner": 100.0,
+                "pd_corner": 10_000.0,
+                "saturation_gain": 20.0,
+                "saturation_turning_frequency": 10.0,
+            },
+            apply_callback=applied.append,
+            companion_widget_factory=lambda parent: PIDParamCanvas(parent),
+        )
+        panel = dialog._pid_tuning_panel
+
+        panel._sliders["overall_gain"].setValue(0)
+        self.app.processEvents()
+        self.assertEqual(applied[-1], {"overall_gain": float("-inf")})
+        self.assertEqual(
+            dialog._editors["overall_gain"][1].preview_quantity_value(),
+            float("-inf"),
+        )
+
+        panel._sliders["pd_corner"].setValue(panel._sliders["pd_corner"].maximum())
+        self.app.processEvents()
+        self.assertEqual(applied[-1], {"pd_corner": float("inf")})
+        self.assertEqual(
+            dialog._editors["pd_corner"][1].preview_quantity_value(),
+            float("inf"),
+        )
+
+        saturation_slider = panel._sliders["saturation_gain"]
+        saturation_slider.setValue(saturation_slider.maximum())
+        self.app.processEvents()
+        self.assertEqual(applied[-1], {"saturation_gain": float("inf")})
+        self.assertEqual(
+            dialog._editors["saturation_gain"][1].preview_quantity_value(),
+            float("inf"),
+        )
+        dialog.close()
+
+    def test_pid_tuning_slider_ranges_match_hardware_limits(self):
+        schema = [field for field in PID_SCHEMA if field.get("mode") == "indirect"]
+        dialog = ParamDialog(
+            schema,
+            {
+                "overall_gain": 0.0,
+                "pi_corner": 100.0,
+                "pd_corner": 10_000.0,
+                "saturation_gain": 20.0,
+                "saturation_turning_frequency": 10.0,
+            },
+            companion_widget_factory=lambda parent: PIDParamCanvas(parent),
+        )
+        panel = dialog._pid_tuning_panel
+
+        self.assertEqual(
+            panel._position_to_value("overall_gain", panel._sliders["overall_gain"].maximum()),
+            40.0,
+        )
+        self.assertEqual(
+            panel._position_to_value("pi_corner", panel._sliders["pi_corner"].maximum()),
+            1_000_000.0,
+        )
+        self.assertEqual(panel._position_to_value("pd_corner", 0), 10_000.0)
+        self.assertEqual(
+            panel._position_to_value("pd_corner", panel._sliders["pd_corner"].maximum()),
+            float("inf"),
+        )
+        saturation_slider = panel._sliders["saturation_gain"]
+        self.assertEqual(
+            panel._position_to_value("saturation_gain", saturation_slider.maximum() - 1),
+            80.0,
+        )
+        self.assertEqual(
+            panel._position_to_value("saturation_gain", saturation_slider.maximum()),
+            float("inf"),
+        )
+        self.assertAlmostEqual(
+            panel._position_to_value(
+                "saturation_turning_frequency",
+                panel._sliders["saturation_turning_frequency"].maximum(),
+            ),
+            125_000_000.0 / (256.0 * 2.0 * math.pi),
+        )
+
+        gain_i = next(field for field in PID_SCHEMA if field["key"] == "gain_i")
+        self.assertEqual(gain_i["min"], -(2**31))
+        self.assertEqual(gain_i["max"], 2**31 - 1)
+        dialog.close()
+
+    def test_pid_node_rejects_special_values_that_bypass_the_editor(self):
+        node = ModulePID("PID控制器", 0, QPointF(0, 0))
+        for params in (
+            {"overall_gain": float("inf")},
+            {"pi_corner": float("inf")},
+            {"pi_corner": float("-inf")},
+            {"pd_corner": float("-inf")},
+            {"saturation_gain": float("-inf")},
+            {"saturation_turning_frequency": float("inf")},
+            {"overall_gain": float("nan")},
+        ):
+            with self.assertRaises(ValueError):
+                node.set_params(params)
+
+    def test_hardware_pid_special_value_contract(self):
+        class StubBus:
+            def __init__(self, gain_p):
+                self.gain_p = gain_p
+
+            def read(self, _name, address):
+                value = self.gain_p if address == 0 else 0
+                return int(value).to_bytes(4, "big", signed=True)
+
+        pid = hw_module.ModulePID(StubBus(gain_p=2**16), "PIDC")
+        self.assertEqual(
+            pid.overall_gain_func(float("-inf")),
+            [(0, 0), (1, 0), (2, 0)],
+        )
+        self.assertEqual(pid.pd_corner_func(float("inf")), [(2, 0)])
+        self.assertEqual(pid.saturation_gain_func(float("inf")), [(6, 0)])
+
+        pi_pairs = pid.pi_corner_func(1_000_000.0)
+        self.assertGreater(pi_pairs[0][1], 2**23 - 1)
+        self.assertLessEqual(pi_pairs[0][1], 2**31 - 1)
+        with self.assertRaisesRegex(ValueError, "gain_i is out of range"):
+            pid.pi_corner_func(100_000_000.0)
+
+        pid_with_zero_p = hw_module.ModulePID(StubBus(gain_p=0), "PIDC")
+        with self.assertRaisesRegex(ValueError, "gain_p is zero"):
+            pid_with_zero_p.pd_corner_func(float("inf"))
+
+        _addresses, saturation_formula = pid.saturation_gain_func()
+        self.assertEqual(
+            saturation_formula(((1).to_bytes(4, "big"), (0).to_bytes(4, "big"))),
+            float("inf"),
+        )
 
     def test_plot_markers_drag_to_apply_frequency_and_gain_parameters(self):
         schema = [field for field in PID_SCHEMA if field.get("mode") == "indirect"]

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 import inspect
+import math
 import re
 from typing import Any, Callable
 
@@ -28,10 +29,12 @@ class QuantityFormat:
         digits_limit: tuple[int, int, int] = (9, 9, 3),
         prefix: dict[str, float] | None = None,
         unit: str = "",
+        special_values: tuple[str, ...] = (),
     ) -> None:
         self.digits_limit = digits_limit
         self.prefix = self.default_prefix if prefix is None else dict(prefix)
         self.unit = unit
+        self.special_values = frozenset(special_values)
         self.re = self._compile_pattern()
 
     def _compile_pattern(self) -> re.Pattern[str]:
@@ -54,12 +57,29 @@ class QuantityFormat:
         else:
             parts.append(r"(?P<unit>)")
 
-        return re.compile("^" + "".join(parts) + "$")
+        numeric_pattern = "".join(parts)
+        special_patterns = []
+        if "inf" in self.special_values:
+            special_patterns.append(r"\+?[iI][nN][fF]|\+?∞")
+        if "-inf" in self.special_values:
+            special_patterns.append(r"-[iI][nN][fF]|-∞")
+        if special_patterns:
+            special = "|".join(special_patterns)
+            suffix = rf"(?:{re.escape(self.unit)})?" if self.unit else ""
+            return re.compile(rf"^(?:{numeric_pattern}|(?P<special>{special}){suffix})$")
+        return re.compile("^" + numeric_pattern + "$")
 
     def match(self, text: str) -> tuple[re.Match[str] | None, float | None, str | None]:
         result = self.re.fullmatch(text)
         if result is None:
             return None, None, None
+
+        special = result.groupdict().get("special")
+        if special is not None:
+            negative = special.startswith("-")
+            value = float("-inf") if negative else float("inf")
+            formalized = ("-inf" if negative else "inf") + self.unit
+            return result, value, formalized
 
         sign = "-" if result.group("sign") else ""
         integer = result.group("int")
@@ -251,6 +271,8 @@ class QuantityEntryCore:
     def enter_roll(self, direction: str) -> bool:
         if not self.enabled or self.formalized is None:
             return False
+        if self.value is not None and not math.isfinite(self.value):
+            return True
 
         self._load_roll_from_formalized()
         if not self.quantity:
