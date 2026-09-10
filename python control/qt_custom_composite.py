@@ -32,14 +32,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from qt_filter_designer import FIRDesignerWidget, IIRDesignerWidget
+from qt_pid_tuning import PIDParamCanvas
 from qt_module import (
-    FIRDesignerWidget,
-    IIRDesignerWidget,
     ModuleFIRFilter,
     ModuleIIRFilter,
     ModulePID,
     NodeItem,
-    PIDParamCanvas,
     ParamDialog,
     SpecialMethodDialog,
 )

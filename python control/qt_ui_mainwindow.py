@@ -27,6 +27,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtSerialPort import QSerialPort
 
+from qt_filter_designer import FIRDesignerWidget, IIRDesignerWidget
+from qt_pid_tuning import PIDParamCanvas
 from qt_module import (
     NodeItem,
     ModulePID,
@@ -38,9 +40,6 @@ from qt_module import (
     ModulePDHFSM,
     ModuleLinerTransformer,
     ParamDialog,
-    PIDParamCanvas,
-    FIRDesignerWidget,
-    IIRDesignerWidget,
     SpecialMethodDialog,
     set_param_apply_handler,
     set_param_open_handler,

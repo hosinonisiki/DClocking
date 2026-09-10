@@ -8,7 +8,8 @@ from PySide6.QtWidgets import QApplication, QSlider, QToolButton
 
 from tests.qt_test_support import ensure_app
 import module as hw_module
-from qt_module import ModulePID, PIDParamCanvas, ParamDialog
+from qt_module import ModulePID, ParamDialog
+from qt_pid_tuning import PIDParamCanvas
 from qt_module_schema import PID_SCHEMA
 
 

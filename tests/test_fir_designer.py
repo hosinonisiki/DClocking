@@ -5,7 +5,7 @@ from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QApplication, QToolButton
 
 from tests.qt_test_support import ensure_app
-from qt_module import FIRDesignModel, FIRDesignerWidget, FIRResponseCanvas
+from qt_filter_designer import FIRDesignModel, FIRDesignerWidget, FIRResponseCanvas
 
 
 class FIRDesignerTests(unittest.TestCase):

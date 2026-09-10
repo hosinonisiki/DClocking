@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QApplication, QToolButton
 
 from tests.qt_test_support import ensure_app
 from module import IIR
-from qt_module import IIRDesignModel, IIRDesignerWidget, IIRResponseCanvas
+from qt_filter_designer import IIRDesignModel, IIRDesignerWidget, IIRResponseCanvas
 
 
 class IIRDesignerTests(unittest.TestCase):
