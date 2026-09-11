@@ -219,7 +219,7 @@ class MainWindowShellTests(unittest.TestCase):
         self.assertFalse(self.window.port_ctrl.hw_controller.is_initialized())
         self.assertIsNone(self.window.router)
         self.assertFalse(self.window.init_btn.isEnabled())
-        self.assertEqual(self.window.connect_btn.text(), "连接")
+        self.assertEqual(self.window.connect_btn.text(), "连接设备")
         warning.assert_called_once()
         self.assertIn("route timeout", self.window.log_output.toPlainText())
 

@@ -50,6 +50,16 @@ def set_param_open_handler(handler):
     _PARAM_OPEN_HANDLER = handler
 
 def _dispatch_param_apply(node, params):
+    scene = node.scene() if node is not None else None
+    if scene is None and node is not None:
+        scene = getattr(node, "_parameter_owner_scene", None)
+    local_handler = getattr(scene, "param_apply_handler", None) if scene is not None else None
+    if callable(local_handler):
+        try:
+            local_handler(node, params)
+        except Exception as exc:
+            print(f"[param] local apply failed: {exc}")
+        return
     if _PARAM_APPLY_HANDLER:
         _PARAM_APPLY_HANDLER(node, params)
 
@@ -845,10 +855,10 @@ class NodeItem(QGraphicsItem):
         local_handler = getattr(scene, "param_open_handler", None) if scene is not None else None
         if callable(local_handler):
             try:
-                if bool(local_handler(self)):
-                    return True
+                return bool(local_handler(self))
             except Exception as exc:
                 print(f"[param] local open panel failed: {exc}")
+                return False
         if _dispatch_param_open(self):
             return True
         if not self.param_schema() and not self.special_methods_schema():

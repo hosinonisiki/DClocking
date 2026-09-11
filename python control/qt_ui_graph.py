@@ -698,6 +698,8 @@ class DiagramScene(QGraphicsScene):
 
 
 class DiagramView(QGraphicsView):
+    node_removed = Signal(object)
+
     module_factory = {
         "PID控制器": ModulePID,
         "累加器": ModuleAccumulator,
@@ -736,9 +738,8 @@ class DiagramView(QGraphicsView):
         self._drag_start_pos = None
         self._is_dragging_view = False
         self._view_drag_start_pos = None
-        self._last_clicked_node = None
-        self._last_node_click_at = 0.0
-        self._last_node_click_pos = None
+        self._last_param_activation_node = None
+        self._last_param_activation_at = 0.0
         self.scale_factor = 1.0
         self._custom_composite_provider = None
         self._custom_instance_counter = 0
@@ -976,6 +977,8 @@ class DiagramView(QGraphicsView):
             )
             self._apply_mode_to_node(black_box)
             self.scene().addItem(black_box)
+            for runtime_node in runtime_nodes.values():
+                runtime_node._parameter_owner_scene = self.scene()
 
             for src_node, src_port_index, dst_node, dst_port_index in resolved_internal_edges:
                 self.scene().signals.connection_created.emit(
@@ -995,6 +998,8 @@ class DiagramView(QGraphicsView):
                 )
             if black_box is not None and black_box.scene() is self.scene():
                 self.scene().removeItem(black_box)
+            for runtime_node in runtime_nodes.values():
+                runtime_node._parameter_owner_scene = None
             for component_name, idx in allocated:
                 self._free_index(component_name, idx)
             raise
@@ -1025,33 +1030,35 @@ class DiagramView(QGraphicsView):
                 return parent_node
         return None
 
-    def _is_consecutive_node_click(self, node, view_pos):
+    def _activate_node_parameter_editor(self, node):
+        """Activate once for one click/double-click gesture."""
         now = time.monotonic()
-        point = view_pos.toPoint()
-        elapsed_ms = (now - self._last_node_click_at) * 1000.0
-        close_enough = (
-            self._last_node_click_pos is not None
-            and (point - self._last_node_click_pos).manhattanLength()
-            <= QApplication.startDragDistance()
-        )
-        is_double = (
-            node is self._last_clicked_node
-            and close_enough
+        elapsed_ms = (now - self._last_param_activation_at) * 1000.0
+        if (
+            node is self._last_param_activation_node
             and elapsed_ms <= QApplication.doubleClickInterval()
-        )
-        self._last_clicked_node = None if is_double else node
-        self._last_node_click_at = 0.0 if is_double else now
-        self._last_node_click_pos = None if is_double else point
-        return is_double
+        ):
+            return True
+        activated = bool(node.activate_parameter_editor())
+        if activated:
+            self._last_param_activation_node = node
+            self._last_param_activation_at = now
+        return activated
+
+    @staticmethod
+    def _items_contain_port(items):
+        return any(isinstance(item, PortItem) for item in items)
 
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.LeftButton:
+            scene_pos = self.mapToScene(event.position().toPoint())
+            items = self.scene().items(scene_pos)
+            if self._items_contain_port(items):
+                event.accept()
+                return
             node = self._node_at_view_position(event.position())
             if node is not None:
-                self._last_clicked_node = None
-                self._last_node_click_at = 0.0
-                self._last_node_click_pos = None
-                node.activate_parameter_editor()
+                self._activate_node_parameter_editor(node)
                 event.accept()
                 return
         super().mouseDoubleClickEvent(event)
@@ -1117,6 +1124,10 @@ class DiagramView(QGraphicsView):
             self._is_dragging_view = False
             self._view_drag_start_pos = None
 
+            if self._items_contain_port(items):
+                super().mousePressEvent(event)
+                return
+
             has_control_point = any(isinstance(it, QGraphicsEllipseItem) for it in items)
             if has_control_point:
                 return
@@ -1125,16 +1136,9 @@ class DiagramView(QGraphicsView):
                 if isinstance(it, NodeItem):
                     self._drag_candidate_node = it
                     self._drag_start_pos = event.position().toPoint()
-                    consecutive_click = self._is_consecutive_node_click(it, event.position())
                     super().mousePressEvent(event)
-                    if consecutive_click:
-                        it.activate_parameter_editor()
-                        event.accept()
                     return
 
-            self._last_clicked_node = None
-            self._last_node_click_at = 0.0
-            self._last_node_click_pos = None
             if not self._is_near_node(scene_pos, margin=10) and not self._is_near_port(scene_pos, margin=10):
                 self._is_dragging_view = True
                 self._view_drag_start_pos = event.position().toPoint()
@@ -1157,9 +1161,6 @@ class DiagramView(QGraphicsView):
         if (event.buttons() & Qt.LeftButton) and self._drag_candidate_node and self._drag_start_pos:
             dist = (event.position().toPoint() - self._drag_start_pos).manhattanLength()
             if dist >= QApplication.startDragDistance():
-                self._last_clicked_node = None
-                self._last_node_click_at = 0.0
-                self._last_node_click_pos = None
                 gp = event.globalPosition().toPoint()
                 top_left = self.viewport().mapToGlobal(self.viewport().rect().topLeft())
                 bottom_right = self.viewport().mapToGlobal(self.viewport().rect().bottomRight())
@@ -1209,6 +1210,21 @@ class DiagramView(QGraphicsView):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        clicked_node = None
+        if (
+            event.button() == Qt.LeftButton
+            and self._drag_candidate_node is not None
+            and self._drag_start_pos is not None
+        ):
+            release_pos = event.position().toPoint()
+            moved = (release_pos - self._drag_start_pos).manhattanLength()
+            release_node = self._node_at_view_position(event.position())
+            if (
+                moved < QApplication.startDragDistance()
+                and release_node is self._drag_candidate_node
+            ):
+                clicked_node = self._drag_candidate_node
+
         self._drag_candidate_node = None
         self._drag_start_pos = None
         if self._is_dragging_view:
@@ -1216,6 +1232,8 @@ class DiagramView(QGraphicsView):
             self._view_drag_start_pos = None
             self.setCursor(Qt.ArrowCursor)
         super().mouseReleaseEvent(event)
+        if clicked_node is not None and clicked_node.scene() is self.scene():
+            self._activate_node_parameter_editor(clicked_node)
 
     def wheelEvent(self, event):
         if event.modifiers() & Qt.ControlModifier:
@@ -1269,6 +1287,7 @@ class DiagramView(QGraphicsView):
                     if callable(release_runtime):
                         release_runtime(self, self.scene())
                     self._free_index(node.component_name, int(node.index))
+                    self.node_removed.emit(node)
                     node.scene().removeItem(node)
                 node.edges.clear()
                 self.scene().update()

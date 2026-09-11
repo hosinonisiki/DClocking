@@ -522,6 +522,7 @@ class CustomCompositeNode(NodeItem):
                     int(dst.get("port_index", 0)),
                 )
         for node in self.runtime_nodes.values():
+            node._parameter_owner_scene = None
             view._free_index(node.component_name, int(node.index))
         self.runtime_nodes.clear()
 
@@ -1147,6 +1148,12 @@ class CustomCompositeWorkbench(QDialog):
                 companion_widget_factory=companion,
             )
             param_widget.setWindowFlags(Qt.Widget)
+            if isinstance(node, ModulePID):
+                pid_canvas = param_widget.findChild(PIDParamCanvas)
+                if pid_canvas is not None:
+                    pid_canvas.setProperty(
+                        "workspaceTitle", f"{node.display_name} · 实时响应"
+                    )
             self._inspector_layout.addWidget(param_widget)
 
         if special_methods:
@@ -1171,6 +1178,10 @@ class CustomCompositeWorkbench(QDialog):
                     initial_values=getattr(node, "_special_method_args", {}),
                 )
             special_widget.setWindowFlags(Qt.Widget)
+            if isinstance(node, (ModuleFIRFilter, ModuleIIRFilter)):
+                special_widget.setProperty(
+                    "workspaceTitle", f"{node.display_name} · 滤波器设计"
+                )
             self._inspector_layout.addWidget(special_widget)
 
         if not schema and not special_methods:

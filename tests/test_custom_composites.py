@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock
 
 from PySide6.QtCore import QPointF, QSettings, Qt
 from PySide6.QtWidgets import QApplication, QTreeWidget
@@ -181,6 +182,39 @@ class CustomCompositeTests(unittest.TestCase):
         self.assertIsNotNone(tree)
         self.assertEqual(tree.topLevelItemCount(), 3)
         details.deleteLater()
+
+    def test_black_box_internal_parameter_apply_uses_owning_scene_handler(self):
+        settings_a = QSettings(
+            str(Path(self.temp_dir.name) / "window-a.ini"), QSettings.IniFormat
+        )
+        settings_b = QSettings(
+            str(Path(self.temp_dir.name) / "window-b.ini"), QSettings.IniFormat
+        )
+        window_a = MainWindow(
+            settings=settings_a,
+            custom_composite_path=self.library_path,
+        )
+        window_b = None
+        try:
+            local_apply = Mock()
+            window_a.scene.param_apply_handler = local_apply
+            black_box = window_a.view.instantiate_custom_composite(
+                self._definition(), QPointF(0, 0)
+            )
+            window_b = MainWindow(
+                settings=settings_b,
+                custom_composite_path=self.library_path,
+            )
+
+            black_box.set_params({"first_stage_scale": 4})
+
+            internal = black_box.runtime_nodes["n1"]
+            local_apply.assert_called_once_with(internal, {"scale": 4})
+        finally:
+            if window_b is not None:
+                window_b.close()
+            window_a.close()
+            self.app.processEvents()
 
     def test_repeated_black_box_names_receive_definition_scoped_ordinals(self):
         scene = DiagramScene(NodeSignals())

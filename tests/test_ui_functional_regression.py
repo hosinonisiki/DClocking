@@ -1,10 +1,10 @@
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from PySide6.QtCore import QPoint, QPointF, QRect, QSettings, Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QLineEdit, QWidget
+from PySide6.QtWidgets import QApplication, QLineEdit, QWidget
 
 from tests.qt_test_support import ensure_app
 from FPGA_Agent.main import create_window as create_integrated_window
@@ -16,6 +16,7 @@ from qt_module import (
     ModuleIIRFilter,
     ModulePID,
     ModuleScaler,
+    PIDParamCanvas,
 )
 from qt_ui_mainwindow import MainWindow
 
@@ -111,6 +112,241 @@ class UiFunctionalRegressionTests(unittest.TestCase):
         self.assertIsNotNone(panel)
         self.assertEqual(self.window.inspector_tabs.currentIndex(), 1)
         self.assertTrue(panel.isVisibleTo(self.window))
+
+    def test_single_click_reveals_parameter_editor_for_core_module_types(self):
+        cases = (
+            ModulePID("PID控制器", 0, QPointF(-270, -140)),
+            ModuleIIRFilter("IIR滤波器", 0, QPointF(-90, 140)),
+            ModuleFIRFilter("FIR滤波器", 0, QPointF(90, -140)),
+            ModuleScaler("线性缩放器", 0, QPointF(270, 140)),
+        )
+        for node in cases:
+            self.window.scene.addItem(node)
+        self.app.processEvents()
+
+        for node in cases:
+            with self.subTest(module=node.component_name):
+                viewport_pos = self.window.view.mapFromScene(node.scenePos())
+                QTest.mouseClick(
+                    self.window.view.viewport(),
+                    Qt.LeftButton,
+                    Qt.NoModifier,
+                    viewport_pos,
+                )
+                self.app.processEvents()
+
+                panel_key = f"{node.name}@{node.component_name}:{node.index}"
+                panel = self.window._param_panels.get(panel_key)
+                self.assertIsNotNone(panel)
+                self.assertEqual(self.window.inspector_tabs.currentIndex(), 1)
+                self.assertTrue(panel.isVisibleTo(self.window))
+
+    def test_dragging_node_does_not_open_parameter_editor(self):
+        node = ModulePID("PID控制器", 0, QPointF(0, 0))
+        self.window.scene.addItem(node)
+        self.app.processEvents()
+        start = self.window.view.mapFromScene(node.scenePos())
+        end = start + QPoint(QApplication.startDragDistance() + 30, 0)
+
+        QTest.mousePress(
+            self.window.view.viewport(),
+            Qt.LeftButton,
+            Qt.NoModifier,
+            start,
+        )
+        QTest.mouseMove(self.window.view.viewport(), end, delay=10)
+        QTest.mouseRelease(
+            self.window.view.viewport(),
+            Qt.LeftButton,
+            Qt.NoModifier,
+            end,
+        )
+        self.app.processEvents()
+
+        panel_key = f"{node.name}@{node.component_name}:{node.index}"
+        self.assertNotIn(panel_key, self.window._param_panels)
+
+    def test_rapid_double_click_activates_parameter_editor_once(self):
+        node = ModulePID("PID控制器", 0, QPointF(0, 0))
+        self.window.scene.addItem(node)
+        original_activate = node.activate_parameter_editor
+        node.activate_parameter_editor = Mock(wraps=original_activate)
+        viewport_pos = self.window.view.mapFromScene(node.scenePos())
+
+        for _ in range(2):
+            QTest.mouseClick(
+                self.window.view.viewport(),
+                Qt.LeftButton,
+                Qt.NoModifier,
+                viewport_pos,
+            )
+        self.app.processEvents()
+
+        self.assertEqual(node.activate_parameter_editor.call_count, 1)
+
+    def test_clicking_connected_input_port_disconnects_without_opening_parameters(self):
+        source, target = self.add_scaler_pair()
+        self.assertTrue(
+            self.window.scene.create_connection(
+                source.out_ports[0], target.in_ports[0]
+            )
+        )
+        port_pos = self.window.view.mapFromScene(target.in_ports[0].scenePos())
+
+        QTest.mouseClick(
+            self.window.view.viewport(),
+            Qt.LeftButton,
+            Qt.NoModifier,
+            port_pos,
+        )
+        self.app.processEvents()
+
+        panel_key = f"{target.name}@{target.component_name}:{target.index}"
+        self.assertFalse(target.in_ports[0].has_connection())
+        self.assertNotIn(panel_key, self.window._param_panels)
+
+    def test_double_clicking_input_port_does_not_open_parameters(self):
+        _source, target = self.add_scaler_pair()
+        original_activate = target.activate_parameter_editor
+        target.activate_parameter_editor = Mock(wraps=original_activate)
+        port_pos = self.window.view.mapFromScene(target.in_ports[0].scenePos())
+
+        QTest.mouseDClick(
+            self.window.view.viewport(),
+            Qt.LeftButton,
+            Qt.NoModifier,
+            port_pos,
+        )
+        self.app.processEvents()
+
+        panel_key = f"{target.name}@{target.component_name}:{target.index}"
+        self.assertNotIn(panel_key, self.window._param_panels)
+        self.assertEqual(target.activate_parameter_editor.call_count, 0)
+
+    def test_recreated_node_with_reused_index_gets_fresh_parameter_panel(self):
+        original = ModuleScaler("线性缩放器", 0, QPointF(0, 0))
+        self.window.view._used_indices["线性缩放器"].add(0)
+        self.window.scene.addItem(original)
+        self.assertTrue(self.window._open_param_panel(original))
+        panel_key = f"{original.name}@{original.component_name}:{original.index}"
+        original_panel = self.window._param_panels[panel_key]
+
+        self.window.view.remove_node(original)
+        QTest.qWait(20)
+        self.app.processEvents()
+        self.assertNotIn(panel_key, self.window._param_panels)
+
+        reused_index = self.window.view._alloc_index("线性缩放器")
+        self.assertEqual(reused_index, 0)
+        replacement = ModuleScaler(
+            "线性缩放器", reused_index, QPointF(0, 0)
+        )
+        self.window.scene.addItem(replacement)
+        viewport_pos = self.window.view.mapFromScene(replacement.scenePos())
+        QTest.mouseClick(
+            self.window.view.viewport(),
+            Qt.LeftButton,
+            Qt.NoModifier,
+            viewport_pos,
+        )
+        self.app.processEvents()
+
+        replacement_panel = self.window._param_panels[panel_key]
+        self.assertIsNot(replacement_panel, original_panel)
+        self.assertIs(
+            replacement_panel._param_widget._apply_callback.__self__,
+            replacement,
+        )
+
+    def test_parameter_open_handler_is_isolated_per_main_window(self):
+        node = ModulePID("PID控制器", 0, QPointF(0, 0))
+        self.window.scene.addItem(node)
+        other_settings = QSettings(
+            f"{self.temp_dir.name}/other-ui.ini", QSettings.IniFormat
+        )
+        other_window = MainWindow(settings=other_settings)
+        other_window.resize(960, 640)
+        other_window.show()
+        self.app.processEvents()
+        other_window.close()
+        self.window.raise_()
+        self.window.activateWindow()
+        self.app.processEvents()
+
+        viewport_pos = self.window.view.mapFromScene(node.scenePos())
+        QTest.mouseDClick(
+            self.window.view.viewport(),
+            Qt.LeftButton,
+            Qt.NoModifier,
+            viewport_pos,
+        )
+        self.app.processEvents()
+
+        panel_key = f"{node.name}@{node.component_name}:{node.index}"
+        self.assertIn(panel_key, self.window._param_panels)
+        self.assertNotIn(panel_key, other_window._param_panels)
+
+    def test_parameter_apply_handler_is_isolated_per_scene(self):
+        node = ModuleScaler("线性缩放器", 0, QPointF(0, 0))
+        self.window.scene.addItem(node)
+        local_apply = Mock()
+        self.window.scene.param_apply_handler = local_apply
+
+        other_settings = QSettings(
+            f"{self.temp_dir.name}/other-apply-ui.ini", QSettings.IniFormat
+        )
+        other_window = MainWindow(settings=other_settings)
+        other_window.close()
+        self.app.processEvents()
+
+        key = next(iter(node.get_params()))
+        value = node.get_params()[key] + 1
+        node.set_params({key: value})
+
+        local_apply.assert_called_once_with(node, {key: value})
+
+    def test_native_double_click_opens_pid_fir_and_iir_designers(self):
+        cases = (
+            (ModulePID("PID控制器", 0, QPointF(-220, 0)), PIDParamCanvas),
+            (ModuleFIRFilter("FIR滤波器", 0, QPointF(0, 0)), FIRDesignerWidget),
+            (ModuleIIRFilter("IIR滤波器", 0, QPointF(220, 0)), IIRDesignerWidget),
+        )
+        for node, _widget_type in cases:
+            self.window.scene.addItem(node)
+        self.app.processEvents()
+
+        for node, widget_type in cases:
+            with self.subTest(module=node.component_name):
+                viewport_pos = self.window.view.mapFromScene(node.scenePos())
+                QTest.mouseDClick(
+                    self.window.view.viewport(),
+                    Qt.LeftButton,
+                    Qt.NoModifier,
+                    viewport_pos,
+                )
+                self.app.processEvents()
+
+                panel_key = f"{node.name}@{node.component_name}:{node.index}"
+                panel = self.window._param_panels.get(panel_key)
+                self.assertIsNotNone(panel)
+                self.assertIsNotNone(panel.findChild(widget_type))
+
+    def test_parameter_opening_returns_from_tool_tab_to_main_console(self):
+        node = ModulePID("PID控制器", 0, QPointF(0, 0))
+        self.window.scene.addItem(node)
+        tool = QWidget(self.window)
+        self.window.open_workspace_window("test-tool", "测试工具", tool)
+        self.app.processEvents()
+        self.assertIs(self.window.workspace_tabs.currentWidget(), tool)
+
+        self.assertTrue(node.activate_parameter_editor())
+        self.app.processEvents()
+
+        self.assertIs(
+            self.window.workspace_tabs.currentWidget(),
+            self.window.workspace_tabs._home_page,
+        )
+        self.assertEqual(self.window.inspector_tabs.currentIndex(), 1)
 
     def test_fir_node_opens_visual_designer_in_parameter_inspector(self):
         node = ModuleFIRFilter("FIR滤波器", 0, QPointF(0, 0))

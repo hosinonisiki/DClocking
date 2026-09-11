@@ -52,7 +52,9 @@ from qt_custom_composite import (
     CustomCompositeNode,
     CustomCompositeWorkbench,
 )
+from qt_experiment_workbench import ExperimentWorkbench
 from qt_ui_theme import UiColors, apply_application_theme
+from qt_workspace_tabs import WorkspaceTabWidget
 from qt_ui_utils import (
     ensure_port_methods,
     border_port_index,
@@ -88,7 +90,12 @@ class _StreamProxy(QObject):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, settings=None, custom_composite_path=None):
+    def __init__(
+        self,
+        settings=None,
+        custom_composite_path=None,
+        experiment_repository_path=None,
+    ):
         super().__init__()
         self._settings = settings or QSettings("DClocking", "PrecisionWorkstation")
         self._last_log_height = 160
@@ -162,9 +169,12 @@ class MainWindow(QMainWindow):
         self.scene = DiagramScene(self.signals)
         self.view = DiagramView(self.scene)
         self.view.setObjectName("canvas_frame")
+        self.view.node_removed.connect(self._handle_node_removed)
         self.palette = ComponentPalette()
         self.custom_composite_library = CustomCompositeLibrary(custom_composite_path, parent=self)
         self._custom_composite_workbench = None
+        self._experiment_repository_path = experiment_repository_path
+        self._experiment_workbench = None
         self.view.set_custom_composite_provider(self.custom_composite_library.get)
         self.custom_composite_library.changed.connect(self._refresh_custom_composite_palette)
         self._refresh_custom_composite_palette()
@@ -187,6 +197,11 @@ class MainWindow(QMainWindow):
         self._restore_ui_state()
         self._refresh_ui_status()
 
+        # Keep parameter routing scoped to this scene.  The global hook remains
+        # as a compatibility fallback for legacy callers, but must not decide
+        # which MainWindow owns a node when more than one window has existed.
+        self.scene.param_open_handler = self._open_param_panel
+        self.scene.param_apply_handler = self._apply_param_to_hardware
         set_param_apply_handler(self._apply_param_to_hardware)
         set_param_open_handler(self._open_param_panel)
 
@@ -199,10 +214,35 @@ class MainWindow(QMainWindow):
                 self.custom_composite_library,
                 parent=self,
             )
-        self._custom_composite_workbench.show()
-        self._custom_composite_workbench.raise_()
-        self._custom_composite_workbench.activateWindow()
+        self.open_workspace_window(
+            "custom-composite-workbench",
+            "自定义组合模块",
+            self._custom_composite_workbench,
+            source=self,
+        )
         return self._custom_composite_workbench
+
+    def open_experiment_workbench(self):
+        if self._experiment_workbench is None:
+            self._experiment_workbench = ExperimentWorkbench(
+                settings=self._settings,
+                default_root=self._experiment_repository_path,
+                parent=self,
+            )
+        self.open_workspace_window(
+            "experiment-workbench",
+            "实验记录",
+            self._experiment_workbench,
+            source=self,
+        )
+        return self._experiment_workbench
+
+    def open_workspace_window(self, key, title, widget, source=None):
+        """Open a tool as a main-window tab, or focus its detached window."""
+        if source is not None and source is not self and not self.workspace_tabs.contains_source(source):
+            return False
+        self.workspace_tabs.open_workspace(key, title, widget, source=source)
+        return True
 
     def _build_workstation_shell(self, command_bar):
         main_widget = QWidget(self)
@@ -239,20 +279,25 @@ class MainWindow(QMainWindow):
         self.param_rail_btn = add_rail_button("▤", "参数检查器")
         self.config_rail_btn = add_rail_button("▣", "加载配置")
         self.config_rail_btn.setCheckable(False)
+        self.experiment_rail_btn = add_rail_button("✎", "打开实验记录工作台")
+        self.experiment_rail_btn.setObjectName("experiment_workbench_rail_button")
+        self.experiment_rail_btn.setCheckable(False)
         self.log_rail_btn = add_rail_button("⌁", "运行日志")
         rail_layout.addStretch()
         self.settings_rail_btn = add_rail_button("⚙", "Agent 设置")
         self.settings_rail_btn.hide()
 
-        self.design_rail_btn.clicked.connect(self.view.setFocus)
+        self.design_rail_btn.clicked.connect(self._focus_canvas_workspace)
         self.param_rail_btn.clicked.connect(self._focus_inspector)
         self.config_rail_btn.clicked.connect(self.load_configuration)
+        self.experiment_rail_btn.clicked.connect(self.open_experiment_workbench)
         self.log_rail_btn.clicked.connect(
             lambda: self.set_log_expanded(not self.is_log_expanded())
         )
         self.settings_rail_btn.clicked.connect(self.open_agent_settings)
 
         body = QWidget(main_widget)
+        body.setObjectName("main_console_workspace")
         body_layout = QVBoxLayout(body)
         body_layout.setContentsMargins(0, 0, 0, 0)
         body_layout.setSpacing(0)
@@ -277,8 +322,12 @@ class MainWindow(QMainWindow):
         body_layout.addWidget(self.content_splitter, 1)
 
         self._build_status_bar(body_layout)
+        self.workspace_tabs = WorkspaceTabWidget(main_widget)
+        self.workspace_tabs.add_home_tab(body, "主控制台")
+        self.workspace_tabs.currentChanged.connect(self._sync_workspace_navigation)
+
         root_layout.addWidget(self.left_rail)
-        root_layout.addWidget(body, 1)
+        root_layout.addWidget(self.workspace_tabs, 1)
         self.setCentralWidget(main_widget)
 
         self.agent_fab = QToolButton(self.view.viewport())
@@ -292,6 +341,16 @@ class MainWindow(QMainWindow):
         self.agent_fab.hide()
         self.view.viewport().installEventFilter(self)
         QTimer.singleShot(0, self._position_agent_fab)
+
+    def _focus_canvas_workspace(self):
+        self.workspace_tabs.show_home()
+        self.view.setFocus(Qt.OtherFocusReason)
+
+    def _sync_workspace_navigation(self, index):
+        is_home = self.workspace_tabs.widget(index) is getattr(
+            self.workspace_tabs, "_home_page", None
+        )
+        self.design_rail_btn.setChecked(is_home)
 
     def _build_status_bar(self, body_layout):
         self.status_panel = QFrame(self)
@@ -321,8 +380,21 @@ class MainWindow(QMainWindow):
         body_layout.addWidget(self.status_panel)
 
     def _focus_inspector(self):
+        self.workspace_tabs.show_home()
         self.side_panel.show()
-        self.palette_search.setFocus()
+        self.inspector_tabs.setCurrentIndex(1)
+        selected_node = next(
+            (
+                item
+                for item in self.scene.selectedItems()
+                if isinstance(item, NodeItem)
+            ),
+            None,
+        )
+        if selected_node is not None:
+            self._open_param_panel(selected_node)
+        else:
+            self.param_scroll.setFocus(Qt.OtherFocusReason)
 
     def _position_agent_fab(self):
         if not hasattr(self, "agent_fab"):
@@ -518,6 +590,12 @@ class MainWindow(QMainWindow):
         self._report_error(message)
 
     def closeEvent(self, event):
+        if self._experiment_workbench is not None:
+            if not self._experiment_workbench.close_from_parent():
+                event.ignore()
+                return
+        if hasattr(self, "workspace_tabs"):
+            self.workspace_tabs.shutdown()
         self._save_ui_state()
         self._restore_log_redirect()
         super().closeEvent(event)
@@ -611,6 +689,12 @@ class MainWindow(QMainWindow):
         panel.setParent(None)
         panel.deleteLater()
 
+    def _handle_node_removed(self, node):
+        panel_key = f"{node.name}@{node.component_name}:{node.index}"
+        panel = self._param_panels.get(panel_key)
+        if panel is not None and getattr(panel, "_parameter_node", None) is node:
+            self._close_param_panel(panel_key)
+
     def _clear_param_panels(self):
         for key in list(self._param_panels.keys()):
             self._close_param_panel(key)
@@ -618,6 +702,10 @@ class MainWindow(QMainWindow):
     def _open_param_panel(self, node):
         if node is None:
             return False
+
+        if hasattr(self, "workspace_tabs"):
+            self.workspace_tabs.show_home()
+        self.side_panel.show()
 
         self._refresh_node_params_from_device(
             node,
@@ -633,6 +721,9 @@ class MainWindow(QMainWindow):
 
         panel_key = f"{node.name}@{node.component_name}:{node.index}"
         existing = self._param_panels.get(panel_key)
+        if existing is not None and getattr(existing, "_parameter_node", None) is not node:
+            self._close_param_panel(panel_key)
+            existing = None
         if existing is not None:
             if not isinstance(node, (ModuleFIRFilter, ModuleIIRFilter)):
                 self._update_panel_from_node(existing, node)
@@ -640,6 +731,7 @@ class MainWindow(QMainWindow):
             return True
 
         card = QFrame(self.param_container)
+        card._parameter_node = node
         card.setFrameShape(QFrame.StyledPanel)
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(8, 8, 8, 8)
@@ -675,6 +767,12 @@ class MainWindow(QMainWindow):
             param_widget.setWindowFlags(Qt.Widget)
             card_layout.addWidget(param_widget)
             card._param_widget = param_widget
+            if isinstance(node, ModulePID):
+                pid_canvas = param_widget.findChild(PIDParamCanvas)
+                if pid_canvas is not None:
+                    pid_canvas.setProperty(
+                        "workspaceTitle", f"{node.display_name} · 实时响应"
+                    )
 
         if special_methods:
             if isinstance(node, ModuleFIRFilter):
@@ -697,6 +795,10 @@ class MainWindow(QMainWindow):
                     initial_values=getattr(node, "_special_method_args", {}),
                 )
             special_widget.setWindowFlags(Qt.Widget)
+            if isinstance(node, (ModuleFIRFilter, ModuleIIRFilter)):
+                special_widget.setProperty(
+                    "workspaceTitle", f"{node.display_name} · 滤波器设计"
+                )
             card_layout.addWidget(special_widget)
             card._special_widget = special_widget
 

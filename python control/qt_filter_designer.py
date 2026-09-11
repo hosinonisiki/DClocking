@@ -26,6 +26,19 @@ __all__ = [
 ]
 
 
+def _dispatch_workspace_open(source, key, title, widget):
+    """Offer an expanded tool to the owning browser-style workspace."""
+    top_level = source.window() if source is not None else None
+    handler = getattr(top_level, "open_workspace_window", None)
+    if not callable(handler):
+        return False
+    try:
+        return bool(handler(key, title, widget, source=source))
+    except Exception as exc:
+        print(f"[workspace] open tab failed: {exc}")
+        return False
+
+
 def _log_frequency_grid(freq_sample, points):
     """Return a four-decade plotting grid ending at Nyquist."""
     nyquist = float(freq_sample) / 2.0
@@ -783,8 +796,17 @@ class FIRDesignerWidget(QWidget):
         return FIRResponseCanvas._format_frequency(value)
 
     def open_expanded_window(self):
+        workspace_key = f"fir-designer:{id(self)}"
+        workspace_title = self.property("workspaceTitle") or "FIR 滤波器设计"
         if self._expanded_window is not None:
             try:
+                if _dispatch_workspace_open(
+                    self,
+                    workspace_key,
+                    workspace_title,
+                    self._expanded_window,
+                ):
+                    return self._expanded_window
                 if self._expanded_window.isVisible():
                     self._expanded_window.raise_()
                     self._expanded_window.activateWindow()
@@ -797,6 +819,13 @@ class FIRDesignerWidget(QWidget):
             parent=self.window(),
         )
         self._expanded_window.destroyed.connect(self._clear_expanded_window)
+        if _dispatch_workspace_open(
+            self,
+            workspace_key,
+            workspace_title,
+            self._expanded_window,
+        ):
+            return self._expanded_window
         self._expanded_window.show()
         self._expanded_window.raise_()
         self._expanded_window.activateWindow()
@@ -1446,8 +1475,17 @@ class IIRDesignerWidget(QWidget):
             self._status_label.setStyleSheet("color: #A4003B;")
 
     def open_expanded_window(self):
+        workspace_key = f"iir-designer:{id(self)}"
+        workspace_title = self.property("workspaceTitle") or "IIR 滤波器设计"
         if self._expanded_window is not None:
             try:
+                if _dispatch_workspace_open(
+                    self,
+                    workspace_key,
+                    workspace_title,
+                    self._expanded_window,
+                ):
+                    return self._expanded_window
                 if self._expanded_window.isVisible():
                     self._expanded_window.raise_()
                     self._expanded_window.activateWindow()
@@ -1460,6 +1498,13 @@ class IIRDesignerWidget(QWidget):
             parent=self.window(),
         )
         self._expanded_window.destroyed.connect(self._clear_expanded_window)
+        if _dispatch_workspace_open(
+            self,
+            workspace_key,
+            workspace_title,
+            self._expanded_window,
+        ):
+            return self._expanded_window
         self._expanded_window.show()
         self._expanded_window.raise_()
         self._expanded_window.activateWindow()

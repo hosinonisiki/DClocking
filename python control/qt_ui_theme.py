@@ -184,6 +184,74 @@ QSplitter::handle {{
     height: 1px;
     background: {c.BORDER};
 }}
+QTabWidget#workspace_tabs {{
+    background: {c.SURFACE};
+}}
+QTabWidget#workspace_tabs::pane {{
+    background: {c.SURFACE};
+    border: none;
+    border-top: 1px solid {c.BORDER};
+}}
+QTabWidget#workspace_tabs > QTabBar {{
+    background: {c.SURFACE_ALT};
+}}
+QTabWidget#workspace_tabs > QTabBar::tab {{
+    min-width: 128px;
+    min-height: 38px;
+    padding: 0 34px 0 16px;
+    margin: 5px 2px 0 2px;
+    color: {c.TEXT_MUTED};
+    background: #E9E6E2;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-top-left-radius: 9px;
+    border-top-right-radius: 9px;
+}}
+QTabWidget#workspace_tabs > QTabBar::tab:hover {{
+    color: {c.TEXT};
+    background: #F4F2EF;
+    border-color: {c.BORDER};
+}}
+QTabWidget#workspace_tabs > QTabBar::tab:selected {{
+    color: {c.PKU_WINE};
+    background: {c.SURFACE_RAISED};
+    border-color: {c.BORDER};
+    border-bottom-color: {c.SURFACE_RAISED};
+    font-weight: 700;
+}}
+QTabWidget#workspace_tabs > QTabBar::close-button {{
+    subcontrol-position: right;
+    margin-right: 8px;
+}}
+QPushButton#workspace_tab_close_button {{
+    min-width: 28px;
+    max-width: 28px;
+    min-height: 28px;
+    max-height: 28px;
+    padding: 0;
+    color: {c.TEXT_MUTED};
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    font-size: 16px;
+    font-weight: 500;
+}}
+QPushButton#workspace_tab_close_button:hover {{
+    color: {c.PKU_WINE};
+    background: #F3E7EA;
+}}
+QPushButton#workspace_tab_close_button:pressed {{
+    background: #E8CFD8;
+}}
+QFrame#detached_workspace_toolbar {{
+    min-height: 34px;
+    background: {c.SURFACE_ALT};
+    border-bottom: 1px solid {c.BORDER};
+}}
+QPushButton#reattach_workspace_button {{
+    min-height: 28px;
+    padding: 0 12px;
+}}
 QTabWidget::pane {{
     border: none;
 }}
