@@ -8,7 +8,6 @@ control over whether their experiment records are versioned or shared.
 from __future__ import annotations
 
 import ctypes
-import fcntl
 import hashlib
 import os
 import re
@@ -18,6 +17,11 @@ import sys
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # Windows has no fcntl; select the Win32 handle backend below.
+    fcntl = None
 
 from PySide6.QtCore import (
     QByteArray,
@@ -46,6 +50,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from qt_experiment_storage import (
+    PortableExperimentRepository,
+    PortableStorageExternalModificationError,
+)
+from qt_experiment_storage_windows import (
+    WindowsExperimentRepository,
+    WindowsStorageCommitUncertainError,
+    WindowsStorageExternalModificationError,
+)
+from qt_ui_theme import fixed_font_family
+
 
 class _ExternalModificationError(OSError):
     def __init__(self, message, recovery_name=None):
@@ -54,8 +69,8 @@ class _ExternalModificationError(OSError):
 
 
 class _CommitUncertainError(OSError):
-    def __init__(self, recovery_name):
-        super().__init__("原文件回滚失败，已保留可见恢复副本")
+    def __init__(self, recovery_name, message=None):
+        super().__init__(message or "保存结果需要检查，已保留恢复副本")
         self.recovery_name = recovery_name
 
 
@@ -112,12 +127,44 @@ class ExperimentWorkbench(QDialog):
     SETTINGS_ROOT_KEY = "experiment_workspace/root"
     SETTINGS_SPLITTER_KEY = "experiment_workspace/splitter"
 
-    def __init__(self, settings=None, default_root=None, parent=None):
+    def __init__(
+        self,
+        settings=None,
+        default_root=None,
+        parent=None,
+        storage_backend=None,
+    ):
         super().__init__(parent)
         self._settings = settings or QSettings("DClocking", "PrecisionWorkstation")
         self._default_root = Path(default_root).expanduser() if default_root else self.default_repository_path()
         self.repository_root: Path | None = None
         self._root_fd: int | None = None
+        if storage_backend not in (None, "descriptor", "portable", "windows"):
+            raise ValueError("storage_backend must be descriptor, windows, or portable")
+        if storage_backend == "descriptor" and (
+            fcntl is None or sys.platform != "darwin"
+        ):
+            raise RuntimeError("当前平台不支持 macOS descriptor 实验存储后端")
+        if storage_backend == "windows" and os.name != "nt":
+            raise RuntimeError("Windows 实验存储后端只能在 Windows 上使用")
+        if storage_backend is None:
+            if sys.platform == "darwin" and fcntl is not None:
+                storage_backend = "descriptor"
+            elif os.name == "nt":
+                storage_backend = "windows"
+            else:
+                raise RuntimeError(
+                    "当前平台没有安全的实验记录存储后端；"
+                    "portable 仅供显式测试使用"
+                )
+        self._storage_backend = storage_backend
+        self._portable_repository = (
+            WindowsExperimentRepository(self.MAX_FILE_BYTES)
+            if self._storage_backend == "windows"
+            else PortableExperimentRepository(self.MAX_FILE_BYTES)
+            if self._storage_backend == "portable"
+            else None
+        )
         self.current_path: Path | None = None
         self._opened_snapshot = None
         self._loading_document = False
@@ -154,15 +201,16 @@ class ExperimentWorkbench(QDialog):
             self.body_splitter.restoreState(splitter_state)
         self._update_document_state()
 
+        fixed_font = fixed_font_family()
         self.setStyleSheet(
             "#experiment_header { background: #FFFFFF; border-bottom: 1px solid #D8D4CE; }"
             "#experiment_title { color: #243447; font-size: 17px; font-weight: 750; letter-spacing: 1px; }"
             "#experiment_chip { color: #8F123D; background: #F5E6EB; border: 1px solid #E5C7D2; "
             "border-radius: 9px; padding: 3px 9px; font-size: 10px; font-weight: 650; }"
-            "#experiment_repo_path { color: #5F6976; font-family: Menlo; font-size: 10px; }"
+            f'#experiment_repo_path {{ color: #5F6976; font-family: "{fixed_font}"; font-size: 10px; }}'
             "#experiment_tree_panel, #experiment_editor_panel, #experiment_preview_panel { background: #FBFBF9; }"
             "#experiment_editor { background: #FFFFFF; color: #303438; border: 1px solid #D8D4CE; "
-            "border-radius: 7px; padding: 12px; font-family: Menlo; font-size: 13px; }"
+            f'border-radius: 7px; padding: 12px; font-family: "{fixed_font}"; font-size: 13px; }}'
             "#experiment_preview { background: #FFFFFF; color: #303438; border: 1px solid #D8D4CE; "
             "border-radius: 7px; padding: 12px; }"
             "#experiment_status_bar { background: #F2F0ED; border-top: 1px solid #D8D4CE; }"
@@ -327,7 +375,9 @@ class ExperimentWorkbench(QDialog):
         self.document_status_label = QLabel("就绪", status)
         self.document_status_label.setObjectName("experiment_dirty_status")
         self.encoding_label = QLabel("UTF-8", status)
-        self.encoding_label.setStyleSheet("color: #72777B; font-family: Menlo; font-size: 10px;")
+        self.encoding_label.setStyleSheet(
+            f'color: #72777B; font-family: "{fixed_font_family()}"; font-size: 10px;'
+        )
         layout.addWidget(self.document_status_label)
         layout.addStretch()
         layout.addWidget(self.encoding_label)
@@ -339,23 +389,27 @@ class ExperimentWorkbench(QDialog):
         new_root_fd = None
         try:
             requested = Path(root).expanduser()
-            requested.mkdir(parents=True, exist_ok=True)
-            resolved = requested.resolve(strict=True)
-            if not resolved.is_dir():
-                raise ValueError("选择的位置不是文件夹")
-            before = os.stat(resolved, follow_symlinks=False)
-            new_root_fd = self._open_absolute_directory_no_symlinks(resolved)
-            opened = os.fstat(new_root_fd)
-            visible = os.stat(resolved, follow_symlinks=False)
-            identities = {
-                (before.st_dev, before.st_ino),
-                (opened.st_dev, opened.st_ino),
-                (visible.st_dev, visible.st_ino),
-            }
-            if not stat.S_ISDIR(opened.st_mode) or len(identities) != 1:
-                os.close(new_root_fd)
-                new_root_fd = None
-                raise ValueError("仓库路径在打开过程中发生变化，请重新选择")
+            if self._storage_backend != "descriptor":
+                self._portable_repository.max_file_bytes = self.MAX_FILE_BYTES
+                resolved = self._portable_repository.set_root(requested)
+            else:
+                requested.mkdir(parents=True, exist_ok=True)
+                resolved = requested.resolve(strict=True)
+                if not resolved.is_dir():
+                    raise ValueError("选择的位置不是文件夹")
+                before = os.stat(resolved, follow_symlinks=False)
+                new_root_fd = self._open_absolute_directory_no_symlinks(resolved)
+                opened = os.fstat(new_root_fd)
+                visible = os.stat(resolved, follow_symlinks=False)
+                identities = {
+                    (before.st_dev, before.st_ino),
+                    (opened.st_dev, opened.st_ino),
+                    (visible.st_dev, visible.st_ino),
+                }
+                if not stat.S_ISDIR(opened.st_mode) or len(identities) != 1:
+                    os.close(new_root_fd)
+                    new_root_fd = None
+                    raise ValueError("仓库路径在打开过程中发生变化，请重新选择")
         except (OSError, ValueError) as exc:
             if new_root_fd is not None:
                 os.close(new_root_fd)
@@ -494,6 +548,12 @@ class ExperimentWorkbench(QDialog):
     def _require_repository(self) -> Path:
         if self.repository_root is None:
             raise ValueError("实验仓库尚未初始化，请先切换仓库")
+        if self._storage_backend != "descriptor":
+            self._portable_repository.max_file_bytes = self.MAX_FILE_BYTES
+            root = self._portable_repository.require_root()
+            if root != self.repository_root:
+                raise ValueError("当前实验仓库不可用，请重新选择仓库")
+            return root
         if self._root_fd is None:
             raise ValueError("当前实验仓库不可用，请重新选择仓库")
         try:
@@ -532,6 +592,8 @@ class ExperimentWorkbench(QDialog):
     def _secure_repository_directory(self, name: str) -> Path:
         if not name or name in (".", "..") or "/" in name or "\x00" in name:
             raise ValueError("实验记录目录名称无效")
+        if self._storage_backend != "descriptor":
+            return self._portable_repository.ensure_directory(name)
         self._require_repository()
         try:
             os.mkdir(name, mode=0o700, dir_fd=self._root_fd)
@@ -549,6 +611,10 @@ class ExperimentWorkbench(QDialog):
 
     @contextmanager
     def _repository_write_lock(self):
+        if self._storage_backend != "descriptor":
+            with self._portable_repository.write_lock():
+                yield
+            return
         self._require_repository()
         flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_CLOEXEC", 0)
         flags |= getattr(os, "O_NOFOLLOW", 0)
@@ -593,6 +659,9 @@ class ExperimentWorkbench(QDialog):
         return payload, snapshot
 
     def _read_document(self, path: Path):
+        if self._storage_backend != "descriptor":
+            self._portable_repository.max_file_bytes = self.MAX_FILE_BYTES
+            return self._portable_repository.read_text(path, self.SUPPORTED_SUFFIXES)
         parts = self._relative_parts(path)
         shown_path = self.repository_root.joinpath(*parts)
         if shown_path.suffix.lower() not in self.SUPPORTED_SUFFIXES:
@@ -642,6 +711,26 @@ class ExperimentWorkbench(QDialog):
         exclusive=False,
         expected_snapshot=None,
     ):
+        if self._storage_backend != "descriptor":
+            self._portable_repository.max_file_bytes = self.MAX_FILE_BYTES
+            try:
+                return self._portable_repository.write_text(
+                    path,
+                    text,
+                    exclusive=exclusive,
+                    expected_snapshot=expected_snapshot,
+                )
+            except PortableStorageExternalModificationError as exc:
+                raise _ExternalModificationError(str(exc)) from exc
+            except WindowsStorageExternalModificationError as exc:
+                raise _ExternalModificationError(
+                    str(exc), recovery_name=exc.recovery_name
+                ) from exc
+            except WindowsStorageCommitUncertainError as exc:
+                raise _CommitUncertainError(
+                    exc.recovery_name,
+                    message=str(exc),
+                ) from exc
         payload = text.encode("utf-8")
         if len(payload) > self.MAX_FILE_BYTES:
             raise ValueError("实验记录超过 5 MiB，已拒绝保存")
@@ -878,8 +967,8 @@ class ExperimentWorkbench(QDialog):
             QMessageBox.warning(
                 self,
                 "保存状态需要检查",
-                "系统未能自动回滚原文件。当前编辑版本已位于原文件路径，"
-                f"原版本已另存为：\n{exc.recovery_name}\n\n请检查两个文件后再继续。",
+                f"{exc}\n\n已保留恢复文件：\n{exc.recovery_name}"
+                "\n\n请检查原文件与恢复文件后再继续。",
             )
             return False
         except _ExternalModificationError as exc:
@@ -1067,9 +1156,12 @@ class ExperimentWorkbench(QDialog):
         return True
 
     def _close_root_descriptor(self):
-        if self._root_fd is not None:
+        if getattr(self, "_root_fd", None) is not None:
             os.close(self._root_fd)
             self._root_fd = None
+        repository = getattr(self, "_portable_repository", None)
+        if repository is not None:
+            repository.close()
 
     def _save_ui_state(self):
         self._settings.setValue(self.SETTINGS_SPLITTER_KEY, self.body_splitter.saveState())

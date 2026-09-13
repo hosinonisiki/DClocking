@@ -30,14 +30,31 @@ class UiColors:
 
 def _ui_font_family() -> str:
     available = set(QFontDatabase.families())
-    for family in ("Helvetica Neue", "PingFang SC", ".AppleSystemUIFont"):
+    for family in (
+        "Segoe UI",
+        "Microsoft YaHei UI",
+        "Helvetica Neue",
+        "PingFang SC",
+        ".AppleSystemUIFont",
+    ):
         if family in available:
             return family
-    return ".AppleSystemUIFont"
+    system = QFontDatabase.systemFont(QFontDatabase.GeneralFont).family()
+    return system or next(iter(available), "Sans Serif")
+
+
+def fixed_font_family() -> str:
+    available = set(QFontDatabase.families())
+    for family in ("Cascadia Mono", "Consolas", "Menlo", "SF Mono"):
+        if family in available:
+            return family
+    system = QFontDatabase.systemFont(QFontDatabase.FixedFont).family()
+    return system or "monospace"
 
 
 def build_application_stylesheet() -> str:
     c = UiColors
+    fixed = fixed_font_family()
     return f"""
 QMainWindow, QWidget {{
     color: {c.TEXT};
@@ -270,6 +287,9 @@ QToolTip {{
     background: {c.NODE_BG};
     border: 1px solid {c.NODE_BORDER};
     padding: 5px;
+}}
+QPlainTextEdit#log_output {{
+    font-family: "{fixed}";
 }}
 QDockWidget {{
     color: {c.TEXT};

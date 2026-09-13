@@ -36,15 +36,56 @@ class LLMClient:
     def __init__(self, endpoint: str, api_key: str, model: str = "gpt-4o",
                  temperature: float = 0.1, max_tokens: int = 4096,
                  timeout: float = 120.0):
-        self.endpoint = endpoint.rstrip("/") + "/chat/completions"
-        self.api_key = api_key
-        self.model = model
-        self.temperature = temperature
-        self.max_tokens = max_tokens
-        self.timeout = timeout
+        self._configuration_lock = threading.RLock()
+        self.endpoint = ""
+        self.api_key = ""
+        self.model = ""
+        self.temperature = float(temperature)
+        self.max_tokens = int(max_tokens)
+        self.timeout = float(timeout)
+        self.configure(endpoint=endpoint, api_key=api_key, model=model)
         self._curl_binary = shutil.which("curl")
         self._active_lock = threading.Lock()
         self._active_requests: dict[object, dict[str, Any]] = {}
+
+    @staticmethod
+    def _chat_completions_endpoint(endpoint: str) -> str:
+        base = str(endpoint).strip().rstrip("/")
+        if not base:
+            raise ValueError("API endpoint is required")
+        if base.endswith("/chat/completions"):
+            return base
+        return base + "/chat/completions"
+
+    def configure(self, *, endpoint: str, api_key: str, model: str) -> None:
+        """Atomically publish one provider/model/credential configuration."""
+
+        normalized_endpoint = self._chat_completions_endpoint(endpoint)
+        key = str(api_key or "")
+        model_name = str(model or "").strip()
+        if not normalized_endpoint or any(
+            mark in normalized_endpoint for mark in ("\r", "\n", "\x00")
+        ):
+            raise ValueError("API endpoint is invalid")
+        if any(mark in key for mark in ("\r", "\n", "\x00")):
+            raise ValueError("API key contains an invalid control character")
+        if not model_name:
+            raise ValueError("Model name is required")
+        with self._configuration_lock:
+            self.endpoint = normalized_endpoint
+            self.api_key = key
+            self.model = model_name
+
+    def configuration_snapshot(self) -> dict[str, Any]:
+        with self._configuration_lock:
+            return {
+                "endpoint": self.endpoint,
+                "api_key": self.api_key,
+                "model": self.model,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+                "timeout": self.timeout,
+            }
 
     def chat(self, messages: list[dict],
              tools: list[dict] | None = None, *,
@@ -53,14 +94,17 @@ class LLMClient:
         """Send one cancellable, streaming chat-completion request."""
         if not self._curl_binary:
             raise LLMError("curl is required for cancellable LLM requests")
-        if "\r" in self.api_key or "\n" in self.api_key:
+        configuration = self.configuration_snapshot()
+        if not configuration["api_key"]:
+            raise LLMError("API key is not configured")
+        if "\r" in configuration["api_key"] or "\n" in configuration["api_key"]:
             raise LLMError("API key contains an invalid line break")
 
         payload = {
-            "model": self.model,
+            "model": configuration["model"],
             "messages": messages,
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
+            "temperature": configuration["temperature"],
+            "max_tokens": configuration["max_tokens"],
             "stream": True,
         }
         if tools:
@@ -85,7 +129,12 @@ class LLMClient:
 
         try:
             self._raise_if_cancelled(cancel_event)
-            config = self._build_curl_config(payload)
+            config = self._build_curl_config(
+                payload,
+                endpoint=configuration["endpoint"],
+                api_key=configuration["api_key"],
+                timeout=configuration["timeout"],
+            )
             try:
                 process.stdin.write(config.encode("utf-8"))
                 process.stdin.close()
@@ -130,7 +179,7 @@ class LLMClient:
                 messages=[{"role": "user", "content": "Hi"}],
                 tools=None,
             )
-            return {"ok": True, "model": self.model,
+            return {"ok": True, "model": self.configuration_snapshot()["model"],
                     "response": result.get("content", "")[:100]}
         except LLMError as e:
             return {"ok": False, "error": str(e)}
@@ -150,7 +199,19 @@ class LLMClient:
         thread.start()
         return thread
 
-    def _build_curl_config(self, payload: dict) -> str:
+    def _build_curl_config(
+        self,
+        payload: dict,
+        *,
+        endpoint=None,
+        api_key=None,
+        timeout=None,
+    ) -> str:
+        if endpoint is None or api_key is None or timeout is None:
+            configuration = self.configuration_snapshot()
+            endpoint = configuration["endpoint"] if endpoint is None else endpoint
+            api_key = configuration["api_key"] if api_key is None else api_key
+            timeout = configuration["timeout"] if timeout is None else timeout
         payload_text = json.dumps(
             payload, ensure_ascii=False, separators=(",", ":")
         )
@@ -158,17 +219,17 @@ class LLMClient:
             "\n" + self._STATUS_PREFIX.decode() + "%{http_code}\n"
         )
         lines = [
-            f"url = {self._curl_quote(self.endpoint)}",
+            f"url = {self._curl_quote(endpoint)}",
             'request = "POST"',
             'header = "Content-Type: application/json"',
             'header = "Accept: text/event-stream"',
-            f"header = {self._curl_quote('Authorization: Bearer ' + self.api_key)}",
+            f"header = {self._curl_quote('Authorization: Bearer ' + api_key)}",
             f"data-binary = {self._curl_quote(payload_text)}",
             "no-buffer",
             "silent",
             "show-error",
-            f"connect-timeout = {max(1.0, min(float(self.timeout), 30.0))}",
-            f"max-time = {max(1.0, float(self.timeout))}",
+            f"connect-timeout = {max(1.0, min(float(timeout), 30.0))}",
+            f"max-time = {max(1.0, float(timeout))}",
             f"write-out = {self._curl_quote(status_template)}",
         ]
         return "\n".join(lines) + "\n"

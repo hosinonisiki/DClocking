@@ -19,6 +19,7 @@ for path in (str(CONTROL), str(AGENT), str(ROOT)):
         sys.path.insert(0, path)
 
 from PySide6.QtCore import QPointF, QSettings
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from FPGA_Agent.main import create_window as create_integrated_window
@@ -64,9 +65,37 @@ def capture(factory, variant, width, height, output_dir, settings_path):
     return output
 
 
+def capture_scope(width, height, output_dir, settings_path):
+    settings = QSettings(str(settings_path), QSettings.IniFormat)
+    settings.clear()
+    window = create_integrated_window(settings=settings)
+    window.resize(width, height)
+    window.show()
+    app = QApplication.instance()
+    app.processEvents()
+    scope = window.open_oscilloscope_workbench()
+    scope.source_combo.setCurrentText("内置仿真")
+    scope.start_button.click()
+    QTest.qWait(420)
+    app.processEvents()
+
+    output = output_dir / f"oscilloscope-{width}x{height}.png"
+    if not window.grab().save(str(output), "PNG"):
+        raise RuntimeError(f"Failed to save {output}")
+    scope.stop_button.click()
+    window.close()
+    app.processEvents()
+    return output
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--include-scope",
+        action="store_true",
+        help="also capture the live simulator oscilloscope workspace",
+    )
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
 
@@ -88,6 +117,14 @@ def main():
                     settings_root / f"{variant}-{width}.ini",
                 )
                 print(output)
+        if args.include_scope:
+            output = capture_scope(
+                1600,
+                900,
+                args.output,
+                settings_root / "oscilloscope.ini",
+            )
+            print(output)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,8 @@
 import tempfile
 import unittest
 import shutil
+import os
+import sys
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
@@ -35,6 +37,7 @@ class ExperimentWorkbenchTests(unittest.TestCase):
     def tearDown(self):
         self.workbench._close_without_prompt = True
         self.workbench.close()
+        self.workbench._close_root_descriptor()
         self.app.processEvents()
         self.temp_dir.cleanup()
 
@@ -98,13 +101,22 @@ class ExperimentWorkbenchTests(unittest.TestCase):
         outside = Path(self.temp_dir.name) / "outside.md"
         outside.write_text("outside", encoding="utf-8")
         link = self.root / "escape.md"
-        link.symlink_to(outside)
         binary = self.root / "capture.dat"
         binary.write_bytes(b"abc\x00def")
         oversized = self.root / "large.txt"
         oversized.write_bytes(b"x" * (ExperimentWorkbench.MAX_FILE_BYTES + 1))
 
-        for candidate in (outside, link, binary, oversized):
+        candidates = [outside, binary, oversized]
+        try:
+            link.symlink_to(outside)
+        except OSError:
+            # Windows CI may not grant symlink creation.  Reparse-point
+            # rejection is covered by the Windows handle-backend tests.
+            pass
+        else:
+            candidates.append(link)
+
+        for candidate in candidates:
             with self.subTest(candidate=candidate.name):
                 with patch("qt_experiment_workbench.QMessageBox.warning"):
                     self.assertFalse(self.workbench.open_document(candidate))
@@ -113,11 +125,19 @@ class ExperimentWorkbenchTests(unittest.TestCase):
         outside_dir.mkdir()
         escaped_child = outside_dir / "child.md"
         escaped_child.write_text("outside child", encoding="utf-8")
-        (self.root / "linked-directory").symlink_to(outside_dir, target_is_directory=True)
-        with patch("qt_experiment_workbench.QMessageBox.warning"):
-            self.assertFalse(
-                self.workbench.open_document(self.root / "linked-directory" / "child.md")
+        try:
+            (self.root / "linked-directory").symlink_to(
+                outside_dir, target_is_directory=True
             )
+        except OSError:
+            pass
+        else:
+            with patch("qt_experiment_workbench.QMessageBox.warning"):
+                self.assertFalse(
+                    self.workbench.open_document(
+                        self.root / "linked-directory" / "child.md"
+                    )
+                )
 
         self.assertTrue(self.workbench.file_model.filter() & QDir.NoSymLinks)
         self.assertFalse(self.workbench.preview.openLinks())
@@ -158,6 +178,8 @@ class ExperimentWorkbenchTests(unittest.TestCase):
         self.assertEqual(self.workbench.editor.toPlainText(), original)
 
     def test_deleted_repository_reports_error_instead_of_raising(self):
+        if os.name == "nt":
+            self.workbench._portable_repository.close()
         shutil.rmtree(self.root)
         with patch("qt_experiment_workbench.QMessageBox.warning") as warning:
             created = self.workbench.create_record(
@@ -281,6 +303,8 @@ class ExperimentWorkbenchTests(unittest.TestCase):
 
     def test_renamed_and_recreated_repository_is_rejected(self):
         moved = Path(self.temp_dir.name) / "moved-records"
+        if os.name == "nt":
+            self.workbench._portable_repository.close()
         self.root.rename(moved)
         self.root.mkdir()
 
@@ -293,6 +317,7 @@ class ExperimentWorkbenchTests(unittest.TestCase):
         self.assertFalse(any(moved.rglob("*错误仓库*")))
         warning.assert_called_once()
 
+    @unittest.skipUnless(sys.platform == "darwin", "macOS descriptor backend test")
     def test_repository_open_rejects_ancestor_symlink_swap(self):
         container = Path(self.temp_dir.name) / "candidate-container"
         candidate = container / "repo"
@@ -320,6 +345,7 @@ class ExperimentWorkbenchTests(unittest.TestCase):
         self.assertEqual(self.workbench.repository_root, self.root.resolve())
         warning.assert_called_once()
 
+    @unittest.skipUnless(sys.platform == "darwin", "macOS atomic exchange test")
     def test_atomic_exchange_preserves_external_write_during_save(self):
         record = self.workbench.create_record(
             "交换冲突", when=datetime(2026, 9, 10, 14, 42)
@@ -387,6 +413,7 @@ class ExperimentWorkbenchTests(unittest.TestCase):
             "本地待保存版本",
         )
 
+    @unittest.skipUnless(sys.platform == "darwin", "macOS atomic exchange test")
     def test_failed_exchange_rollback_exposes_original_as_recovery_file(self):
         record = self.workbench.create_record(
             "回滚失败", when=datetime(2026, 9, 10, 14, 44)
@@ -420,6 +447,7 @@ class ExperimentWorkbenchTests(unittest.TestCase):
         self.assertTrue(self.workbench.is_dirty)
         warning.assert_called_once()
 
+    @unittest.skipUnless(sys.platform == "darwin", "macOS directory fsync test")
     def test_directory_fsync_failure_rolls_back_before_conflict_save(self):
         record = self.workbench.create_record(
             "同步失败", when=datetime(2026, 9, 10, 14, 45)
@@ -455,6 +483,7 @@ class ExperimentWorkbenchTests(unittest.TestCase):
             "本地同步版本",
         )
 
+    @unittest.skipUnless(sys.platform == "darwin", "macOS atomic exchange test")
     def test_second_external_write_during_rollback_is_preserved(self):
         record = self.workbench.create_record(
             "二次外部写入", when=datetime(2026, 9, 10, 14, 46)

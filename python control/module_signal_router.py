@@ -1,6 +1,4 @@
 import module
-import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
 from port_numbers import *
 import time
 

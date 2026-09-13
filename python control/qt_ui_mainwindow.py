@@ -52,8 +52,8 @@ from qt_custom_composite import (
     CustomCompositeNode,
     CustomCompositeWorkbench,
 )
-from qt_experiment_workbench import ExperimentWorkbench
-from qt_ui_theme import UiColors, apply_application_theme
+from qt_oscilloscope_workbench import OscilloscopeWorkbench
+from qt_ui_theme import UiColors, apply_application_theme, fixed_font_family
 from qt_workspace_tabs import WorkspaceTabWidget
 from qt_ui_utils import (
     ensure_port_methods,
@@ -175,6 +175,7 @@ class MainWindow(QMainWindow):
         self._custom_composite_workbench = None
         self._experiment_repository_path = experiment_repository_path
         self._experiment_workbench = None
+        self._oscilloscope_workbench = None
         self.view.set_custom_composite_provider(self.custom_composite_library.get)
         self.custom_composite_library.changed.connect(self._refresh_custom_composite_palette)
         self._refresh_custom_composite_palette()
@@ -224,6 +225,11 @@ class MainWindow(QMainWindow):
 
     def open_experiment_workbench(self):
         if self._experiment_workbench is None:
+            # Keep optional tool imports out of the main startup path.  A
+            # platform-specific workbench failure must never prevent the FPGA
+            # console from opening on Windows.
+            from qt_experiment_workbench import ExperimentWorkbench
+
             self._experiment_workbench = ExperimentWorkbench(
                 settings=self._settings,
                 default_root=self._experiment_repository_path,
@@ -236,6 +242,20 @@ class MainWindow(QMainWindow):
             source=self,
         )
         return self._experiment_workbench
+
+    def open_oscilloscope_workbench(self):
+        if self._oscilloscope_workbench is None:
+            self._oscilloscope_workbench = OscilloscopeWorkbench(
+                settings=self._settings,
+                parent=self,
+            )
+        self.open_workspace_window(
+            "oscilloscope-workbench",
+            "实时示波器",
+            self._oscilloscope_workbench,
+            source=self,
+        )
+        return self._oscilloscope_workbench
 
     def open_workspace_window(self, key, title, widget, source=None):
         """Open a tool as a main-window tab, or focus its detached window."""
@@ -282,6 +302,9 @@ class MainWindow(QMainWindow):
         self.experiment_rail_btn = add_rail_button("✎", "打开实验记录工作台")
         self.experiment_rail_btn.setObjectName("experiment_workbench_rail_button")
         self.experiment_rail_btn.setCheckable(False)
+        self.oscilloscope_rail_btn = add_rail_button("∿", "打开实时示波器工作台")
+        self.oscilloscope_rail_btn.setObjectName("oscilloscope_workbench_rail_button")
+        self.oscilloscope_rail_btn.setCheckable(False)
         self.log_rail_btn = add_rail_button("⌁", "运行日志")
         rail_layout.addStretch()
         self.settings_rail_btn = add_rail_button("⚙", "Agent 设置")
@@ -291,6 +314,7 @@ class MainWindow(QMainWindow):
         self.param_rail_btn.clicked.connect(self._focus_inspector)
         self.config_rail_btn.clicked.connect(self.load_configuration)
         self.experiment_rail_btn.clicked.connect(self.open_experiment_workbench)
+        self.oscilloscope_rail_btn.clicked.connect(self.open_oscilloscope_workbench)
         self.log_rail_btn.clicked.connect(
             lambda: self.set_log_expanded(not self.is_log_expanded())
         )
@@ -368,7 +392,9 @@ class MainWindow(QMainWindow):
             self.mode_status_label,
             self.route_status_label,
         ):
-            label.setStyleSheet("font-family: Menlo; font-size: 10px;")
+            label.setStyleSheet(
+                f'font-family: "{fixed_font_family()}"; font-size: 10px;'
+            )
             layout.addWidget(label)
         layout.addStretch()
         self.log_toggle_btn = QToolButton(self.status_panel)
@@ -480,7 +506,7 @@ class MainWindow(QMainWindow):
         self.device_status_label.setText("● 设备在线" if connected else "● 设备离线")
         color = UiColors.STATUS_OK if connected else UiColors.TEXT_MUTED
         self.device_status_label.setStyleSheet(
-            f"color: {color}; font-family: Menlo; font-size: 10px;"
+            f'color: {color}; font-family: "{fixed_font_family()}"; font-size: 10px;'
         )
         developer = self.mode_combo.currentText() == "Developer Mode"
         self.mode_status_label.setText("DEVELOPER MODE" if developer else "FREE MODE")
@@ -541,7 +567,10 @@ class MainWindow(QMainWindow):
 
         self.log_output = QPlainTextEdit(self.log_panel)
         self.log_output.setReadOnly(True)
-        self.log_output.setStyleSheet("font-family: Menlo; font-size: 11px;")
+        self.log_output.setObjectName("log_output")
+        self.log_output.setStyleSheet(
+            f'font-family: "{fixed_font_family()}"; font-size: 11px;'
+        )
         self.log_output.document().setMaximumBlockCount(300)
         layout.addWidget(self.log_output, stretch=1)
 
@@ -594,6 +623,8 @@ class MainWindow(QMainWindow):
             if not self._experiment_workbench.close_from_parent():
                 event.ignore()
                 return
+        if self._oscilloscope_workbench is not None:
+            self._oscilloscope_workbench.shutdown()
         if hasattr(self, "workspace_tabs"):
             self.workspace_tabs.shutdown()
         self._save_ui_state()

@@ -143,6 +143,7 @@ class AgentUiIntegrationTests(unittest.TestCase):
         self.app.processEvents()
         self.assertEqual(chat._send_btn.text(), "■")
         self.assertEqual(chat._send_btn.accessibleName(), "停止 Agent 生成")
+        self.assertFalse(chat._settings_btn.isEnabled())
 
         chat._input.setPlainText("下一条消息")
         chat._send_btn.click()
@@ -155,6 +156,7 @@ class AgentUiIntegrationTests(unittest.TestCase):
         self.app.processEvents()
         self.assertEqual(chat._send_btn.text(), "↑")
         self.assertTrue(chat._send_btn.isEnabled())
+        self.assertTrue(chat._settings_btn.isEnabled())
 
     def test_agent_visibility_and_dock_state_restore_after_registration(self):
         chat = AgentChatWidget(self.window)

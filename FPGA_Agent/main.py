@@ -12,8 +12,6 @@ Usage:
 from __future__ import annotations
 
 import sys
-import json
-import os
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
@@ -36,13 +34,17 @@ def create_window(settings=None):
 
     window = MainWindow(settings=settings)
 
-    # ---- Load config ----
+    # ---- Load public config and OS-backed API credential ----
     agent_dir = Path(__file__).resolve().parent
     config_path = agent_dir / "config.json"
-    if config_path.exists():
-        config = json.loads(config_path.read_text(encoding="utf-8"))
-    else:
+    from secret_store import load_agent_configuration
+
+    try:
+        config, api_key, credential_warning = load_agent_configuration(config_path)
+    except (OSError, ValueError) as exc:
         config = {"llm": {}, "agent": {}}
+        api_key = ""
+        credential_warning = str(exc)
 
     # ---- Build Agent components ----
     from canvas_bridge import CanvasBridge
@@ -66,7 +68,7 @@ def create_window(settings=None):
     llm_cfg = config.get("llm", {})
     llm = LLMClient(
         endpoint=llm_cfg.get("endpoint", "https://api.openai.com/v1"),
-        api_key=llm_cfg.get("api_key", ""),
+        api_key=api_key,
         model=llm_cfg.get("model", "gpt-4o"),
         temperature=llm_cfg.get("temperature", 0.1),
         max_tokens=llm_cfg.get("max_tokens", 4096),
@@ -82,6 +84,25 @@ def create_window(settings=None):
     # ---- Wire signals ----
     chat.user_message_submitted.connect(agent.send_message)
     chat.cancel_requested.connect(agent.stop_generation)
+
+    def apply_saved_settings(payload):
+        updated = payload.get("config", {})
+        updated_llm = updated.get("llm", {})
+        current = llm.configuration_snapshot()
+        llm.configure(
+            endpoint=updated_llm.get("endpoint", current["endpoint"]),
+            model=updated_llm.get("model", current["model"]),
+            # Empty is intentional when switching to an origin that has no
+            # credential. Never retain the previous provider's key.
+            api_key=payload.get("api_key", ""),
+        )
+        config.update(updated)
+        if payload.get("api_key"):
+            chat.add_system_message("LLM 设置已安全保存并立即生效。")
+        else:
+            chat.add_system_message("Endpoint 已切换；请为该服务配置 API Key。")
+
+    chat.settings_saved.connect(apply_saved_settings)
 
     agent.response_ready.connect(chat.add_assistant_message)
     agent.thinking_started.connect(lambda: chat.set_thinking(True))
@@ -113,7 +134,9 @@ def create_window(settings=None):
     )
 
     # Check API key
-    if not llm_cfg.get("api_key"):
+    if credential_warning:
+        chat.add_system_message(credential_warning)
+    if not api_key:
         chat.add_system_message(
             "API key not configured. Click Settings to enter your API key."
         )

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QScrollArea, QPlainTextEdit, QPushButton, QLabel,
     QTextBrowser, QFrame, QSizePolicy, QDialog,
     QFormLayout, QLineEdit, QDialogButtonBox,
+    QMessageBox,
 )
 
 from chat_styles import (
@@ -29,6 +30,7 @@ class AgentChatWidget(QDockWidget):
 
     user_message_submitted = Signal(str)
     cancel_requested = Signal()
+    settings_saved = Signal(dict)
 
     def __init__(self, parent=None):
         super().__init__("FPGA Agent", parent)
@@ -166,6 +168,7 @@ class AgentChatWidget(QDockWidget):
         """Show thinking state and switch the primary action to cancel."""
         self._is_thinking = visible
         self._cancel_pending = False
+        self._settings_btn.setEnabled(not visible)
         self._thinking_label.setVisible(visible)
         if visible:
             self._thinking_dots = 0
@@ -195,6 +198,13 @@ class AgentChatWidget(QDockWidget):
 
     def open_settings(self):
         """Open the Agent settings dialog from any presentation control."""
+        if self._is_thinking:
+            QMessageBox.information(
+                self,
+                "Agent 正在运行",
+                "请先停止当前生成，再修改 API Endpoint 或密钥。",
+            )
+            return
         self._open_settings()
 
     # ------------------------------------------------------------------
@@ -346,16 +356,25 @@ class AgentChatWidget(QDockWidget):
         model_edit = QLineEdit()
         model_edit.setPlaceholderText("gpt-4o")
 
-        # Load current config
-        import json
         from pathlib import Path
+        from secret_store import load_agent_configuration
+
         config_path = Path(__file__).resolve().parent / "config.json"
-        if config_path.exists():
-            cfg = json.loads(config_path.read_text(encoding="utf-8"))
-            llm = cfg.get("llm", {})
-            endpoint_edit.setText(llm.get("endpoint", ""))
-            api_key_edit.setText(llm.get("api_key", ""))
-            model_edit.setText(llm.get("model", ""))
+        try:
+            cfg, stored_key, warning = load_agent_configuration(config_path)
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "无法读取 Agent 设置", str(exc))
+            return
+        llm = cfg.get("llm", {})
+        endpoint_edit.setText(llm.get("endpoint", ""))
+        model_edit.setText(llm.get("model", ""))
+        if stored_key:
+            api_key_edit.setPlaceholderText("已安全保存；留空则保持当前密钥")
+        if warning:
+            warning_label = QLabel(warning, dialog)
+            warning_label.setWordWrap(True)
+            warning_label.setStyleSheet("color: #A15C00;")
+            layout.addRow(warning_label)
 
         layout.addRow("API Endpoint:", endpoint_edit)
         layout.addRow("API Key:", api_key_edit)
@@ -372,20 +391,19 @@ class AgentChatWidget(QDockWidget):
         dialog.exec()
 
     def _save_settings(self, dialog, endpoint, api_key, model):
-        import json
         from pathlib import Path
+        from secret_store import save_agent_settings
+
         config_path = Path(__file__).resolve().parent / "config.json"
-        cfg = {}
-        if config_path.exists():
-            cfg = json.loads(config_path.read_text(encoding="utf-8"))
-        if "llm" not in cfg:
-            cfg["llm"] = {}
-        if endpoint:
-            cfg["llm"]["endpoint"] = endpoint
-        if api_key:
-            cfg["llm"]["api_key"] = api_key
-        if model:
-            cfg["llm"]["model"] = model
-        config_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2),
-                               encoding="utf-8")
+        try:
+            config, active_key = save_agent_settings(
+                config_path,
+                endpoint=endpoint,
+                api_key=api_key,
+                model=model,
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            QMessageBox.warning(self, "无法保存 Agent 设置", str(exc))
+            return
+        self.settings_saved.emit({"config": config, "api_key": active_key})
         dialog.accept()

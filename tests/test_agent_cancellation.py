@@ -131,6 +131,23 @@ class _CompletedProcess:
 
 
 class AgentCancellationTests(unittest.TestCase):
+    def test_runtime_configuration_is_atomic_and_keeps_chat_path(self):
+        client = LLMClient("https://api.openai.com/v1", "openai-key", "gpt-4o")
+
+        client.configure(
+            endpoint="https://api.deepseek.com/v1",
+            api_key="deepseek-key",
+            model="deepseek-chat",
+        )
+        snapshot = client.configuration_snapshot()
+
+        self.assertEqual(
+            snapshot["endpoint"],
+            "https://api.deepseek.com/v1/chat/completions",
+        )
+        self.assertEqual(snapshot["api_key"], "deepseek-key")
+        self.assertEqual(snapshot["model"], "deepseek-chat")
+
     @classmethod
     def setUpClass(cls):
         cls.app = ensure_app()

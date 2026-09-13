@@ -3,7 +3,13 @@ import unittest
 from PySide6.QtWidgets import QWidget
 
 from tests.qt_test_support import ensure_app
-from qt_ui_theme import UiColors, apply_application_theme, build_application_stylesheet
+from qt_ui_theme import (
+    UiColors,
+    _ui_font_family,
+    apply_application_theme,
+    build_application_stylesheet,
+    fixed_font_family,
+)
 
 
 class ThemeTests(unittest.TestCase):
@@ -33,10 +39,8 @@ class ThemeTests(unittest.TestCase):
         widget = QWidget()
         apply_application_theme(widget)
         self.assertIn("#85172E", widget.styleSheet())
-        self.assertIn(
-            widget.font().family(),
-            {"Helvetica Neue", "PingFang SC", ".AppleSystemUIFont"},
-        )
+        self.assertEqual(widget.font().family(), _ui_font_family())
+        self.assertTrue(fixed_font_family())
 
 
 if __name__ == "__main__":
