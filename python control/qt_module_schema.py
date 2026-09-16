@@ -131,14 +131,29 @@ LTRN_SCHEMA = [
 ]
 
 PDH_SCHEMA = [
-    # 直接参数
-    {"key" : "pc_cmd", "label" : "工作模式指令", "type" : "int", "min" : 0, "max" : 3, "mode" : "direct", "free" : True, "note" : "00:空闲/复位, 01:手动扫描, 10:自动校准, 11:自动锁定退出"},
-    {"key" : "threshold_signal_lock", "label" : "手动锁定阈值", "type" : "int", "min" : -32768, "max" : 32767, "display_voltage" : True, "mode" : "direct", "free" : True, "note" : "物理信号。退出锁定状态的振幅阈值"},
-    {"key" : "threshold_signal_scan", "label" : "手动扫描阈值", "type" : "int", "min" : -32768, "max" : 32767, "display_voltage" : True, "mode" : "direct", "free" : True, "note" : "物理信号。从扫描状态切换为锁定状态的振幅阈值"},
-    {"key" : "time_scan", "label" : "手动扫描确认时间", "type" : "int", "min" : 0, "max" : 2**31 - 1, "unit" : "clk", "prefix" : False, "mode" : "direct", "free" : True, "note" : "单位为时钟周期。从扫描状态切换为锁定状态的时间阈值"},
-    {"key" : "time_lock", "label" : "手动锁定超时时间", "type" : "int", "min" : 0, "max" : 2**31 - 1, "unit" : "clk", "prefix" : False, "mode" : "direct", "free" : True, "note" : "单位为时钟周期。退出锁定状态的时间阈值"},
-    {"key" : "coef_scan", "label" : "自动扫描系数", "type" : "int", "min" : -32768, "max" : 32767, "mode" : "direct", "free" : True, "note" : "	Q1.15格式定点数。用于自动计算扫描阈值比例，32767为1.0，16384为0.5"},
-    {"key" : "coef_lock", "label" : "自动锁定系数", "type" : "int", "min" : -32768, "max" : 32767, "mode" : "direct", "free" : True, "note" : "	Q1.15格式定点数。用于自动计算锁定阈值比例，同上"}    
+    # Existing keys, addresses 0–6 and raw integer values are the hardware ABI.
+    # Labels explain behavior; they are never actual FPGA state readback.
+    {"key": "pc_cmd", "label": "控制请求（非实时状态）", "type": "int", "min": 0, "max": 3,
+     "mode": "direct", "free": True,
+     "note": "00为空闲请求；01在00→01时启动手动扫描；10在00→10时启动自动校准。11仅用于旧版自动锁定分支的特定退出判据，不是独立工作模式。00能否立即退出取决于当前状态和命令沿。"},
+    {"key": "threshold_signal_lock", "label": "失锁阈值（高于）", "type": "int", "min": -32768, "max": 32767,
+     "mode": "direct", "free": True,
+     "note": "手动锁定时，ADC原始码连续高于此值达到失锁确认时长，才退出锁定；电压换算需板卡标定。"},
+    {"key": "threshold_signal_scan", "label": "入锁阈值（低于）", "type": "int", "min": -32768, "max": 32767,
+     "mode": "direct", "free": True,
+     "note": "手动扫描时，ADC原始码连续低于此值达到入锁确认时长，才进入锁定；电压换算需板卡标定。"},
+    {"key": "time_scan", "label": "入锁确认时长", "type": "int", "min": 0, "max": 2**31 - 1,
+     "unit": "clk", "prefix": False, "mode": "direct", "free": True,
+     "note": "单位为时钟周期；仅在ADC原始码持续低于入锁阈值时累计。毫秒换算需确认实际板卡时钟。"},
+    {"key": "time_lock", "label": "失锁确认时长", "type": "int", "min": 0, "max": 2**31 - 1,
+     "unit": "clk", "prefix": False, "mode": "direct", "free": True,
+     "note": "单位为时钟周期；仅在ADC原始码持续高于失锁阈值时累计，并非单纯的锁定超时。毫秒换算需确认实际板卡时钟。"},
+    {"key": "coef_scan", "label": "自动入锁阈值位置", "type": "int", "min": -32768, "max": 32767,
+     "mode": "direct", "free": True,
+     "note": "Q1.15原始整数；阈值约为测得最小值＋(最大值－最小值)×原值/32768。16384=50%，32767/32768≈99.997%，允许负原值但须理解阈值可能超出测得范围。"},
+    {"key": "coef_lock", "label": "自动失锁阈值位置", "type": "int", "min": -32768, "max": 32767,
+     "mode": "direct", "free": True,
+     "note": "Q1.15原始整数；阈值约为测得最小值＋(最大值－最小值)×原值/32768。16384=50%，32767/32768≈99.997%，允许负原值但须理解阈值可能超出测得范围。"}
 ]
 
 SCLO_SCHEMA = [

@@ -29,6 +29,7 @@ from PySide6.QtSerialPort import QSerialPort
 
 from qt_filter_designer import FIRDesignerWidget, IIRDesignerWidget
 from qt_pid_tuning import PIDParamCanvas
+from qt_pdh_designer import PDHDesignerWidget
 from qt_module import (
     NodeItem,
     ModulePID,
@@ -65,6 +66,14 @@ from qt_ui_utils import (
 import port_numbers as pn
 
 PLATFORM_WINDOW_TITLE = "北京大学&长三角光电科学研究院 智能集成光学控制平台系统"
+PDH_EDITABLE_KEYS = (
+    "threshold_signal_scan", "time_scan", "threshold_signal_lock", "time_lock",
+    "coef_scan", "coef_lock",
+)
+PDH_LEGACY_PARAM_ALIASES = {
+    "thre_sig_lock": "threshold_signal_lock",
+    "thre_sig_scan": "threshold_signal_scan",
+}
 
 
 class _StreamProxy(QObject):
@@ -180,6 +189,8 @@ class MainWindow(QMainWindow):
         self.custom_composite_library.changed.connect(self._refresh_custom_composite_palette)
         self._refresh_custom_composite_palette()
         self._param_panels = {}
+        self._pdh_designers = {}
+        self._pdh_write_receipts = {}
         self._build_side_panel()
         self._build_log_panel()
         self._setup_log_redirect()
@@ -725,10 +736,23 @@ class MainWindow(QMainWindow):
         panel = self._param_panels.get(panel_key)
         if panel is not None and getattr(panel, "_parameter_node", None) is node:
             self._close_param_panel(panel_key)
+        if isinstance(node, ModulePDHFSM):
+            designer = self._pdh_designers.pop(id(node), None)
+            self._pdh_write_receipts.pop(id(node), None)
+            if designer is not None:
+                self.workspace_tabs.close_workspace(f"pdh-designer:{id(node)}")
+                designer.deleteLater()
 
     def _clear_param_panels(self):
         for key in list(self._param_panels.keys()):
             self._close_param_panel(key)
+
+    def _clear_pdh_designers(self):
+        for node_id, designer in list(self._pdh_designers.items()):
+            self.workspace_tabs.close_workspace(f"pdh-designer:{node_id}")
+            designer.deleteLater()
+        self._pdh_designers.clear()
+        self._pdh_write_receipts.clear()
 
     def _open_param_panel(self, node):
         if node is None:
@@ -738,10 +762,11 @@ class MainWindow(QMainWindow):
             self.workspace_tabs.show_home()
         self.side_panel.show()
 
-        self._refresh_node_params_from_device(
+        refreshed_from_device = self._refresh_node_params_from_device(
             node,
             update_panel=not isinstance(node, (ModuleFIRFilter, ModuleIIRFilter)),
         )
+        pdh_source = self._pdh_parameter_source(refreshed_from_device) if isinstance(node, ModulePDHFSM) else None
 
         schema = node.param_schema() if hasattr(node, "param_schema") else []
         special_methods = node.special_methods_schema() if hasattr(node, "special_methods_schema") else []
@@ -758,6 +783,14 @@ class MainWindow(QMainWindow):
         if existing is not None:
             if not isinstance(node, (ModuleFIRFilter, ModuleIIRFilter)):
                 self._update_panel_from_node(existing, node)
+            if pdh_source is not None:
+                existing._pdh_parameter_source = pdh_source
+                source_badge = getattr(existing, "_pdh_source_badge", None)
+                if source_badge is not None:
+                    source_badge.setText(pdh_source)
+                editor = getattr(existing, "_param_widget", None)
+                if editor is not None:
+                    editor.setEnabled(bool(refreshed_from_device) or not self._pdh_device_connected())
             self._scroll_to_panel(existing)
             return True
 
@@ -775,8 +808,40 @@ class MainWindow(QMainWindow):
         close_btn.clicked.connect(lambda _=False, k=panel_key: self._close_param_panel(k))
         title_row.addWidget(title)
         title_row.addStretch()
+        if isinstance(node, ModulePDHFSM):
+            refresh_btn = QPushButton("读取设备参数", card)
+            refresh_btn.setObjectName("pdh_inspector_refresh_button")
+            refresh_btn.setToolTip("重新读取 FPGA 参数；失败写入的显示值不能作为已生效值")
+            refresh_btn.clicked.connect(
+                lambda _checked=False, pdh_node=node, panel=card:
+                self._refresh_pdh_inspector_panel(pdh_node, panel)
+            )
+            title_row.addWidget(refresh_btn)
+            designer_btn = QPushButton("↗ 设计工作台", card)
+            designer_btn.setObjectName("pdh_designer_open_button")
+            designer_btn.setAccessibleName(f"打开{node.display_name}参数设计工作台")
+            designer_btn.setToolTip("在可拖出的标签页中查看入锁、失锁和自动阈值规则")
+            designer_btn.clicked.connect(
+                lambda _checked=False, pdh_node=node: self._open_pdh_designer(pdh_node)
+            )
+            title_row.addWidget(designer_btn)
         title_row.addWidget(close_btn)
         card_layout.addLayout(title_row)
+
+        if pdh_source is not None:
+            source_badge = QLabel(pdh_source, card)
+            source_badge.setObjectName("pdh_parameter_source")
+            source_badge.setWordWrap(True)
+            source_badge.setToolTip("这是参数来源，不代表 PDH 内部状态或实时测量")
+            card_layout.addWidget(source_badge)
+            rule_hint = QLabel(
+                "入锁：信号连续低于阈值；失锁：信号连续高于阈值。滚动调参结束后才写入。", card
+            )
+            rule_hint.setObjectName("pdh_inspector_rule_hint")
+            rule_hint.setWordWrap(True)
+            card_layout.addWidget(rule_hint)
+            card._pdh_source_badge = source_badge
+            card._pdh_parameter_source = pdh_source
 
         if isinstance(node, CustomCompositeNode):
             details_widget = CustomCompositeDetailsWidget(node, parent=card)
@@ -788,16 +853,28 @@ class MainWindow(QMainWindow):
             if isinstance(node, ModulePID):
                 companion_widget_factory = lambda dialog_parent: PIDParamCanvas(dialog_parent)
 
+            apply_callback = node.set_params
+            if isinstance(node, ModulePDHFSM):
+                # Keep the familiar Inspector editor, but do not let its generic
+                # dialog claim a committed value when the board write failed.
+                apply_callback = (
+                    lambda params, pdh_node=node, panel=card:
+                    self._apply_pdh_inspector_params(pdh_node, panel, params)
+                )
+
             param_widget = ParamDialog(
                 schema,
                 node.get_params(),
                 parent=self,
-                apply_callback=node.set_params,
+                apply_callback=apply_callback,
                 companion_widget_factory=companion_widget_factory,
+                defer_rolling_apply=isinstance(node, ModulePDHFSM),
             )
             param_widget.setWindowFlags(Qt.Widget)
             card_layout.addWidget(param_widget)
             card._param_widget = param_widget
+            if pdh_source is not None:
+                param_widget.setEnabled(bool(refreshed_from_device) or not self._pdh_device_connected())
             if isinstance(node, ModulePID):
                 pid_canvas = param_widget.findChild(PIDParamCanvas)
                 if pid_canvas is not None:
@@ -843,6 +920,328 @@ class MainWindow(QMainWindow):
         param_widget = getattr(panel_card, "_param_widget", None)
         if param_widget is not None:
             param_widget.set_values(node.get_params())
+
+    def _pdh_device_connected(self):
+        return bool(self.serial_port.isOpen())
+
+    def _pdh_parameter_source(self, refreshed_from_device):
+        if refreshed_from_device:
+            return "设备参数已读取 · 内部状态未回读"
+        if self._pdh_device_connected():
+            return "设备参数读取失败 · 当前显示本地配置"
+        return "设备离线 · 本地配置（未读取）"
+
+    def _open_pdh_designer(self, node):
+        if not isinstance(node, ModulePDHFSM) or node.scene() is not self.scene:
+            return None
+        designer = self._pdh_designers.get(id(node))
+        if designer is None:
+            designer = PDHDesignerWidget(parent=self)
+            designer.apply_requested.connect(
+                lambda changes, pdh_node=node, widget=designer:
+                self._apply_pdh_designer_changes(pdh_node, widget, changes)
+            )
+            designer.command_requested.connect(
+                lambda command, pdh_node=node, widget=designer:
+                self._send_pdh_control_request(pdh_node, widget, command)
+            )
+            designer.refresh_requested.connect(
+                lambda pdh_node=node, widget=designer:
+                self._refresh_pdh_designer(pdh_node, widget)
+            )
+            panel_key = f"{node.name}@{node.component_name}:{node.index}"
+            panel = self._param_panels.get(panel_key)
+            source = getattr(panel, "_pdh_parameter_source", self._pdh_parameter_source(False))
+            designer.set_parameters(node.get_params(), source_label=source)
+            self._pdh_designers[id(node)] = designer
+        else:
+            refreshed = self._refresh_node_params_from_device(node) if self._pdh_device_connected() else False
+            source = self._pdh_parameter_source(refreshed)
+            current = node.get_params()
+            pending = designer.staged_parameters()
+            if pending:
+                if not self._pdh_config_matches_baseline(node, designer) or source not in designer.source_badge.text():
+                    designer.mark_conflict(
+                        "节点配置或设备参数来源已改变；旧预览不能直接应用"
+                    )
+            else:
+                designer.set_parameters(current, source_label=source)
+        self.open_workspace_window(
+            f"pdh-designer:{id(node)}",
+            f"{node.display_name} · 参数设计",
+            designer,
+            source=self,
+        )
+        return designer
+
+    def _pdh_node_is_current(self, node, designer):
+        return (
+            isinstance(node, ModulePDHFSM)
+            and node.scene() is self.scene
+            and self._pdh_designers.get(id(node)) is designer
+        )
+
+    def _pdh_config_matches_baseline(self, node, designer):
+        baseline = designer.baseline_parameters()
+        current = node.get_params()
+        return all(current.get(key) == baseline.get(key) for key in PDH_EDITABLE_KEYS)
+
+    def _pdh_preflight(self, node, designer):
+        # A local zero/default cache is not a verified board configuration.
+        if not self._refresh_node_params_from_device(node):
+            designer.mark_conflict("发送前设备参数回读失败；待应用预览已保留")
+            return False
+        if "设备参数已读取" not in designer.source_badge.text():
+            designer.mark_conflict("当前预览建立在本地未读配置上；请刷新参数后再操作")
+            return False
+        if not self._pdh_config_matches_baseline(node, designer):
+            designer.mark_conflict("设备参数与预览基线不一致；请刷新后核对")
+            return False
+        return True
+
+    def _set_pdh_inspector_unconfirmed(self, panel):
+        panel._pdh_parameter_source = "写入未确认 · 显示值可能不是 FPGA 实际参数；请读取设备参数"
+        badge = getattr(panel, "_pdh_source_badge", None)
+        if badge is not None:
+            badge.setText(panel._pdh_parameter_source)
+        editor = getattr(panel, "_param_widget", None)
+        if editor is not None:
+            editor.setEnabled(False)
+
+    def _refresh_pdh_inspector_panel(self, node, panel):
+        if not isinstance(node, ModulePDHFSM) or node.scene() is not self.scene:
+            return False
+        refreshed = self._refresh_node_params_from_device(node)
+        panel._pdh_parameter_source = self._pdh_parameter_source(refreshed)
+        badge = getattr(panel, "_pdh_source_badge", None)
+        if badge is not None:
+            badge.setText(panel._pdh_parameter_source)
+        editor = getattr(panel, "_param_widget", None)
+        if editor is not None:
+            editor.setEnabled(bool(refreshed) or not self._pdh_device_connected())
+        return refreshed
+
+    def _apply_pdh_inspector_params(self, node, panel, params):
+        """Verify a raw Inspector edit without changing its legacy register route."""
+        if not self._pdh_device_connected():
+            # The previous Inspector could stage offline configuration for the
+            # normal Save Configuration flow. Keep that capability explicit:
+            # update only this node's local cache, never the serial writer.
+            self._validate_pdh_inspector_params(node, params)
+            self._stage_pdh_local_params(node, params)
+            self._update_panel_from_node(panel, node)
+            panel._pdh_parameter_source = "设备离线 · 仅本地配置已更新，未写入 FPGA"
+            badge = getattr(panel, "_pdh_source_badge", None)
+            if badge is not None:
+                badge.setText(panel._pdh_parameter_source)
+            designer = self._pdh_designers.get(id(node))
+            if designer is not None:
+                if not self._pdh_config_matches_baseline(node, designer):
+                    designer.mark_conflict("本地配置已在参数面板更改；旧预览已保留，请刷新后核对")
+                elif "pc_cmd" in params:
+                    designer.update_command_value(node.get_params()["pc_cmd"])
+            return
+        panel._pdh_write_attempted = False
+        panel._pdh_preflight_read = False
+        try:
+            self._write_and_confirm_pdh_inspector_params(node, panel, params)
+        except Exception as exc:
+            if panel._pdh_write_attempted:
+                self._set_pdh_inspector_unconfirmed(panel)
+            elif panel._pdh_preflight_read:
+                panel._pdh_parameter_source = (
+                    "设备参数已读取 · 本次未写入 FPGA；配置已变化，请核对后重试"
+                )
+                badge = getattr(panel, "_pdh_source_badge", None)
+                if badge is not None:
+                    badge.setText(panel._pdh_parameter_source)
+                editor = getattr(panel, "_param_widget", None)
+                if editor is not None:
+                    editor.setEnabled(True)
+            else:
+                panel._pdh_parameter_source = f"未写入 FPGA · {exc}；请读取设备参数"
+                badge = getattr(panel, "_pdh_source_badge", None)
+                if badge is not None:
+                    badge.setText(panel._pdh_parameter_source)
+                editor = getattr(panel, "_param_widget", None)
+                if editor is not None:
+                    editor.setEnabled(False)
+            raise
+
+    def _validate_pdh_inspector_params(self, node, params):
+        if not isinstance(node, ModulePDHFSM) or node.scene() is not self.scene:
+            raise RuntimeError("模块已移除；参数未写入 FPGA")
+        if not isinstance(params, dict) or not params:
+            raise RuntimeError("没有可写入的参数")
+        fields = self._schema_field_map(node)
+        for key, value in params.items():
+            field = fields.get(key)
+            if field is None or type(value) is not int:
+                raise RuntimeError(f"未知或无效参数：{key}")
+            if value < field.get("min", value) or value > field.get("max", value):
+                raise RuntimeError(f"参数 {key} 超出允许范围")
+        return fields
+
+    def _stage_pdh_local_params(self, node, canonical_params):
+        """Stage a savable local draft, including legacy cache aliases."""
+        node._params.update(canonical_params)
+        for legacy_key, canonical_key in PDH_LEGACY_PARAM_ALIASES.items():
+            if canonical_key in canonical_params:
+                node._params[legacy_key] = canonical_params[canonical_key]
+
+    def _normalize_pdh_saved_params(self, node, saved_params):
+        fields = self._schema_field_map(node)
+        allowed = set(fields) | set(PDH_LEGACY_PARAM_ALIASES)
+        unknown = set(saved_params) - allowed
+        if unknown:
+            raise RuntimeError("未知 PDH 配置参数：" + ", ".join(sorted(unknown)))
+        canonical = {key: value for key, value in saved_params.items() if key in fields}
+        for legacy_key, canonical_key in PDH_LEGACY_PARAM_ALIASES.items():
+            if canonical_key not in canonical and legacy_key in saved_params:
+                canonical[canonical_key] = saved_params[legacy_key]
+        self._validate_pdh_inspector_params(node, canonical)
+        return canonical
+
+    def _write_and_confirm_pdh_inspector_params(self, node, panel, params):
+        fields = self._validate_pdh_inspector_params(node, params)
+
+        source = getattr(panel, "_pdh_parameter_source", "")
+        if "设备参数已读取" not in source:
+            raise RuntimeError("当前面板仍是本地配置；请重新打开并读取设备参数")
+        baseline = node.get_params()
+        if not self._refresh_node_params_from_device(node, update_panel=False):
+            raise RuntimeError("写入前设备参数回读失败；请重新打开参数面板")
+        panel._pdh_preflight_read = True
+        actual_before = node.get_params()
+        if any(actual_before.get(key) != baseline.get(key) for key in fields):
+            self._update_panel_from_node(panel, node)
+            raise RuntimeError("设备参数已变化；面板已刷新，请重新核对后写入")
+
+        panel._pdh_write_attempted = True
+        self._pdh_write_receipts[id(node)] = False
+        node.set_params(params)
+        if not self._pdh_write_receipts.get(id(node)):
+            raise RuntimeError("参数发送失败；可能部分寄存器已变更，请刷新参数")
+        if not self._refresh_node_params_from_device(node):
+            raise RuntimeError("参数回读失败，不能确认 FPGA 已应用；请刷新参数")
+        actual_after = node.get_params()
+        mismatched = [key for key, value in params.items() if actual_after.get(key) != value]
+        if mismatched:
+            raise RuntimeError("回读值与请求不一致：" + ", ".join(mismatched))
+        designer = self._pdh_designers.get(id(node))
+        if designer is not None:
+            if not self._pdh_config_matches_baseline(node, designer):
+                designer.mark_conflict("右侧参数面板已更改设备配置；旧预览已保留，请刷新后核对")
+            elif "pc_cmd" in actual_after:
+                designer.update_command_value(actual_after["pc_cmd"])
+        panel._pdh_parameter_source = self._pdh_parameter_source(True)
+        badge = getattr(panel, "_pdh_source_badge", None)
+        if badge is not None:
+            badge.setText(panel._pdh_parameter_source)
+
+    def _refresh_pdh_designer(self, node, designer):
+        if not self._pdh_node_is_current(node, designer):
+            return False
+        if self._pdh_device_connected():
+            if not self._refresh_node_params_from_device(node):
+                designer.mark_conflict("设备参数回读失败；旧预览仍保留")
+                return False
+            source = self._pdh_parameter_source(True)
+        else:
+            source = self._pdh_parameter_source(False)
+        designer.set_parameters(node.get_params(), source_label=source)
+        return True
+
+    def _apply_pdh_designer_changes(self, node, designer, changes):
+        if not self._pdh_node_is_current(node, designer):
+            return False
+        if not self._pdh_device_connected():
+            designer.set_apply_result(False, "设备离线，未写入 FPGA")
+            return False
+        if not isinstance(changes, dict) or not changes:
+            designer.set_apply_result(False, "没有待应用的参数")
+            return False
+        editable = set(PDH_EDITABLE_KEYS)
+        fields = self._schema_field_map(node)
+        for key, value in changes.items():
+            field = fields.get(key)
+            if key not in editable or field is None or not isinstance(value, int):
+                designer.set_apply_result(False, f"未知或无效参数：{key}")
+                return False
+            if value < field.get("min", value) or value > field.get("max", value):
+                designer.set_apply_result(False, f"{key} 超出当前界面可安全读写的范围")
+                return False
+
+        if not self._pdh_preflight(node, designer):
+            return False
+
+        # Reuse the existing parameter writer. A callback alone is not proof
+        # that the FPGA accepted a value: confirm the selected registers by readback.
+        try:
+            self._pdh_write_receipts[id(node)] = False
+            node.set_params(changes)
+            if not self._pdh_write_receipts.get(id(node)):
+                designer.mark_conflict("参数发送失败；部分寄存器可能已变更，请刷新参数")
+                return False
+            if not self._refresh_node_params_from_device(node):
+                designer.mark_conflict("参数回读失败；不能确认 FPGA 已应用")
+                return False
+            actual = node.get_params()
+            mismatched = [key for key, value in changes.items() if actual.get(key) != value]
+            if mismatched:
+                designer.mark_conflict(f"回读值与请求不一致：{', '.join(mismatched)}")
+                return False
+            source = self._pdh_parameter_source(True)
+            designer.set_parameters(actual, source_label=source)
+            designer.set_apply_result(True, "所选寄存器回读一致；PDH 实际运行状态仍未知。")
+            return True
+        except Exception as exc:
+            designer.set_apply_result(False, f"写入或回读异常：{exc}")
+            self._report_error(f"[PDH] 参数应用异常：{exc}")
+            return False
+
+    def _send_pdh_control_request(self, node, designer, command):
+        if not self._pdh_node_is_current(node, designer):
+            return False
+        if command not in (0, 1, 2):
+            designer.command_request_feedback.setText("不支持的控制请求；设备未写入。")
+            return False
+        if not self._pdh_device_connected():
+            designer.command_request_feedback.setText("设备离线，控制请求未写入 FPGA。")
+            return False
+        if not self._pdh_preflight(node, designer):
+            designer.command_request_feedback.setText("设备参数待核对，控制请求未发送。")
+            return False
+        current_command = node.get_params().get("pc_cmd")
+        if command in (1, 2) and current_command != 0:
+            designer.command_request_feedback.setText(
+                f"启动需 00→{command:02b} 边沿；设备当前请求码是 {current_command}，本次未发送。"
+            )
+            return False
+        try:
+            self._pdh_write_receipts[id(node)] = False
+            node.set_params({"pc_cmd": command})
+            if not self._pdh_write_receipts.get(id(node)):
+                designer.command_request_feedback.setText(
+                    "控制请求发送失败；实际状态未知，请刷新设备参数。"
+                )
+                designer.mark_conflict("控制请求发送失败，设备参数来源待核对")
+                return False
+            if not self._refresh_node_params_from_device(node):
+                designer.command_request_feedback.setText("控制请求未能回读；实际状态未知。")
+                return False
+            if node.get_params().get("pc_cmd") != command:
+                designer.command_request_feedback.setText("控制请求回读不一致；实际状态未知。")
+                return False
+            designer.command_request_feedback.setText(
+                f"请求码 {command:02b} 已发送且回读一致；是否触发启动边沿及 PDH 当前状态仍未知。"
+            )
+            designer.update_command_value(command)
+            return True
+        except Exception as exc:
+            designer.command_request_feedback.setText(f"控制请求异常：{exc}；实际状态未知。")
+            self._report_error(f"[PDH] 控制请求异常：{exc}")
+            return False
 
     def _refresh_node_params_from_device(self, node, update_panel=True):
         if node is None:
@@ -1594,7 +1993,11 @@ class MainWindow(QMainWindow):
     def _apply_param_to_hardware(self, node, params):
         module_type, module_index = self._resolve_module_identity(node)
         if module_type is None:
+            if isinstance(node, ModulePDHFSM):
+                self._pdh_write_receipts[id(node)] = False
             return
+        if isinstance(node, ModulePDHFSM):
+            self._pdh_write_receipts[id(node)] = False
         try:
             did_write = False
             if isinstance(params, dict) and "__special_method__" in params:
@@ -1637,6 +2040,8 @@ class MainWindow(QMainWindow):
 
             if regular_params:
                 self.port_ctrl.send_param(module_type, module_index, regular_params)
+                if isinstance(node, ModulePDHFSM):
+                    self._pdh_write_receipts[id(node)] = True
                 for key, value in regular_params.items():
                     print(f"[param] sent {node.name}.{key} = {value}")
                 did_write = True
@@ -1646,6 +2051,8 @@ class MainWindow(QMainWindow):
                     self._refresh_node_params_from_device(node)
                 node._commit_pending_cache_update()
         except Exception as exc:
+            if isinstance(node, ModulePDHFSM):
+                self._pdh_write_receipts[id(node)] = False
             node._rollback_pending_cache_update()
             self._refresh_node_params_from_device(
                 node,
@@ -1733,6 +2140,7 @@ class MainWindow(QMainWindow):
         return None
 
     def _clear_canvas(self, emit_connection_removed: bool = False):
+        self._clear_pdh_designers()
         self._clear_param_panels()
         self._route_queue.clear()
         self._route_sending = False
@@ -2029,6 +2437,13 @@ class MainWindow(QMainWindow):
             if not isinstance(direct_params, dict) or not direct_params:
                 continue
             try:
+                if isinstance(node, ModulePDHFSM) and not self._pdh_device_connected():
+                    # Saved drafts must reload offline without invoking the
+                    # serial writer. On a connected device the existing load
+                    # path below remains unchanged.
+                    canonical = self._normalize_pdh_saved_params(node, direct_params)
+                    self._stage_pdh_local_params(node, canonical)
+                    continue
                 node.set_params(direct_params)
             except Exception as exc:
                 self._report_config_error(

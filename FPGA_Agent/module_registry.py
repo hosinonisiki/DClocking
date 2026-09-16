@@ -6,6 +6,29 @@ ports, signal types, parameters, typical use patterns, and compatibility.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+try:
+    from qt_module_schema import PDH_SCHEMA
+except ModuleNotFoundError as exc:
+    if exc.name != "qt_module_schema":
+        raise
+    # Agent registry is also importable without the Qt launcher.  Resolve the
+    # same pure-Python schema file from this repository, not a second copy.
+    _python_control_dir = str(Path(__file__).resolve().parent.parent / "python control")
+    if _python_control_dir not in sys.path:
+        sys.path.insert(0, _python_control_dir)
+    from qt_module_schema import PDH_SCHEMA
+
+# The Qt PDH schema is pure Python and remains the authoritative seven-field
+# display contract.  The Agent advertises the same keys and labels rather than
+# maintaining an independent, drifting copy.
+PDH_DIRECT_PARAMS = [
+    {field: param[field] for field in ("key", "label", "type", "min", "max", "note")}
+    for param in PDH_SCHEMA
+]
+
 # ---------------------------------------------------------------------------
 # Complete registry of all built-in modules
 # ---------------------------------------------------------------------------
@@ -378,8 +401,11 @@ MODULE_REGISTRY: dict[str, dict] = {
         "display_name": "PDH状态机",
         "internal_names": ["PDHS"],
         "max_instances": 1,
-        "purpose": "Pound-Drever-Hall lock state machine. Manages the locking "
-                   "sequence: idle → scan → lock → hold → unlock on signal loss.",
+        "purpose": "Pound-Drever-Hall lock state machine. Manual mode enters "
+                   "lock after sustained low signal and leaves after sustained "
+                   "high signal. Auto mode measures signal extrema before "
+                   "calculating entry/loss thresholds. Parameters are not a "
+                   "live hardware state readback.",
         "category": "control",
         "inputs": [
             {"index": 0, "name": "IN_POWER", "display": "透射光强信号输入",
@@ -390,21 +416,17 @@ MODULE_REGISTRY: dict[str, dict] = {
              "description": "Sawtooth scan signal for monitoring."},
         ],
         "outputs": [
-            {"index": 0, "name": "PID_RESET_CTRL", "display": "PID复位信号",
+            {"index": 0, "name": "PID_RESET_CTRL", "display": "PID复位请求",
              "signal": ["bool"],
-             "description": "PID reset/enable control. HIGH = PID active."},
+             "description": "HIGH requests PID reset when the downstream auto-reset option is enabled; otherwise this level may be ignored."},
             {"index": 1, "name": "MIXER_RESET_CTRL", "display": "混频器复位信号",
              "signal": ["bool"],
              "description": "Mixer gating control."},
-            {"index": 2, "name": "SCAN_RESET_CTRL", "display": "扫描复位信号",
+            {"index": 2, "name": "SCAN_RESET_CTRL", "display": "扫描累加器复位请求",
              "signal": ["bool"],
-             "description": "Scan accumulator reset."},
+             "description": "HIGH requests scan accumulator reset when its downstream auto-reset option is enabled."},
         ],
-        "direct_params": [
-            {"key": "pc_cmd", "label": "工作模式", "type": "int",
-             "min": 0, "max": 3,
-             "note": "0=idle, 1=manual scan, 2=auto cal, 3=auto lock"},
-        ],
+        "direct_params": PDH_DIRECT_PARAMS,
         "indirect_params": [],
         "typical_connections": [
             "P.PID_RESET_CTRL —> PID.RESET",

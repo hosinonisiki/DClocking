@@ -11,30 +11,30 @@ entity pdh_state_machine is
     port (
         clk             : in  std_logic;  -- System clock
         rst             : in  std_logic;  -- System reset
-        core_param_in   : in  std_logic_vector(255 downto 0); -- Standard parameter bus
+        core_param_in   : in  std_logic_vector(255 downto 0); -- Eight 32-bit slots; addresses 0-6 are used
 
         -- Data flow ports (to/from signal_router)
         sig_in          : in  std_logic_vector(15 downto 0);  -- Input signal for validity check
-        pid_enable      : out std_logic;  -- Enable PID controller
-        mixer_enable    : out std_logic;  -- Enable mixer
-        sawtooth_enable : out std_logic;  -- Sawtooth wave for scanning
+        pid_enable      : out std_logic;  -- Active-high downstream auto-reset request when configured
+        mixer_enable    : out std_logic;  -- Existing mixer control level; verify polarity at integration
+        sawtooth_enable : out std_logic;  -- Active-high accumulator auto-reset request when configured
         saw_input       : in  std_logic_vector(15 downto 0)
     );
 end entity pdh_state_machine;
 
 architecture behavioral of pdh_state_machine is
-    -- Internal signals to unpack parameters from core_param_in
+    -- Internal names express the existing register meaning without changing its bus ABI.
     signal pc_cmd                   : std_logic_vector(1 downto 0);
-    signal threshold_signal_locking : signed(15 downto 0);
-    signal threshold_signal_scanning: signed(15 downto 0);
-    signal time_duration_scanning   : unsigned(31 downto 0);
-    signal time_duration_locking    : unsigned(31 downto 0);
-    signal auto_threshold_signal_scanning : signed(15 downto 0);
-    signal auto_threshold_signal_locking  : signed(15 downto 0);
-    signal auto_threshold_signal_scanning_buf : signed(15 downto 0);
-    signal auto_threshold_signal_locking_buf : signed(15 downto 0);
-    signal auto_time_duration_scanning      : unsigned(31 downto 0);
-    signal auto_time_duration_locking      : unsigned(31 downto 0);
+    signal manual_loss_threshold_adc : signed(15 downto 0);
+    signal manual_enter_threshold_adc: signed(15 downto 0);
+    signal manual_enter_hold_cycles  : unsigned(31 downto 0);
+    signal manual_loss_hold_cycles   : unsigned(31 downto 0);
+    signal auto_enter_threshold_adc  : signed(15 downto 0);
+    signal auto_loss_threshold_adc   : signed(15 downto 0);
+    signal auto_enter_threshold_adc_buf : signed(15 downto 0);
+    signal auto_loss_threshold_adc_buf  : signed(15 downto 0);
+    signal auto_enter_hold_cycles    : unsigned(31 downto 0);
+    signal auto_loss_hold_cycles     : unsigned(31 downto 0);
     signal max_sig_in                : signed(15 downto 0) := (15 => '1', others => '0');
     signal min_sig_in                : signed(15 downto 0) := (15 => '0', others => '1');
     signal diff_sig_in               : signed(16 downto 0); 
@@ -43,14 +43,14 @@ architecture behavioral of pdh_state_machine is
     signal scaled_scan_sig_in             : signed(32 downto 0);
     signal scaled_lock_sig_in_buf    : signed(32 downto 0);
     signal scaled_scan_sig_in_buf    : signed(32 downto 0);
-    signal coef_scan                  : signed(15 downto 0); 
-    signal coef_lock                  : signed(15 downto 0);
+    signal auto_enter_ratio_q15       : signed(15 downto 0);
+    signal auto_loss_ratio_q15        : signed(15 downto 0);
     constant min_AUTO_TIME            : unsigned(15 downto 0) := to_unsigned(500, 16);
 
     -- State machine signals
     type state_type is (IDLE, AUTO_AMP, AUTO_TIME, AUTO_WAIT,AUTO_SCANNING, SCANNING, AUTO_LOCKING, LOCKING);
     signal current_state            : state_type;
-    signal time_able                : unsigned(31 downto 0) := (others => '0');
+    signal condition_elapsed_cycles : unsigned(31 downto 0) := (others => '0'); -- Consecutive qualifying clocks
     signal pc_cmd_prev              : std_logic_vector(1 downto 0) := "00";
 
     -- Internal buffer for input
@@ -66,16 +66,17 @@ architecture behavioral of pdh_state_machine is
 
 
 begin
-    -- Unpack parameters from the core_param_in bus
-    pc_cmd                      <= core_param_in(1 downto 0); -- address 0x00
-    threshold_signal_locking    <= signed(core_param_in(47 downto 32)); -- address 0x01
-    threshold_signal_scanning   <= signed(core_param_in(79 downto 64)); -- address 0x02
+    -- Preserve the 0-6 register layout: 16-bit ADC codes, 32-bit clock cycles,
+    -- and signed Q1.15 fractions in the low half of their 32-bit slots.
+    pc_cmd                     <= core_param_in(1 downto 0); -- 0: command request
+    manual_loss_threshold_adc  <= signed(core_param_in(47 downto 32)); -- 1: above => loss condition
+    manual_enter_threshold_adc <= signed(core_param_in(79 downto 64)); -- 2: below => enter condition
 
-    time_duration_scanning      <= unsigned(core_param_in(127 downto 96)); -- address 0x03
-    time_duration_locking       <= unsigned(core_param_in(159 downto 128)); -- address 0x04
+    manual_enter_hold_cycles   <= unsigned(core_param_in(127 downto 96)); -- 3
+    manual_loss_hold_cycles    <= unsigned(core_param_in(159 downto 128)); -- 4
 
-    coef_scan                   <= signed(core_param_in(175 downto 160)); -- address 0x05(-32768 to 32767) Q1.15
-    coef_lock                   <= signed(core_param_in(207 downto 192)); -- address 0x06
+    auto_enter_ratio_q15       <= signed(core_param_in(175 downto 160)); -- 5: signed Q1.15
+    auto_loss_ratio_q15        <= signed(core_param_in(207 downto 192)); -- 6: signed Q1.15
 
     saw_input_signed          <= signed(saw_input); 
 
@@ -105,8 +106,8 @@ begin
         end if;
     end process;
 
-    scaled_scan_sig_in_buf <= diff_sig_in * coef_scan ;-- Q18.15
-    scaled_lock_sig_in_buf <= diff_sig_in * coef_lock;-- Q18.15
+    scaled_scan_sig_in_buf <= diff_sig_in * auto_enter_ratio_q15 ;-- Q18.15
+    scaled_lock_sig_in_buf <= diff_sig_in * auto_loss_ratio_q15;-- Q18.15
     process(clk)
     begin
         if rising_edge(clk) then
@@ -115,14 +116,14 @@ begin
         end if;
     end process;
 
-    auto_threshold_signal_scanning_buf <= min_sig_in + scaled_scan_sig_in(30 downto 15); -- Q16.0
-    auto_threshold_signal_locking_buf <= min_sig_in + scaled_lock_sig_in(30 downto 15);
+    auto_enter_threshold_adc_buf <= min_sig_in + scaled_scan_sig_in(30 downto 15); -- Q16.0
+    auto_loss_threshold_adc_buf <= min_sig_in + scaled_lock_sig_in(30 downto 15);
 
     process(clk)
     begin
         if rising_edge(clk) then
-            auto_threshold_signal_scanning <= auto_threshold_signal_scanning_buf;
-            auto_threshold_signal_locking <= auto_threshold_signal_locking_buf;
+            auto_enter_threshold_adc <= auto_enter_threshold_adc_buf;
+            auto_loss_threshold_adc <= auto_loss_threshold_adc_buf;
         end if;
     end process;
     
@@ -140,15 +141,15 @@ begin
 
             if rst = '1'  then
                 current_state <= IDLE;
-                time_able <= (others => '0');
+                condition_elapsed_cycles <= (others => '0');
                 pid_enable <= '1';
                 mixer_enable <= '1';
                 sawtooth_enable <= '1';
                 min_sig_in <= (15 => '0', others => '1');
                 max_sig_in <= (15 => '1', others => '0');
                 measurement_done <= '0';
-                auto_time_duration_scanning <= (others => '0');
-                auto_time_duration_locking <= (others => '0');
+                auto_enter_hold_cycles <= (others => '0');
+                auto_loss_hold_cycles <= (others => '0');
                 pc_cmd_prev <= pc_cmd ; 
             else
                 pc_cmd_prev <= pc_cmd;
@@ -161,7 +162,7 @@ begin
                         sawtooth_enable <= '1';
                         if pc_cmd = "01" and pc_cmd_prev = "00" then
                             current_state <= SCANNING;
-                            time_able <= (others => '0');
+                            condition_elapsed_cycles <= (others => '0');
                         elsif pc_cmd = "10" and pc_cmd_prev = "00" then
                             current_state <= AUTO_WAIT;
                         end if;
@@ -194,7 +195,7 @@ begin
                             current_state <= IDLE;
                         elsif sawtooth_jump = '1' then
                             current_state <= AUTO_TIME;
-                            time_able <= (others => '0');
+                            condition_elapsed_cycles <= (others => '0');
                             measurement_done <= '0'; 
                         end if;
 
@@ -205,40 +206,40 @@ begin
                         sawtooth_enable <= '0';
 
                         if measurement_done = '0' then
-                            if sig_in_buf < auto_threshold_signal_scanning then
-                                time_able <= time_able + 1;
+                            if sig_in_buf < auto_enter_threshold_adc then
+                                condition_elapsed_cycles <= condition_elapsed_cycles + 1;
                             else
-                                if time_able > min_AUTO_TIME then
+                                if condition_elapsed_cycles > min_AUTO_TIME then
                                     measurement_done <= '1'; 
-                                    auto_time_duration_scanning <= '0' & time_able(31 downto 1);--*0.5
-                                    auto_time_duration_locking <= time_able(29 downto 0) & "00"; --*4
-                                    time_able <= (others => '0');
+                                    auto_enter_hold_cycles <= '0' & condition_elapsed_cycles(31 downto 1);-- Existing half-duration calculation
+                                    auto_loss_hold_cycles <= condition_elapsed_cycles(29 downto 0) & "00"; -- Existing fourfold-duration calculation
+                                    condition_elapsed_cycles <= (others => '0');
                                 else 
-                                    time_able <= (others => '0');
+                                    condition_elapsed_cycles <= (others => '0');
                                 end if;
                             end if;
                         end if;
 
                         if pc_cmd = "00" then
                             current_state <= IDLE;
-                        elsif sawtooth_jump = '1' and auto_time_duration_scanning > 0 then
+                        elsif sawtooth_jump = '1' and auto_enter_hold_cycles > 0 then
                             current_state <= AUTO_SCANNING;
-                            time_able <= (others => '0');
+                            condition_elapsed_cycles <= (others => '0');
                         end if;
                     
                     when AUTO_SCANNING => 
                         mixer_enable <= '0';
                         pid_enable <= '1';
                         sawtooth_enable <= '0';
-                        if sig_in_buf < auto_threshold_signal_scanning then
-                            if time_able < auto_time_duration_scanning then
-                                time_able <= time_able + 1;
+                        if sig_in_buf < auto_enter_threshold_adc then
+                            if condition_elapsed_cycles < auto_enter_hold_cycles then
+                                condition_elapsed_cycles <= condition_elapsed_cycles + 1;
                             else
                                 current_state <= AUTO_LOCKING;
-                                time_able <= (others => '0');
+                                condition_elapsed_cycles <= (others => '0');
                             end if;
                         else
-                            time_able <= (others => '0');
+                            condition_elapsed_cycles <= (others => '0');
                         end if;
                         if pc_cmd = "00" and pc_cmd_prev = "10" then
                             current_state <= IDLE;
@@ -250,16 +251,16 @@ begin
                         sawtooth_enable <= '1';
                         if pc_cmd = "00" and pc_cmd_prev = "10" then
                             current_state <= IDLE;
-                            time_able <= (others => '0');
-                        elsif sig_in_buf > auto_threshold_signal_locking then
-                            if time_able < auto_time_duration_locking then
-                                time_able <= time_able + 1;
+                            condition_elapsed_cycles <= (others => '0');
+                        elsif sig_in_buf > auto_loss_threshold_adc then
+                            if condition_elapsed_cycles < auto_loss_hold_cycles then
+                                condition_elapsed_cycles <= condition_elapsed_cycles + 1;
                             elsif pc_cmd = "11" then
                                 current_state <= IDLE;
-                                time_able <= (others => '0');
+                                condition_elapsed_cycles <= (others => '0');
                             end if;
                         else
-                            time_able <= (others => '0');
+                            condition_elapsed_cycles <= (others => '0');
                         end if;
 
                     --################ MANUAL MODE ################--
@@ -267,15 +268,15 @@ begin
                         mixer_enable <= '0';
                         pid_enable <= '1';
                         sawtooth_enable <= '0';
-                        if sig_in_buf < threshold_signal_scanning then
-                            if time_able < time_duration_scanning then
-                                time_able <= time_able + 1;
+                        if sig_in_buf < manual_enter_threshold_adc then
+                            if condition_elapsed_cycles < manual_enter_hold_cycles then
+                                condition_elapsed_cycles <= condition_elapsed_cycles + 1;
                             else
                                 current_state <= LOCKING;
-                                time_able <= (others => '0');
+                                condition_elapsed_cycles <= (others => '0');
                             end if;
                         else
-                            time_able <= (others => '0');
+                            condition_elapsed_cycles <= (others => '0');
                         end if;
                         if pc_cmd = "00" and pc_cmd_prev = "01" then
                             current_state <= IDLE;
@@ -287,16 +288,16 @@ begin
                         sawtooth_enable <= '1';
                         if pc_cmd = "00" and pc_cmd_prev = "01" then
                             current_state <= IDLE;
-                            time_able <= (others => '0');
-                        elsif sig_in_buf > threshold_signal_locking then
-                            if time_able < time_duration_locking then
-                                time_able <= time_able + 1;
+                            condition_elapsed_cycles <= (others => '0');
+                        elsif sig_in_buf > manual_loss_threshold_adc then
+                            if condition_elapsed_cycles < manual_loss_hold_cycles then
+                                condition_elapsed_cycles <= condition_elapsed_cycles + 1;
                             else
                                 current_state <= IDLE;
-                                time_able <= (others => '0');
+                                condition_elapsed_cycles <= (others => '0');
                             end if;
                         else
-                            time_able <= (others => '0');
+                            condition_elapsed_cycles <= (others => '0');
                         end if;
                 end case;
             end if;

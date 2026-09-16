@@ -23,9 +23,9 @@ entity module_pdh_state_machine is
         
         -- Standard Data/Control Flow Interface
         sig_in          :   in  std_logic_vector(15 downto 0);
-        pid_enable      : out std_logic;  -- Enable PID controller
-        mixer_enable    : out std_logic;  -- Enable mixer
-        sawtooth_enable : out std_logic;  -- Sawtooth wave for scanning
+        pid_enable      : out std_logic;  -- Active-high PID auto-reset request when configured
+        mixer_enable    : out std_logic;  -- Existing mixer control level; verify polarity at integration
+        sawtooth_enable : out std_logic;  -- Active-high accumulator auto-reset request when configured
         saw_input       : in  std_logic_vector(15 downto 0)
     );
 end entity module_pdh_state_machine;
@@ -66,9 +66,12 @@ begin
         saw_input       =>  saw_input
     );
 
-    -- Instantiate the parameter RAM to store the core's configuration
+    -- Instantiate the parameter RAM to store the core's configuration.
+    -- Defaults by 32-bit address (unchanged): 0=0, 1=-32768 ADC, 2=0 ADC,
+    -- 3=0x20000000 cycles, 4=0x20000000 cycles, 5=0x4000 Q1.15,
+    -- 6=0x7530 Q1.15. Slots 7 and above are unused by this core.
     parameter_ram : entity work.parameter_ram_256 generic map(
-        -- Default values can be set here if needed
+        -- Preserve these raw register defaults for existing configurations.
         ram_default     =>  x"00000000000075300000400020000000" &
                             x"20000000000000000000800000000000"
     ) port map(

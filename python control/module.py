@@ -703,6 +703,7 @@ class ModuleLinearTransformer(ModuleBase):
             return address_list, formula
         
 class ModulePDHFSM(ModuleBase):
+    # Keep the register keys and addresses stable for saved configurations and RTL.
     parameter_list = {
         0: {"name": "pc_cmd", "width": 2},
         1: {"name": "thre_sig_lock", "width": 16},
@@ -717,7 +718,9 @@ class ModulePDHFSM(ModuleBase):
         "thre_sig_lock": 1, "threshold_signal_lock": 1,
         "thre_sig_scan": 2, "threshold_signal_scan": 2,
         "time_scan": 3,
-        "time_lock": 4
+        "time_lock": 4,
+        "coef_scan": 5,
+        "coef_lock": 6
     }
 
 class ModuleSCLOFSM(ModuleBase):

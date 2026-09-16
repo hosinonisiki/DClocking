@@ -73,12 +73,13 @@ def _dispatch_param_open(node):
 
 
 class ParamDialog(QDialog):
-    def __init__(self, schema: list[dict], values: dict, parent = None, apply_callback = None, companion_widget_factory = None):
+    def __init__(self, schema: list[dict], values: dict, parent = None, apply_callback = None, companion_widget_factory = None, defer_rolling_apply = False):
         super().__init__(parent)
         self.setWindowTitle("参数修改")
         self._editors = {}
         self._fields = {}
         self._apply_callback = apply_callback
+        self._defer_rolling_apply = defer_rolling_apply
         self._committed_values = {}
         self._enter_committed_keys = set()
         self._companion_widget = None
@@ -139,7 +140,7 @@ class ParamDialog(QDialog):
                 w = QuantityLineEdit(
                     value=int(values.get(key, field.get("default", 0))),
                     field=field,
-                    report_callback=lambda k=key: self._apply_field(k, preserve_roll=True),
+                    report_callback=lambda k=key: self._apply_quantity_report(k),
                     roll_finished_callback=lambda k=key: self._apply_field(k),
                 )
                 self._editors[key] = ("int_qty", w)
@@ -147,7 +148,7 @@ class ParamDialog(QDialog):
                 w = QuantityLineEdit(
                     value=float(values.get(key, field.get("default", 0.0))),
                     field=field,
-                    report_callback=lambda k=key: self._apply_field(k, preserve_roll=True),
+                    report_callback=lambda k=key: self._apply_quantity_report(k),
                     roll_finished_callback=lambda k=key: self._apply_field(k),
                 )
                 self._editors[key] = ("float_qty", w)
@@ -359,6 +360,13 @@ class ParamDialog(QDialog):
         if not self._apply_callback:
             return
         self._apply_callback({key: None})
+
+    def _apply_quantity_report(self, key: str) -> bool:
+        if self._defer_rolling_apply:
+            _kind, editor = self._editors[key]
+            if editor.core.state == editor.core.ROLLING:
+                return False
+        return self._apply_field(key, preserve_roll=not self._defer_rolling_apply)
 
     def _apply_field(self, key: str, preserve_roll: bool = False) -> bool:
         if not self._apply_callback:
@@ -1667,7 +1675,7 @@ class ModulePDHFSM(NodeItem):
         self.inputs = ["POWER", "SCAN"]
         self.outputs = ["PID_RESET_CTRL", "MIXER_RESET_CTRL", "SCAN_RESET_CTRL"]
         self.inputs_display_name = ["功率输入", "扫描信号"]
-        self.outputs_display_name = ["关闭PID", "关闭混频器", "暂停扫描"]
+        self.outputs_display_name = ["PID复位请求", "混频器控制", "扫描累加器复位请求"]
         self.inputs_signals = [["level"], ["level"]]
         self.outputs_signals = [["bool"], ["bool"], ["bool"]]
         self.maxm = 1
