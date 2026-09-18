@@ -292,9 +292,14 @@ class ExperimentWorkbenchTests(unittest.TestCase):
                 return_value=QMessageBox.Save,
             ),
             patch("qt_experiment_workbench.QMessageBox.information"),
+            patch(
+                "qt_experiment_workbench.QMessageBox.warning",
+                side_effect=AssertionError("unexpected modal warning"),
+            ) as warning,
         ):
             self.assertTrue(self.workbench.save_document())
 
+        warning.assert_not_called()
         self.assertEqual(self.workbench.current_path.parent.name, "恢复记录")
         self.assertEqual(
             self.workbench.current_path.read_text(encoding="utf-8"),

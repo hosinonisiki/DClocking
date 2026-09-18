@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -72,6 +73,23 @@ class WindowsExperimentStorageTests(unittest.TestCase):
                 )
 
         self.assertEqual(target.read_text(encoding="utf-8"), "external")
+
+    def test_deleted_parent_with_snapshot_is_external_modification(self):
+        target = self.root / "deleted" / "note.md"
+        target.parent.mkdir()
+        self.repository.write_text(target, "opened", exclusive=True)
+        _path, _text, snapshot = self.repository.read_text(target, {".md"})
+        shutil.rmtree(target.parent)
+
+        with self.assertRaises(WindowsStorageExternalModificationError) as raised:
+            self.repository.write_text(
+                target,
+                "local edit",
+                expected_snapshot=snapshot,
+            )
+
+        self.assertIsInstance(raised.exception.__cause__, OSError)
+        self.assertFalse(target.parent.exists())
 
     def test_exclusive_publish_never_overwrites_racing_creator(self):
         target = self.root / "new.md"

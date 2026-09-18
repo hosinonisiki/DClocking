@@ -128,6 +128,68 @@ class WindowsRecoveryStateMachineTests(unittest.TestCase):
         recovery = target.parent / raised.exception.recovery_name
         self.assertEqual(recovery.read_text(encoding="utf-8"), "local")
 
+    def test_missing_parent_with_snapshot_is_typed_as_external_modification(self):
+        repository = self._repository()
+        target = self.root / "deleted" / "note.md"
+
+        @contextmanager
+        def missing_parent(_self, _path):
+            raise FileNotFoundError("simulated deleted parent directory")
+            yield  # pragma: no cover - keeps this a context manager generator
+
+        repository._hold_parent = types.MethodType(missing_parent, repository)
+
+        with self.assertRaises(WindowsStorageExternalModificationError) as raised:
+            repository.write_text(
+                target,
+                "local edit",
+                expected_snapshot="opened-snapshot",
+            )
+
+        self.assertIn("不可用", str(raised.exception))
+        self.assertIsInstance(raised.exception.__cause__, FileNotFoundError)
+        self.assertIsNone(raised.exception.recovery_name)
+
+    def test_missing_parent_without_snapshot_keeps_original_error(self):
+        repository = self._repository()
+        target = self.root / "deleted" / "new-note.md"
+
+        @contextmanager
+        def missing_parent(_self, _path):
+            raise FileNotFoundError("simulated deleted parent directory")
+            yield  # pragma: no cover - keeps this a context manager generator
+
+        repository._hold_parent = types.MethodType(missing_parent, repository)
+
+        with self.assertRaises(FileNotFoundError) as raised:
+            repository.write_text(target, "new document", exclusive=True)
+
+        self.assertNotIsInstance(
+            raised.exception,
+            WindowsStorageExternalModificationError,
+        )
+
+    def test_write_failure_after_parent_entry_is_not_reclassified(self):
+        repository = self._repository()
+        target = self.root / "write-failure.md"
+
+        def fail_write(_self, _parent, _payload):
+            raise OSError("simulated disk write failure")
+
+        repository._write_temp = types.MethodType(fail_write, repository)
+
+        with self.assertRaises(OSError) as raised:
+            repository.write_text(
+                target,
+                "local edit",
+                expected_snapshot="opened-snapshot",
+            )
+
+        self.assertNotIsInstance(
+            raised.exception,
+            WindowsStorageExternalModificationError,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

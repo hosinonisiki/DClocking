@@ -10,7 +10,7 @@ detected and restored without silently discarding either version.
 
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 import ctypes
 from ctypes import wintypes
 import hashlib
@@ -662,7 +662,18 @@ class WindowsExperimentRepository:
         if len(payload) > self.max_file_bytes:
             raise ValueError("实验记录超过 5 MiB，已拒绝保存")
 
-        with self._hold_parent(path) as target:
+        parent_stack = ExitStack()
+        try:
+            target = parent_stack.enter_context(self._hold_parent(path))
+        except (OSError, ValueError) as exc:
+            parent_stack.close()
+            if expected_snapshot is not None:
+                raise WindowsStorageExternalModificationError(
+                    "原文件目录或内容已不可用"
+                ) from exc
+            raise
+
+        with parent_stack:
             parent = target.parent
             temp = self._write_temp(parent, payload)
             temp_exists = True
