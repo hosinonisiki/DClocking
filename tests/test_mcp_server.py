@@ -8,6 +8,7 @@ import sys
 import unittest
 from pathlib import Path
 
+import anyio
 from mcp import StdioServerParameters
 from mcp.client import Client
 
@@ -266,11 +267,12 @@ class MCPServerProtocolTests(unittest.IsolatedAsyncioTestCase):
             env=os.environ.copy(),
         )
 
-        async with Client(parameters, raise_exceptions=True) as client:
-            tools = await client.list_tools()
-            result = await client.call_tool(
-                "get_module_spec", {"module_type": "PID控制器"}
-            )
+        with anyio.fail_after(15):
+            async with Client(parameters, raise_exceptions=True, read_timeout_seconds=5) as client:
+                tools = await client.list_tools()
+                result = await client.call_tool(
+                    "get_module_spec", {"module_type": "PID控制器"}
+                )
 
         self.assertIn("get_module_spec", {tool.name for tool in tools.tools})
         payload = _tool_result_json(result)

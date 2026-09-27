@@ -186,6 +186,45 @@ args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:\\绝对路径\\
 
 服务还提供项目说明、模块目录和单模块详情等只读资源。实际可用工具及输入结构应以客户端连接后发现的 schema 为准。
 
+## 开发者验收
+
+在已安装 `requirements-mcp.txt` 的 Python 环境中执行：
+
+```bash
+python -m unittest discover -s tests -p 'test_mcp*.py' -v
+```
+
+除目录、参数及 CLI 单元测试外，该命令还运行真实 stdio 子进程和真实本机 TCP HTTP 测试。HTTP 测试使用系统分配的临时端口，不占用默认的 8765：
+
+- 验证经典 `initialize` 握手和新版 `server/discover` 协商；
+- 发现五个只读工具，读取 PDH 参数定义与资源，检查合法和非法参数、候选设计；
+- 拒绝不存在的硬件写入工具；
+- 验证缺失/错误令牌、不可信 Host/Origin 和超大请求被拒绝；
+- 验证经典会话关闭时发送 DELETE，关闭后的会话不可重用；
+- 设置连接、协议请求及关闭的超时，结束时释放临时监听端口。
+
+普通测试不会下载依赖。首次安装脚本的完整验收需要显式开启，且只运行当前操作系统的原生启动器。
+
+macOS / Linux：
+
+```bash
+DCLOCKING_MCP_BOOTSTRAP_SMOKE=1 python -m unittest discover -s tests -p 'test_mcp_launcher_smoke.py' -v
+```
+
+Windows PowerShell：
+
+```powershell
+$env:DCLOCKING_MCP_BOOTSTRAP_SMOKE = '1'
+python -m unittest discover -s tests -p 'test_mcp_launcher_smoke.py' -v
+Remove-Item Env:DCLOCKING_MCP_BOOTSTRAP_SMOKE
+```
+
+该测试把 Python 源码和启动脚本复制到含中文、空格的临时目录，**不复制密钥、用户配置、实验文件或已有虚拟环境**。它从另一个工作目录调用真实启动脚本，创建全新 `.venv`、安装轻量依赖、进行两次 stdio 握手和 PDH 查询，并检查第二次启动未重装依赖。测试完成后仅清理自身临时目录，不操作原项目 `.venv`。首次安装受网络和包索引可用性影响，最多等待 120 秒。
+
+这些测试证明 MCP 协议与只读服务可用，不代表任意桌面客户端已配置成功，也不替代目标系统实测。macOS 上通过不能被记录为 Windows 启动已验收；Windows 必须单独执行原生启动器测试。
+
+接口实现与客户端用法以固定版本 SDK 和 [官方 Python SDK 传输文档](https://py.sdk.modelcontextprotocol.io/client/transports/)为依据；HTTP 自定义令牌需传入 `httpx2.AsyncClient`，再交给 `streamable_http_client`，不能向后者直接传 `headers=`。
+
 ## 常见问题
 
 ### 首次连接较慢
