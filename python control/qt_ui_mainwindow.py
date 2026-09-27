@@ -30,6 +30,8 @@ from PySide6.QtSerialPort import QSerialPort
 from qt_filter_designer import FIRDesignerWidget, IIRDesignerWidget
 from qt_pid_tuning import PIDParamCanvas
 from qt_pdh_designer import PDHDesignerWidget
+from qt_pdh_experiment import PDHExperimentWorkbench
+from FPGA_Agent.pdh_experiment import ExperimentProfile, WaveformTrace, validate_parameters
 from qt_module import (
     NodeItem,
     ModulePID,
@@ -212,10 +214,132 @@ class MainWindow(QMainWindow):
         # Keep parameter routing scoped to this scene.  The global hook remains
         # as a compatibility fallback for legacy callers, but must not decide
         # which MainWindow owns a node when more than one window has existed.
-        self.scene.param_open_handler = self._open_param_panel
+        self.scene.param_open_handler = self._open_module_workspace
         self.scene.param_apply_handler = self._apply_param_to_hardware
         set_param_apply_handler(self._apply_param_to_hardware)
-        set_param_open_handler(self._open_param_panel)
+        set_param_open_handler(self._open_module_workspace)
+
+    def _open_module_workspace(self, node):
+        if isinstance(node, ModulePDHFSM):
+            return self._open_pdh_designer(node) is not None
+        return self._open_param_panel(node)
+
+    def open_pdh_workbench(self):
+        """Reuse the one PDHS instance; creating its local node sends no command."""
+        node = next((item for item in self.scene.items() if isinstance(item, ModulePDHFSM)), None)
+        if node is None:
+            node = ModulePDHFSM("PDH状态机", 0, self.view.mapToScene(self.view.viewport().rect().center()))
+            self.view._used_indices.setdefault("PDH状态机", set()).add(0)
+            self.view._apply_mode_to_node(node)
+            self.scene.addItem(node)
+        return self._open_pdh_designer(node)
+
+    def pdh_experiment_snapshot(self, node):
+        """Read local graph facts only. Shared by the operator UI and Agent.
+
+        A serial connection and command-register readback are not proof of a
+        downloaded route, a running FSM, or a stable optical lock.
+        """
+        routes, issues = {}, []
+        edges = [item for item in self.scene.items() if isinstance(item, EdgeItem)]
+
+        def describe(port):
+            parent = getattr(port, "parent_node", None)
+            if parent is None:
+                return ("输入通道" if port.port_type == "out" else "输出通道") + chr(65+port.index)
+            names = parent.outputs_display_name if port.port_type == "out" else parent.inputs_display_name
+            return f"{parent.display_name} / {names[port.index]}"
+
+        for index, key in ((0, "signal"), (1, "scan")):
+            incoming = [e for e in edges if e.end_port is node.in_ports[index]]
+            routes[key] = "；".join(describe(e.start_port) for e in incoming) or "尚未连接"
+            if len(incoming) != 1:
+                issues.append(("判锁输入" if index == 0 else "扫描同步") + "必须连接一个有效来源")
+        for index, key in ((0, "pid"), (2, "scan_control")):
+            outgoing = [e for e in edges if e.start_port is node.out_ports[index]]
+            routes[key] = "；".join(describe(e.end_port) for e in outgoing) or "尚未连接"
+            if not outgoing:
+                issues.append(("PID 控制" if index == 0 else "扫描控制") + "尚未连接下游模块")
+            for edge in outgoing:
+                target = getattr(edge.end_port, "parent_node", None)
+                if index == 0:
+                    if not isinstance(target, ModulePID) or edge.end_port.index != 0:
+                        issues.append("PID 控制需连接 PID 的复位输入")
+                    elif not target.get_params().get("enable_auto_reset"):
+                        issues.append(f"{target.display_name} 未启用自动控制，可能忽略状态机指令")
+                elif not isinstance(target, ModuleAccumulator) or edge.end_port.index not in (2, 3):
+                    issues.append("扫描控制需连接扫描累加器的暂停或复位输入，并核对实际作用")
+                elif edge.end_port.index == 2 and not target.get_params().get("enable_auto_reset"):
+                    issues.append(f"{target.display_name} 的复位控制未使能")
+        widget = self._pdh_designers.get(id(node))
+        saved = getattr(node, "_pdh_experiment_bundle", {})
+        profile = widget.profile.to_dict() if isinstance(widget, PDHExperimentWorkbench) else saved.get("profile", ExperimentProfile().to_dict())
+        parameters = node.get_params()
+        baseline = widget.baseline_parameters() if widget is not None else {}
+        same_values = bool(baseline) and all(parameters.get(key) == value for key, value in baseline.items())
+        source = (widget._source_label if same_values and not widget._conflict_message
+                  else "本地缓存，当前值未核对设备")
+        return {"connected": self._pdh_device_connected(), "profile": profile,
+                "parameters": parameters, "parameter_source": source,
+                "routes": routes, "topology_issues": issues,
+                "runtime_state": "unknown", "hardware_state_available": False,
+                "connection_evidence": "local_graph_only", "optical_lock": "unverified"}
+
+    def _update_pdh_context(self, node, widget):
+        if node.scene() is self.scene:
+            widget.set_context(self.pdh_experiment_snapshot(node))
+
+    def _locate_pdh_signal(self, node, role):
+        if node.scene() is not self.scene:
+            return
+        self.workspace_tabs.show_home()
+        self.scene.clearSelection()
+        node.setSelected(True)
+        for edge in [i for i in self.scene.items() if isinstance(i, EdgeItem)]:
+            related = ((role == "signal" and edge.end_port is node.in_ports[0])
+                       or (role == "scan" and edge.end_port is node.in_ports[1])
+                       or (role == "error" and edge.start_port is node.out_ports[0]))
+            if related:
+                for port in (edge.start_port, edge.end_port):
+                    owner = getattr(port, "parent_node", None)
+                    if owner is not None:
+                        owner.setSelected(True)
+        self.view.centerOn(node)
+
+    def _stage_pdh_experiment_local(self, node, widget, changes):
+        if self._pdh_device_connected() or not self._pdh_node_is_current(node, widget):
+            widget.set_apply_result(False, "设备已连接或模块已移除；未保存到本地画布")
+            return
+        self._validate_pdh_inspector_params(node, changes)
+        self._stage_pdh_local_params(node, changes)
+        widget.set_parameters(node.get_params(), "仅本地配置 · 未写入 FPGA")
+        widget.operation_feedback.setText("草稿已保存到本地画布；保存配置可复用，未写入 FPGA。")
+
+    def _capture_pdh_scope_snapshot(self, widget):
+        scope = self._oscilloscope_workbench
+        if not widget.scope_mapping_confirmed.isChecked():
+            widget.operation_feedback.setText("请先确认 CH1 对应此判锁输入且使用相同内部信号码，不能把任意采集通道当作判锁信号。")
+            return
+        observation = scope.pdh_snapshot() if scope is not None else None
+        if observation is None:
+            widget.operation_feedback.setText("尚无可分析的单次采集快照。请完成采集并确认设备采样率，不能拼接不同采集批次。")
+            return
+        try:
+            trace = WaveformTrace(tuple(observation["time_s"]), tuple(observation["values"]),
+                                  observation["source"], observation["label"])
+            widget.set_trace(trace)
+            widget.operation_feedback.setText("已取得单通道快照；不是连续遥测，Legacy UDP 无包序号，不能证明采样无丢包。")
+        except ValueError as exc:
+            widget.operation_feedback.setText(f"快照不可用于判据分析：{exc}")
+
+    def _record_pdh_experiment(self, widget, report):
+        workbench = self.open_experiment_workbench()
+        path = workbench.create_record("PDH-" + widget.profile.name)
+        if path is None:
+            return
+        workbench.editor.setPlainText(report)
+        if workbench.save_document():
+            widget.operation_feedback.setText(f"实验记录已保存：{path.name}")
 
     def _refresh_custom_composite_palette(self):
         self.palette.set_custom_composites(self.custom_composite_library.definitions())
@@ -316,6 +440,9 @@ class MainWindow(QMainWindow):
         self.oscilloscope_rail_btn = add_rail_button("∿", "打开实时示波器工作台")
         self.oscilloscope_rail_btn.setObjectName("oscilloscope_workbench_rail_button")
         self.oscilloscope_rail_btn.setCheckable(False)
+        self.pdh_rail_btn = add_rail_button("PDH", "打开 PDH 实验工作台")
+        self.pdh_rail_btn.setObjectName("pdh_experiment_rail_button")
+        self.pdh_rail_btn.setCheckable(False)
         self.log_rail_btn = add_rail_button("⌁", "运行日志")
         rail_layout.addStretch()
         self.settings_rail_btn = add_rail_button("⚙", "Agent 设置")
@@ -326,6 +453,7 @@ class MainWindow(QMainWindow):
         self.config_rail_btn.clicked.connect(self.load_configuration)
         self.experiment_rail_btn.clicked.connect(self.open_experiment_workbench)
         self.oscilloscope_rail_btn.clicked.connect(self.open_oscilloscope_workbench)
+        self.pdh_rail_btn.clicked.connect(self.open_pdh_workbench)
         self.log_rail_btn.clicked.connect(
             lambda: self.set_log_expanded(not self.is_log_expanded())
         )
@@ -523,6 +651,10 @@ class MainWindow(QMainWindow):
         self.mode_status_label.setText("DEVELOPER MODE" if developer else "FREE MODE")
         route_count = sum(isinstance(item, EdgeItem) for item in self.scene.items())
         self.route_status_label.setText(f"{route_count} routes")
+        for node in self.scene.items():
+            widget = self._pdh_designers.get(id(node))
+            if isinstance(widget, PDHExperimentWorkbench):
+                self._update_pdh_context(node, widget)
 
     def _refresh_connection_presentation(self):
         if not self._serial_was_open and not self.serial_port.isOpen():
@@ -817,7 +949,7 @@ class MainWindow(QMainWindow):
                 self._refresh_pdh_inspector_panel(pdh_node, panel)
             )
             title_row.addWidget(refresh_btn)
-            designer_btn = QPushButton("↗ 设计工作台", card)
+            designer_btn = QPushButton("↗ PDH 实验工作台", card)
             designer_btn.setObjectName("pdh_designer_open_button")
             designer_btn.setAccessibleName(f"打开{node.display_name}参数设计工作台")
             designer_btn.setToolTip("在可拖出的标签页中查看入锁、失锁和自动阈值规则")
@@ -936,7 +1068,13 @@ class MainWindow(QMainWindow):
             return None
         designer = self._pdh_designers.get(id(node))
         if designer is None:
-            designer = PDHDesignerWidget(parent=self)
+            designer = PDHExperimentWorkbench(parent=self)
+            designer.context_requested.connect(lambda n=node, w=designer: self._update_pdh_context(n, w))
+            designer.locate_requested.connect(lambda role, n=node: self._locate_pdh_signal(n, role))
+            designer.scope_requested.connect(self.open_oscilloscope_workbench)
+            designer.scope_snapshot_requested.connect(lambda w=designer: self._capture_pdh_scope_snapshot(w))
+            designer.local_stage_requested.connect(lambda changes, n=node, w=designer: self._stage_pdh_experiment_local(n, w, changes))
+            designer.record_requested.connect(lambda report, w=designer: self._record_pdh_experiment(w, report))
             designer.apply_requested.connect(
                 lambda changes, pdh_node=node, widget=designer:
                 self._apply_pdh_designer_changes(pdh_node, widget, changes)
@@ -952,8 +1090,16 @@ class MainWindow(QMainWindow):
             panel_key = f"{node.name}@{node.component_name}:{node.index}"
             panel = self._param_panels.get(panel_key)
             source = getattr(panel, "_pdh_parameter_source", self._pdh_parameter_source(False))
+            if panel is None and self._pdh_device_connected():
+                source = self._pdh_parameter_source(self._refresh_node_params_from_device(node))
             designer.set_parameters(node.get_params(), source_label=source)
             self._pdh_designers[id(node)] = designer
+            saved = getattr(node, "_pdh_experiment_bundle", None)
+            if saved:
+                try:
+                    designer.import_bundle(saved)
+                except ValueError as exc:
+                    designer.operation_feedback.setText(f"实验方案未载入：{exc}；原始模块参数保持不变。")
         else:
             refreshed = self._refresh_node_params_from_device(node) if self._pdh_device_connected() else False
             source = self._pdh_parameter_source(refreshed)
@@ -968,10 +1114,11 @@ class MainWindow(QMainWindow):
                 designer.set_parameters(current, source_label=source)
         self.open_workspace_window(
             f"pdh-designer:{id(node)}",
-            f"{node.display_name} · 参数设计",
+            f"{node.display_name} · PDH 实验",
             designer,
             source=self,
         )
+        self._update_pdh_context(node, designer)
         return designer
 
     def _pdh_node_is_current(self, node, designer):
@@ -1099,8 +1246,9 @@ class MainWindow(QMainWindow):
         for legacy_key, canonical_key in PDH_LEGACY_PARAM_ALIASES.items():
             if canonical_key not in canonical and legacy_key in saved_params:
                 canonical[canonical_key] = saved_params[legacy_key]
-        self._validate_pdh_inspector_params(node, canonical)
-        return canonical
+        # File restoration is not a hardware write: preserve historical uint32
+        # timings, while new writes keep the existing int31 safety limit.
+        return validate_parameters(canonical, for_write=False)
 
     def _write_and_confirm_pdh_inspector_params(self, node, panel, params):
         fields = self._validate_pdh_inspector_params(node, params)
@@ -1149,7 +1297,11 @@ class MainWindow(QMainWindow):
             source = self._pdh_parameter_source(True)
         else:
             source = self._pdh_parameter_source(False)
-        designer.set_parameters(node.get_params(), source_label=source)
+        if isinstance(designer, PDHExperimentWorkbench):
+            designer.accept_refresh(node.get_params(), source)
+            self._update_pdh_context(node, designer)
+        else:
+            designer.set_parameters(node.get_params(), source_label=source)
         return True
 
     def _apply_pdh_designer_changes(self, node, designer, changes):
@@ -1193,7 +1345,7 @@ class MainWindow(QMainWindow):
                 return False
             source = self._pdh_parameter_source(True)
             designer.set_parameters(actual, source_label=source)
-            designer.set_apply_result(True, "所选寄存器回读一致；PDH 实际运行状态仍未知。")
+            designer.set_apply_result(True, "所选寄存器回读一致；PDH 实际运行状态仍未知。", readback_confirmed=True)
             return True
         except Exception as exc:
             designer.set_apply_result(False, f"写入或回读异常：{exc}")
@@ -2233,6 +2385,11 @@ class MainWindow(QMainWindow):
                         "special_methods": self._node_special_method_state(item),
                     }
                 )
+                if isinstance(item, ModulePDHFSM):
+                    workspace = self._pdh_designers.get(id(item))
+                    bundle = workspace.export_bundle() if workspace is not None else getattr(item, "_pdh_experiment_bundle", None)
+                    if bundle is not None:
+                        nodes[-1]["pdh_experiment"] = bundle
 
         for item in self.scene.items():
             if isinstance(item, EdgeItem):
@@ -2254,8 +2411,8 @@ class MainWindow(QMainWindow):
         if not file_path:
             return
 
-        config = self._build_config_dict()
         try:
+            config = self._build_config_dict()
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
             print(f"[config] saved: {file_path}")
@@ -2310,6 +2467,9 @@ class MainWindow(QMainWindow):
         self.view._used_indices.setdefault(component_name, set()).add(idx)
         self.view._apply_mode_to_node(node)
         self.scene.addItem(node)
+
+        if isinstance(node, ModulePDHFSM) and isinstance(node_cfg.get("pdh_experiment"), dict):
+            node._pdh_experiment_bundle = node_cfg["pdh_experiment"]
 
         return node
 

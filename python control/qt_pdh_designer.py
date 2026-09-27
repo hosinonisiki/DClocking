@@ -896,13 +896,15 @@ class PDHDesignerWidget(QWidget):
         self.feedback.setText("已请求应用；等待写入结果／设备参数回读，不能据此认定已生效。")
         self.apply_requested.emit(pending)
 
-    def set_apply_result(self, success, message=""):
+    def set_apply_result(self, success, message="", *, readback_confirmed=False):
         """Report controller feedback without silently changing baseline values."""
         if self._conflict_message is not None:
             self.mark_conflict(self._conflict_message)
             return
         if success:
             self.feedback.setText(
+                (message or "所选参数已写入并回读一致；实际运行状态仍未知。")
+                if readback_confirmed else
                 f"写入请求已处理。{message} 请回读设备后确认实际值。"
             )
         else:

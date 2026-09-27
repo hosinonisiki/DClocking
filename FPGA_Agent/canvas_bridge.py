@@ -6,6 +6,8 @@ without directly touching Qt objects or knowing internal widget structure.
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 from PySide6.QtCore import QPointF, Qt
 from PySide6.QtWidgets import QGraphicsItem
 
@@ -137,7 +139,7 @@ class CanvasBridge:
         result = []
         for item in self._scene.items():
             if isinstance(item, NodeItem):
-                result.append({
+                entry = {
                     "name": item.name,
                     "display_name": getattr(item, "display_name", ""),
                     "component_name": item.component_name,
@@ -145,8 +147,39 @@ class CanvasBridge:
                     "position": [item.pos().x(), item.pos().y()],
                     "num_inputs": int(item.num_inputs),
                     "num_outputs": int(item.num_outputs),
-                })
+                }
+                if item.name == "PDHS":
+                    entry["pdh_experiment"] = self._pdh_context(item)
+                result.append(entry)
         return result
+
+    def _pdh_context(self, node) -> dict:
+        """Use the existing in-memory experiment snapshot, never open/read hardware."""
+        context = {
+            "profile": {}, "parameters": {}, "parameter_source": "unavailable",
+            "runtime_state": "unknown", "hardware_state_available": False,
+            "routes": {}, "topology_issues": [],
+        }
+        snapshot = getattr(self._mw, "pdh_experiment_snapshot", None)
+        if callable(snapshot):
+            try:
+                supplied = snapshot(node)
+                if not isinstance(supplied, dict):
+                    raise ValueError("Invalid experiment snapshot")
+                context.update(deepcopy(supplied))
+            except Exception:
+                # Context is auxiliary: a closed designer or unavailable metadata
+                # must not break list_modules or provoke fallback device reads.
+                context["context_error"] = "snapshot_unavailable"
+        if context.get("hardware_state_available") is not True:
+            context["hardware_state_available"] = False
+            context["runtime_state"] = "unknown"
+        context["interpretation_note"] = (
+            "pc_cmd 是控制请求，不是运行状态；参数缓存或写入成功不是光学锁定证明。"
+            "请按 parameter_source 区分本地值与已核对值；未提供设备状态时明确回答未知。"
+            "自动模式不代表自动 PID 整定或自动重锁。"
+        )
+        return context
 
     def _find_node(self, name: str):
         """Find a NodeItem by its internal name."""
@@ -319,7 +352,10 @@ class CanvasBridge:
                     "error": f"No node named '{node_name}' on canvas."}
         try:
             params = node.get_params() if hasattr(node, 'get_params') else {}
-            return {"success": True, "params": params}
+            result = {"success": True, "params": params}
+            if node.name == "PDHS":
+                result["pdh_experiment"] = self._pdh_context(node)
+            return result
         except Exception as e:
             return {"success": False, "error": str(e)}
 

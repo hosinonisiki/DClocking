@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import socket
 import time
+from dataclasses import dataclass
 
 import numpy as np
 from PySide6.QtCore import QPointF, QRectF, QSettings, Qt, QTimer
@@ -34,6 +35,14 @@ from oscilloscope_model import ScopeSampleBuffer
 from oscilloscope_protocol import LegacyUdpScopeProtocol, ScopeProtocolError
 from oscilloscope_transport import ScopeEndpointConfig, UdpScopeReceiver
 from qt_ui_theme import UiColors
+
+
+@dataclass(frozen=True)
+class _PDHAcquisitionSnapshot:
+    values: tuple[float, ...]
+    time_s: tuple[float, ...]
+    source: str
+    label: str
 
 
 class ScopePlotWidget(QWidget):
@@ -201,6 +210,8 @@ class OscilloscopeWorkbench(QWidget):
         self._capture_stats_baseline = 0
         self._capture_drop_baseline = 0
         self._capabilities_checked = False
+        self._pdh_snapshot_record = None
+        self._pdh_capture_signature = None
         self._rng = np.random.default_rng(0xDCC10C)
         self._is_running = False
         self._last_source_is_udp = None
@@ -236,6 +247,67 @@ class OscilloscopeWorkbench(QWidget):
     @property
     def is_running(self) -> bool:
         return self._is_running
+
+    def pdh_snapshot(self) -> dict | None:
+        """Return a detached, fixed-rate acquisition; never expose mixed batches.
+
+        Reading this snapshot neither triggers acquisition nor reads a device.
+        The display ring and its selected source/rate are not provenance.
+        """
+        snapshot = self._pdh_snapshot_record
+        if snapshot is None:
+            return None
+        return {"values": list(snapshot.values), "time_s": list(snapshot.time_s),
+                "source": snapshot.source, "label": snapshot.label}
+
+    def _clear_samples_and_pdh_snapshot(self):
+        self._pdh_snapshot_record = None
+        self.sample_buffer.clear()
+
+    @staticmethod
+    def _pdh_capability_signature(capabilities):
+        """Only a previously validated, representable format can stamp samples."""
+        if capabilities is None:
+            return None
+        rate = capabilities.sample_rate_hz
+        if (type(rate) not in (int, float) or not math.isfinite(rate)
+                or not 1 <= rate <= OscilloscopeWorkbench.MAX_REPORTED_SAMPLE_RATE_HZ
+                or capabilities.signed is not True or capabilities.sample_bytes != 2
+                or capabilities.channel_count != 1 or not 1 <= capabilities.sample_bits <= 16):
+            return None
+        return (capabilities.fpga_ip, capabilities.fpga_mac, rate,
+                capabilities.sample_bits, capabilities.sample_bytes, capabilities.channel_count)
+
+    def _store_pdh_snapshot(self, values, rate, source, description):
+        """Freeze metadata together with one contiguous local sample extent."""
+        values = np.asarray(values, dtype=np.float64).reshape(-1)[-20000:]
+        if (values.size < 2 or not math.isfinite(rate) or rate <= 0
+                or not np.isfinite(values).all() or (values < -32768).any()
+                or (values > 32767).any()):
+            self._pdh_snapshot_record = None
+            return
+        self._pdh_snapshot_record = _PDHAcquisitionSnapshot(
+            values=tuple(float(value) for value in values),
+            time_s=tuple(index / rate for index in range(values.size)),
+            source=source,
+            label=f"CH1 · {description} · {time.strftime('%Y-%m-%d %H:%M:%S')} · "
+                  f"{values.size} 点 / {rate:g} S/s",
+        )
+
+    def _complete_pdh_udp_snapshot(self, capabilities):
+        """Called before the next request resets the current capture counter."""
+        signature = self._pdh_capability_signature(capabilities)
+        if (not self._capabilities_checked or signature is None
+                or signature != self._pdh_capture_signature):
+            self._pdh_snapshot_record = None
+            return
+        # The ring may include earlier requests. Only the newest samples from
+        # this completed request are eligible; never bridge acquisition gaps.
+        count = min(self._capture_received, self.sample_buffer.size, 20000)
+        self._store_pdh_snapshot(
+            self.sample_buffer.snapshot(count)[0], float(signature[2]), "live",
+            "单次请求完成后的末段；Legacy 无包序号，不能证明无丢包或乱序",
+        )
 
     def _build_header(self):
         header = QFrame(self)
@@ -521,7 +593,7 @@ class OscilloscopeWorkbench(QWidget):
         self.source_combo.currentTextChanged.connect(self._sync_source_controls)
         self.start_button.clicked.connect(self.start_acquisition)
         self.stop_button.clicked.connect(self.stop_acquisition)
-        self.clear_button.clicked.connect(self.sample_buffer.clear)
+        self.clear_button.clicked.connect(self._clear_samples_and_pdh_snapshot)
         self.clear_button.clicked.connect(self.plot.update)
         self.visible_samples_combo.currentIndexChanged.connect(
             lambda _index: self.plot.set_visible_samples(
@@ -562,6 +634,9 @@ class OscilloscopeWorkbench(QWidget):
     def _sync_source_controls(self, *_args, update_detail=True):
         udp = self.source_combo.currentText() == "FPGA UDP"
         previous_udp = self._last_source_is_udp
+        if previous_udp is not None and previous_udp != udp:
+            self._pdh_snapshot_record = None
+            self._pdh_capture_signature = None
         for widget in (
             self.local_ip_combo,
             self.fpga_ip_edit,
@@ -638,6 +713,8 @@ class OscilloscopeWorkbench(QWidget):
     def start_acquisition(self):
         if self._is_running:
             return
+        self._pdh_snapshot_record = None
+        self._pdh_capture_signature = None
         self.sample_buffer.clear()
         self._last_metric_time = time.monotonic()
         self._last_metric_samples = 0
@@ -750,6 +827,9 @@ class OscilloscopeWorkbench(QWidget):
             noise = self._rng.normal(0.0, 180.0 + channel * 30.0, count)
             channels.append(np.clip(signal + noise, -32768, 32767))
         self.sample_buffer.append(np.asarray(channels, dtype=np.float32))
+        # One generated block is continuous within the simulation model. Do not
+        # use the display ring or adjustable plot rate to invent its timing.
+        self._store_pdh_snapshot(channels[0], sample_rate, "demo", "仿真单块（非设备采集）")
         self._simulation_index += count
         self._capture_received += count
         self._total_samples_received += count
@@ -781,6 +861,10 @@ class OscilloscopeWorkbench(QWidget):
             self._channel_mask(),
             self.capture_samples_spin.value(),
         )
+        self._pdh_capture_signature = (
+            self._pdh_capability_signature(getattr(receiver, "last_capabilities", None))
+            if self._capabilities_checked else None
+        )
         expected_seconds = self.capture_samples_spin.value() / max(
             1.0, float(self.plot.sample_rate_hz)
         )
@@ -790,6 +874,7 @@ class OscilloscopeWorkbench(QWidget):
         )
 
     def _fail_udp_capture(self, reason):
+        self._pdh_snapshot_record = None
         self._stop_acquisition(
             "● UDP 采集失败",
             detail=str(reason),
@@ -852,6 +937,11 @@ class OscilloscopeWorkbench(QWidget):
             if not self._validate_reported_capabilities(capabilities):
                 self.plot.update()
                 return
+            if (self._capture_request_sent and self._pdh_capture_signature is not None
+                    and self._pdh_capability_signature(capabilities) != self._pdh_capture_signature):
+                # A rate/format change anywhere inside a request taints that
+                # whole capture, even if the original values later reappear.
+                self._pdh_capture_signature = None
             if not self._capture_request_sent and (
                 capabilities is not None
                 or time.monotonic() >= self._capture_request_due
@@ -919,6 +1009,7 @@ class OscilloscopeWorkbench(QWidget):
                 self._capture_request_sent
                 and self._capture_received >= self.capture_samples_spin.value()
             ):
+                self._complete_pdh_udp_snapshot(capabilities)
                 self._capture_cycles += 1
                 if self.acquisition_mode_combo.currentText() == "连续":
                     try:

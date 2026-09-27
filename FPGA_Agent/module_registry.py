@@ -408,9 +408,9 @@ MODULE_REGISTRY: dict[str, dict] = {
                    "live hardware state readback.",
         "category": "control",
         "inputs": [
-            {"index": 0, "name": "IN_POWER", "display": "透射光强信号输入",
+            {"index": 0, "name": "IN_POWER", "display": "判锁信号输入（共振谷）",
              "signal": ["level"],
-             "description": "Transmitted optical power / cavity transmission."},
+             "description": "Lock discriminator in signed-16 internal signal units, potentially after filtering. Entry requires signal below the threshold. Confirm detector source, signal-chain gain and dip polarity; do not assume raw ADC or cavity transmission."},
             {"index": 1, "name": "IN_SCAN", "display": "锯齿波扫描输入",
              "signal": ["level"],
              "description": "Sawtooth scan signal for monitoring."},
@@ -419,23 +419,23 @@ MODULE_REGISTRY: dict[str, dict] = {
             {"index": 0, "name": "PID_RESET_CTRL", "display": "PID复位请求",
              "signal": ["bool"],
              "description": "HIGH requests PID reset when the downstream auto-reset option is enabled; otherwise this level may be ignored."},
-            {"index": 1, "name": "MIXER_RESET_CTRL", "display": "混频器复位信号",
+            {"index": 1, "name": "MIXER_RESET_CTRL", "display": "预留时序控制输出",
              "signal": ["bool"],
-             "description": "Mixer gating control."},
-            {"index": 2, "name": "SCAN_RESET_CTRL", "display": "扫描累加器复位请求",
+             "description": "Legacy timing-control output; qt_env.setup_pdh leaves it unconnected. The current mixer has two analog inputs and no boolean gate/reset port. Never connect this output to a mixer signal input."},
+            {"index": 2, "name": "SCAN_RESET_CTRL", "display": "扫描控制（暂停或复位）",
              "signal": ["bool"],
-             "description": "HIGH requests scan accumulator reset when its downstream auto-reset option is enabled."},
+             "description": "Scan control level. In qt_env.setup_pdh it drives ACC2.PAUSE to hold the scan, not RESET. If intentionally routed to RESET, HIGH requests reset only with downstream auto-reset enabled. Holding, resetting and actuator zeroing are distinct."},
         ],
         "direct_params": PDH_DIRECT_PARAMS,
         "indirect_params": [],
         "typical_connections": [
-            "P.PID_RESET_CTRL —> PID.RESET",
-            "P.MIXER_RESET_CTRL —> MIXER gating",
-            "P.SCAN_RESET_CTRL —> ACC.RESET",
-            "P.IN_POWER <— photodetector signal",
-            "P.IN_SCAN <— ACC.FAST_OUT (sawtooth)",
+            "PDHS.PID_RESET_CTRL —> PIDC.RESET (verify auto-control enable)",
+            "PDHS.SCAN_RESET_CTRL —> ACC2.PAUSE (existing setup_pdh scan hold)",
+            "PDHS.IN_POWER <— FIR2.OUT (confirm detector source and dip polarity)",
+            "PDHS.IN_SCAN <— ACC2.SLOW_OUT (scan, separate from modulation source)",
+            "PDHS.MIXER_RESET_CTRL remains unconnected in setup_pdh; not a mixer analog input",
         ],
-        "connections_with": ["PID控制器", "累加器", "混频器"],
+        "connections_with": ["PID控制器", "累加器", "FIR滤波器"],
     },
 
     "LO自动校准状态机": {
@@ -570,35 +570,49 @@ SIGNAL_COMPAT = {
 # ---------------------------------------------------------------------------
 
 PDH_LOCKING_PATTERN = """
-## PDH Locking Standard Topology
+## PDH reference roles — source: qt_env.setup_pdh
 
-PDH locking requires the following modules and connections:
+This is the existing software routing example, not a verified physical wiring
+for the user's apparatus. INPUT_C / OUTPUT_B / OUTPUT_C are that example's
+channels only. Confirm experiment profile, actual ADC/DAC assignment, polarity,
+internal signal scaling, actuator limits and downstream enables before applying.
+Do not execute the legacy setup routine as a validated one-click experiment.
 
-1. **Signal generation chain:**
-   - `累加器` (ACCM): frequency accumulator, produces sawtooth phase
-   - `三角函数运算器` (TRIG): CORDIC, converts phase to sin/cos
-   - Connect: ACCM.SLOW_OUT(port 0) → TRIG.IN(port 0)
+1. **Modulation reference (separate from the cavity scan):**
+   - ACCM.SLOW_OUT(port 0) → TRIG.IN(port 0)
+   - TRIG.SIN(port 0) → MIXR.IN_A(port 0)
+   - TRIG.SIN(port 0) → example OUTPUT_C
 
-2. **Error signal chain:**
-   - `混频器` (MIXR): demodulates PDH error signal
-   - Connect: TRIG.COS(port 1) → MIXR.IN_A(port 0) [modulation reference]
-   - Connect: [photodetector signal, e.g. via ADC] → MIXR.IN_B(port 1)
+2. **PDH error and feedback chain:**
+   - example INPUT_C → MIXR.IN_B(port 1)
+   - MIXR.OUT(port 0) → FIRF.IN(port 0)
+   - FIRF.OUT(port 0) → PIDC.IN(port 1)
+   - PIDC.OUT(port 0) → LTRN.IN_A(port 0)
 
-3. **Feedback chain:**
-   - `PID控制器` (PIDC): computes correction from error
-   - Connect: MIXR.OUT(port 0) → PIDC.IN(port 1) [error signal]
-   - Connect: PIDC.OUT(port 0) → ACCM.ERROR_IN(port 0)
+3. **Scan and actuator combination:**
+   - ACC2.SLOW_OUT(port 0) → LTRN.IN_B(port 1)
+   - LTRN.OUT_A(port 0) → SCLR.IN(port 0)
+   - SCLR.OUT(port 0) → example OUTPUT_B [actuator role, not verified hardware]
+   - Confirm matrix/scaler gains, output limits and actuator safety before enable.
 
-4. **State machine control:**
-   - `PDH状态机` (PDHS): manages lock sequence
-   - Connect: PDHS.PID_RESET_CTRL(port 0) → PIDC.RESET(port 0)
-   - Connect: PDHS.SCAN_RESET_CTRL(port 2) → ACCM.RESET(port 2)
-   - Connect: PDHS.MIXER_RESET_CTRL(port 1) → MIXR.IN_B gating
-   - Connect: ACCM.FAST_OUT(port 1) → PDHS.IN_SCAN(port 1)
+4. **Lock discriminator (different from the demodulated error signal):**
+   - example INPUT_C → FIR2.IN(port 0)
+   - FIR2.OUT(port 0) → PDHS.IN_POWER(port 0)
+   - ACC2.SLOW_OUT(port 0) → PDHS.IN_SCAN(port 1)
+   - Entry expects a dip: sustained signal below the entry threshold. Do not
+     label this as transmission without verifying the physical detector chain.
 
-5. **Output monitoring:**
-   - Connect: ACCM.FAST_OUT(port 1) → 输出通道 (DAC monitor)
-   - Connect: PIDC.OUT(port 0) → 输出通道 (error monitor)
+5. **Sequencing controls:**
+   - PDHS.PID_RESET_CTRL(port 0) → PIDC.RESET(port 0)
+   - PDHS.SCAN_RESET_CTRL(port 2) → ACC2.PAUSE(port 3) [hold scan, not reset]
+   - Verify downstream auto-control settings and actual wiring.
+   - PDHS.MIXER_RESET_CTRL(port 1) is unused in this reference. MIXR.IN_A/IN_B
+     are analog signal inputs, not boolean reset/gate inputs.
+
+The seven PDHS register values are requests/settings, never real-time state.
+Manual mode does not automatically re-enter after loss. Automatic mode measures
+thresholds/timings; it does not imply automatic PID tuning or automatic relock.
+Use the read-only pdh_experiment context to report source, routes and unknowns.
 """
 
 
