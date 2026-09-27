@@ -503,7 +503,7 @@ class MainWindow(QMainWindow):
         self.agent_fab.setFixedSize(44, 44)
         self.agent_fab.hide()
         self.view.viewport().installEventFilter(self)
-        QTimer.singleShot(0, self._position_agent_fab)
+        QTimer.singleShot(0, self, self._position_agent_fab)
 
     def _focus_canvas_workspace(self):
         self.workspace_tabs.show_home()
@@ -577,7 +577,7 @@ class MainWindow(QMainWindow):
             QEvent.Resize,
             QEvent.Show,
         ):
-            QTimer.singleShot(0, self._position_agent_fab)
+            QTimer.singleShot(0, self, self._position_agent_fab)
         return super().eventFilter(watched, event)
 
     def set_log_expanded(self, expanded):

@@ -7,6 +7,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $VirtualEnvironment = Join-Path $ProjectRoot ".venv"
 $Python = Join-Path $VirtualEnvironment "Scripts\python.exe"
 $Requirements = Join-Path $ProjectRoot "requirements.txt"
+$HarnessRequirements = Join-Path $ProjectRoot "requirements-harness.txt"
 $RequirementsStamp = Join-Path $VirtualEnvironment ".requirements.sha256"
 
 Set-Location $ProjectRoot
@@ -34,7 +35,10 @@ if (-not (Test-Path $Python)) {
 }
 
 if (-not $SkipInstall) {
-    $RequirementsHash = (Get-FileHash -Algorithm SHA256 $Requirements).Hash
+    # Include transitive requirements so updating the pinned Harness runtime
+    # invalidates the dependency stamp even if requirements.txt is unchanged.
+    $RequirementsHash = (Get-FileHash -Algorithm SHA256 $Requirements).Hash +
+        (Get-FileHash -Algorithm SHA256 $HarnessRequirements).Hash
     $InstalledHash = if (Test-Path $RequirementsStamp) {
         (Get-Content $RequirementsStamp -Raw).Trim()
     } else {

@@ -21,6 +21,9 @@ jobs:
       QT_QPA_PLATFORM: offscreen
       PYTHONUTF8: "1"
       PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      # The official bundled Harness talks only to in-process local fixtures.
+      # This exercises the actual Windows/macOS binaries without a paid API.
+      DCLOCKING_TEST_HARNESS_RUNTIME: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

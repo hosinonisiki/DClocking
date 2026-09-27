@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from PySide6.QtCore import QDir, QSettings
+from PySide6.QtCore import QCoreApplication, QDir, QEvent, QSettings
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QMessageBox
 
@@ -38,6 +38,11 @@ class ExperimentWorkbenchTests(unittest.TestCase):
         self.workbench._close_without_prompt = True
         self.workbench.close()
         self.workbench._close_root_descriptor()
+        # close() intentionally preserves this reusable workbench in the app.
+        # Test-owned Qt trees must instead be destroyed on their GUI thread,
+        # before a later SDK worker allocation triggers Python cycle collection.
+        self.workbench.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
         self.app.processEvents()
         self.temp_dir.cleanup()
 
@@ -221,6 +226,7 @@ class ExperimentWorkbenchTests(unittest.TestCase):
         finally:
             other._close_without_prompt = True
             other.close()
+            other.deleteLater()
 
     def test_same_metadata_external_change_is_saved_as_conflict_copy(self):
         record = self.workbench.create_record(
@@ -546,6 +552,7 @@ class ExperimentWorkbenchTests(unittest.TestCase):
         finally:
             restored._close_without_prompt = True
             restored.close()
+            restored.deleteLater()
 
 
 class MainWindowExperimentWorkbenchTests(unittest.TestCase):
@@ -570,6 +577,8 @@ class MainWindowExperimentWorkbenchTests(unittest.TestCase):
         if self.window._experiment_workbench is not None:
             self.window._experiment_workbench._close_without_prompt = True
         self.window.close()
+        self.window.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
         self.app.processEvents()
         self.temp_dir.cleanup()
 

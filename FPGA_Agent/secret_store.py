@@ -24,6 +24,7 @@ ENVIRONMENT_KEY = "DCLOCKING_LLM_API_KEY"
 ENVIRONMENT_ENDPOINT = "DCLOCKING_LLM_API_ENDPOINT"
 DEFAULT_ENDPOINT = "https://api.openai.com/v1"
 DEFAULT_MODEL = "gpt-4o"
+DEFAULT_ENGINE = "harness"
 
 
 class SecretStoreError(RuntimeError):
@@ -53,6 +54,8 @@ def _read_config(path: Path) -> dict:
         raise ValueError("Agent 配置文件顶层必须是对象")
     if not isinstance(value.get("llm", {}), dict):
         raise ValueError("Agent 配置中的 llm 必须是对象")
+    if not isinstance(value.get("agent", {}), dict):
+        raise ValueError("Agent 配置中的 agent 必须是对象")
     return value
 
 
@@ -176,11 +179,19 @@ def validate_api_key(value: str) -> str:
     return key
 
 
+def validate_engine(value: str) -> str:
+    if value not in ("harness", "native"):
+        raise ValueError("Agent 执行引擎必须是 harness 或 native")
+    return value
+
+
 def load_agent_configuration(config_path, *, keyring_backend=None):
     """Return ``(public_config, api_key, warning)`` and migrate legacy keys."""
 
     path = Path(config_path)
     config = _read_config(path)
+    agent = config.setdefault("agent", {})
+    agent["engine"] = validate_engine(agent.get("engine", DEFAULT_ENGINE))
     llm = config.setdefault("llm", {})
     endpoint = validate_endpoint(llm.get("endpoint", DEFAULT_ENDPOINT))
     model = validate_model(llm.get("model", DEFAULT_MODEL))
@@ -260,10 +271,15 @@ def save_agent_settings(
     endpoint: str,
     api_key: str,
     model: str,
+    engine: str | None = None,
     keyring_backend=None,
 ):
     path = Path(config_path)
     config = _read_config(path)
+    agent = config.setdefault("agent", {})
+    agent["engine"] = validate_engine(
+        agent.get("engine", DEFAULT_ENGINE) if engine is None else engine
+    )
     llm = config.setdefault("llm", {})
     legacy_key = validate_api_key(llm.get("api_key", ""))
     previous_endpoint = validate_endpoint(llm.get("endpoint", DEFAULT_ENDPOINT))

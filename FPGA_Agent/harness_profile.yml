@@ -1,0 +1,33 @@
+# Restricted overlay for the pinned standalone sdk-minimal profile.
+# Never use this with the broader sdk/web profiles.
+- id: persistent-bash
+  disabled: true
+- id: persistent-pwsh
+  disabled: true
+- id: terminal-bash
+  disabled: true
+- id: terminal-pwsh
+  disabled: true
+- id: pty
+  disabled: true
+- id: subprocess
+  disabled: true
+- id: sandbox
+  disabled: true
+- id: sandbox-policy
+  disabled: true
+- id: jobs
+  disabled: true
+- id: session-log-deepseek
+  disabled: true
+- id: plugin-package-inventory-deepseek
+  disabled: true
+- id: llm-deepseek
+  disabled: true
+- id: tools
+  config:
+    mode: native
+- id: agent-loop
+  config:
+    agents: []
+    maxParallelToolCalls: 1

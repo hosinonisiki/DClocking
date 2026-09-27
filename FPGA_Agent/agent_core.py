@@ -10,6 +10,7 @@ import json
 import threading
 import time
 import traceback
+import uuid
 
 from PySide6.QtCore import QObject, Signal, QThread
 
@@ -19,7 +20,10 @@ class AgentCore(QObject):
 
     # Signals emitted to the UI
     response_ready = Signal(str)          # final markdown text
+    response_delta = Signal(str, str)     # run_id, streamed text
     tool_executed = Signal(str, str, str)  # tool_name, args_json, result_json
+    # Stable identifiers let the UI update a card instead of adding duplicates.
+    tool_event = Signal(str, str, str, str, str, str)
     thinking_started = Signal()
     thinking_stopped = Signal()
     generation_cancelled = Signal()
@@ -43,7 +47,9 @@ class AgentCore(QObject):
 
         # Worker thread
         self._worker = None
+        self._active_turn = False
         self._messages_at_cancel_boundary = None
+        self._pending_tool_args = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -51,13 +57,22 @@ class AgentCore(QObject):
 
     def reset_conversation(self):
         """Clear conversation history (keeps system prompt)."""
+        if self.is_busy:
+            return False
         self._messages = []
+        return True
+
+    @property
+    def is_busy(self):
+        # QThread may have ended while its queued finished/result signals have
+        # not reached Qt yet. Those receipts must be finalized before reuse.
+        return self._active_turn
 
     def send_message(self, user_text: str):
         """Process a user message — runs LLM loop in background thread."""
         from tool_definitions import TOOLS
 
-        if self._worker is not None and self._worker.isRunning():
+        if self.is_busy:
             return False
         if not user_text.strip():
             return False
@@ -73,10 +88,11 @@ class AgentCore(QObject):
         # incomplete assistant/tool protocol messages from that turn.
         self._messages_at_cancel_boundary = list(self._messages)
 
+        self._active_turn = True
         self.thinking_started.emit()
 
         # Run in background thread
-        self._worker = _AgentWorker(
+        self._worker = self._create_worker(
             llm=self._llm,
             tools_def=TOOLS,
             tool_executor=self._tools,
@@ -90,8 +106,14 @@ class AgentCore(QObject):
         self._worker.finished.connect(self._on_worker_terminated)
         self._worker.tool_call_started.connect(self._on_tool_started)
         self._worker.tool_call_finished.connect(self._on_tool_finished)
+        self._worker.tool_event.connect(self._on_tool_event)
+        self._worker.text_delta.connect(self._on_text_delta)
         self._worker.start()
         return True
+
+    def _create_worker(self, **kwargs):
+        """Native implementation; the runtime facade overrides only this seam."""
+        return _AgentWorker(**kwargs)
 
     def stop_generation(self):
         """Cancel the active LLM turn without terminating its QThread."""
@@ -121,6 +143,7 @@ class AgentCore(QObject):
         worker = self.sender()
         if worker is not self._worker:
             return
+        self._active_turn = False
         outcome = worker.outcome
         if outcome == "completed":
             self._messages = worker.messages
@@ -132,6 +155,9 @@ class AgentCore(QObject):
         if outcome == "cancelled":
             self._on_worker_cancelled(worker.messages)
             return
+        # A model/transport failure after a tool call must not erase the
+        # completed side effects from the next turn's context.
+        self._messages = worker.messages
         self._messages_at_cancel_boundary = None
         self.thinking_stopped.emit()
         self.error_occurred.emit(worker.error_text or "Agent worker failed")
@@ -153,13 +179,23 @@ class AgentCore(QObject):
 
     def _on_tool_started(self, tool_name: str, args: dict):
         """Called when a tool begins execution."""
+        self._pending_tool_args[tool_name] = args
         self.tool_executed.emit(tool_name, json.dumps(args, ensure_ascii=False, indent=2),
                                 "...")
 
     def _on_tool_finished(self, tool_name: str, result: str):
         """Called when a tool finishes."""
-        # Update the last emitted signal (we re-emit with result)
-        pass
+        args = self._pending_tool_args.pop(tool_name, {})
+        self.tool_executed.emit(tool_name, json.dumps(args, ensure_ascii=False), result)
+
+    def _on_tool_event(self, run_id, call_id, name, args, result, status):
+        if self.sender() is self._worker:
+            self.tool_event.emit(run_id, call_id, name, args, result, status)
+
+    def _on_text_delta(self, run_id, text):
+        if (self.sender() is self._worker and self.is_busy
+                and not self._worker._cancel_event.is_set()):
+            self.response_delta.emit(run_id, text)
 
     # ------------------------------------------------------------------
     # System prompt
@@ -178,7 +214,16 @@ class AgentCore(QObject):
         from module_registry import build_llm_context
         module_context = build_llm_context(include_patterns=True)
 
-        return template.replace("{module_descriptions}", module_context)
+        return template.replace("{module_descriptions}", module_context) + """
+
+## Host execution and safety boundary
+Tools run through the application's validated gateway. A confirm argument is
+not user approval. Never retry denied/cancelled writes without asking the user.
+local_staged means only PC configuration changed; hardware_unverified does not
+prove device readback or optical lock. Read-only data is cached unless explicitly
+marked otherwise. Never claim a hardware effect or successful lock without
+actual measurement evidence. Stopping generation cannot undo completed actions.
+"""
 
 
 # ------------------------------------------------------------------
@@ -236,6 +281,8 @@ class _AgentWorker(QThread):
 
     tool_call_started = Signal(str, dict)  # tool_name, args
     tool_call_finished = Signal(str, str)  # tool_name, result_json
+    tool_event = Signal(str, str, str, str, str, str)
+    text_delta = Signal(str, str)
 
     def __init__(self, llm, tools_def, tool_executor, messages,
                  max_iterations, bridge, parent=None):
@@ -248,6 +295,7 @@ class _AgentWorker(QThread):
         self._bridge = bridge
         self._cancel_event = threading.Event()
         self._request_id = object()
+        self.run_id = uuid.uuid4().hex
         self.outcome = None
         self.final_text = ""
         self.error_text = ""
@@ -283,10 +331,18 @@ class _AgentWorker(QThread):
                 self._complete_cancelled_tool_protocol()
                 self.outcome = "cancelled"
             else:
+                self._complete_cancelled_tool_protocol(
+                    reason="Execution stopped after an error; do not repeat completed operations."
+                )
                 self.outcome = "error"
                 self.error_text = (
                     f"Agent error: {e}\n{traceback.format_exc()}"
                 )
+                snapshot = getattr(self._llm, "configuration_snapshot", None)
+                if callable(snapshot):
+                    key = snapshot().get("api_key", "")
+                    if key:
+                        self.error_text = self.error_text.replace(key, "[redacted]")
 
     def _loop(self) -> str:
         from llm_client import LLMError
@@ -327,20 +383,22 @@ class _AgentWorker(QThread):
                 return content
 
             # Execute each tool call
-            for tc in tool_calls:
+            for tool_index, tc in enumerate(tool_calls):
                 self._raise_if_cancelled()
                 fn = tc.get("function", {})
                 tool_name = fn.get("name", "")
                 try:
                     args = json.loads(fn.get("arguments", "{}"))
-                except json.JSONDecodeError:
-                    args = {}
+                except (json.JSONDecodeError, TypeError):
+                    # Invalid JSON must not become {}, which could turn a
+                    # malformed call into a valid default-valued operation.
+                    args = None
 
-                self.tool_call_started.emit(tool_name, args)
-
-                result_str = self._executor.dispatch(tool_name, args)
-
-                self.tool_call_finished.emit(tool_name, result_str)
+                # Provider IDs need only correlate inside one assistant tool
+                # batch. Keep them in model history, but namespace host/UI
+                # receipts so later rounds cannot overwrite earlier results.
+                host_call_id = f"native:{iteration}:{tool_index}:{tc.get('id', '')}"
+                result_str = self._dispatch_tool(tool_name, args, host_call_id)
 
                 self._messages.append({
                     "role": "tool",
@@ -349,27 +407,47 @@ class _AgentWorker(QThread):
                 })
                 self._raise_if_cancelled()
 
-            # Auto-layout after modifications
-            if self._bridge and tool_calls:
-                self._raise_if_cancelled()
-                try:
-                    self._bridge.auto_layout()
-                except Exception:
-                    pass
+            # Layout is an explicit tool, subject to the same GUI-thread and
+            # cancellation boundary. Read-only calls must not move the canvas.
 
         # Max iterations reached
         msg = (
-            f"已达到最大工具调用次数 ({self._max_iter})。"
-            f"我已完成了 {self._max_iter} 步操作，请检查画布结果。"
+            f"已达到最大模型执行轮数 ({self._max_iter})，本轮已停止。"
+            "请以工具结果和画布实际状态为准；未完成的操作不会继续执行。"
         )
         self._messages.append({"role": "assistant", "content": msg})
         return msg
+
+    def _dispatch_tool(self, name, args, call_id):
+        self._raise_if_cancelled()
+        args_json = json.dumps(args, ensure_ascii=False)
+        self.tool_call_started.emit(name, args if isinstance(args, dict) else {})
+        self.tool_event.emit(self.run_id, call_id, name, args_json, "", "running")
+        if not isinstance(args, dict):
+            result = json.dumps({"status": "failed", "error": "Tool arguments must be a JSON object"})
+        elif getattr(self._executor, "supports_run_context", False):
+            result = self._executor.dispatch(
+                name, args, cancel_event=getattr(self, "_execution_cancel_event", self._cancel_event),
+                run_id=self.run_id, call_id=call_id,
+            )
+        else:
+            # Compatibility for headless native clients/test doubles. The UI
+            # entrypoint always supplies ToolGateway, never a raw executor.
+            result = self._executor.dispatch(name, args)
+        self.tool_call_finished.emit(name, result)
+        try:
+            parsed = json.loads(result)
+            status = parsed.get("status", "failed" if parsed.get("error") else "completed")
+        except (ValueError, AttributeError):
+            status = "failed"
+        self.tool_event.emit(self.run_id, call_id, name, args_json, result, status)
+        return result
 
     def _raise_if_cancelled(self):
         if self._cancel_event.is_set() or self.isInterruptionRequested():
             raise _AgentCancelled()
 
-    def _complete_cancelled_tool_protocol(self):
+    def _complete_cancelled_tool_protocol(self, reason=None):
         """Close any partial tool-call protocol without executing more tools."""
         assistant_index = None
         tool_calls = []
@@ -396,12 +474,12 @@ class _AgentWorker(QThread):
                     "role": "tool",
                     "tool_call_id": tool_call_id,
                     "content": json.dumps({
-                        "error": "Cancelled before execution"
+                        "error": reason or "Cancelled before execution"
                     }),
                 })
         self._messages.append({
             "role": "assistant",
-            "content": "Generation stopped by user.",
+            "content": reason or "Generation stopped by user.",
         })
 
 

@@ -49,10 +49,10 @@ def create_window(settings=None):
     # ---- Build Agent components ----
     from canvas_bridge import CanvasBridge
     from llm_client import LLMClient
-    from tool_definitions import TOOLS
     from tool_executor import ToolExecutor
+    from tool_gateway import ToolGateway
     from code_generator import CodeGenerator
-    from agent_core import AgentCore
+    from runtime_agent_core import RuntimeAgentCore
     from agent_chat_widget import AgentChatWidget
 
     # Canvas bridge
@@ -63,6 +63,7 @@ def create_window(settings=None):
 
     # Tool executor
     executor = ToolExecutor(bridge, None, code_gen)
+    gateway = ToolGateway(executor, bridge, parent=window)
 
     # LLM client
     llm_cfg = config.get("llm", {})
@@ -75,7 +76,7 @@ def create_window(settings=None):
     )
 
     # Agent core
-    agent = AgentCore(llm, executor, None, bridge, config)
+    agent = RuntimeAgentCore(llm, gateway, None, bridge, config, parent=window)
 
     # Chat widget
     chat = AgentChatWidget(window)
@@ -84,19 +85,37 @@ def create_window(settings=None):
     # ---- Wire signals ----
     chat.user_message_submitted.connect(agent.send_message)
     chat.cancel_requested.connect(agent.stop_generation)
+    gateway.approval_requested.connect(chat.show_tool_approval)
+    gateway.approval_finished.connect(chat.expire_tool_approval)
+    chat.approval_resolved.connect(gateway.resolve_approval)
+    agent.runtime_status_changed.connect(chat.set_runtime_status)
+    chat.set_runtime_status(agent.engine, agent.runtime_description())
 
     def apply_saved_settings(payload):
+        from copy import deepcopy
+
         updated = payload.get("config", {})
         updated_llm = updated.get("llm", {})
         current = llm.configuration_snapshot()
-        llm.configure(
-            endpoint=updated_llm.get("endpoint", current["endpoint"]),
-            model=updated_llm.get("model", current["model"]),
-            # Empty is intentional when switching to an origin that has no
-            # credential. Never retain the previous provider's key.
-            api_key=payload.get("api_key", ""),
-        )
-        config.update(updated)
+        candidate = deepcopy(config)
+        candidate.update(updated)
+        try:
+            # Validate the entire provider tuple before retiring the old
+            # session. A busy/close failure must not partially replace its key.
+            prepared = LLMClient(
+                endpoint=updated_llm.get("endpoint", current["endpoint"]),
+                model=updated_llm.get("model", current["model"]),
+                api_key=payload.get("api_key", ""),
+            ).configuration_snapshot()
+            agent.reconfigure(candidate)
+            llm.configure(endpoint=prepared["endpoint"], model=prepared["model"],
+                          api_key=prepared["api_key"])
+        except (ValueError, RuntimeError, OSError):
+            chat.add_system_message("运行中的设置未修改：请先停止任务并检查运行时，再重新保存设置。")
+            return
+        config.clear()
+        config.update(candidate)
+        chat.add_system_message("Agent 设置已生效；已开始新的模型会话，画布配置保持不变。")
         if payload.get("api_key"):
             chat.add_system_message("LLM 设置已安全保存并立即生效。")
         else:
@@ -104,21 +123,24 @@ def create_window(settings=None):
 
     chat.settings_saved.connect(apply_saved_settings)
 
-    agent.response_ready.connect(chat.add_assistant_message)
+    agent.response_ready.connect(chat.finish_assistant_message)
+    agent.response_delta.connect(chat.append_assistant_delta)
     agent.thinking_started.connect(lambda: chat.set_thinking(True))
     agent.thinking_stopped.connect(lambda: chat.set_thinking(False))
+    agent.thinking_stopped.connect(chat.dismiss_tool_approvals)
     agent.error_occurred.connect(
         lambda err: chat.add_system_message(f"Error: {err}")
     )
     agent.generation_cancelled.connect(
-        lambda: chat.add_system_message("已停止生成")
+        lambda: chat.add_system_message("已停止生成；尚未执行的操作已取消，已完成的操作不会撤销。")
     )
-    agent.tool_executed.connect(
-        lambda name, args, result: chat.add_tool_call(name, args, result)
-    )
+    agent.tool_event.connect(chat.update_tool_call)
 
     app = QApplication.instance()
     if app is not None:
+        # Wake queued gateway waits before joining the worker. Never process
+        # pending mutations in a nested event loop while closing the app.
+        app.aboutToQuit.connect(gateway.shutdown)
         app.aboutToQuit.connect(agent.shutdown)
 
     # ---- Welcome message ----
@@ -145,6 +167,7 @@ def create_window(settings=None):
         "bridge": bridge,
         "code_generator": code_gen,
         "executor": executor,
+        "gateway": gateway,
         "llm": llm,
         "agent": agent,
         "chat": chat,
