@@ -1,7 +1,7 @@
 import math
 import unittest
 
-from PySide6.QtCore import QPoint, QPointF, Qt, Signal
+from PySide6.QtCore import QPoint, QPointF, QRect, Qt, Signal
 from PySide6.QtGui import QImage
 from PySide6.QtTest import QSignalSpy, QTest
 from PySide6.QtWidgets import QApplication, QSlider, QToolButton
@@ -104,7 +104,7 @@ class PIDParamCanvasTests(unittest.TestCase):
 
             def paintEvent(self, event):
                 super().paintEvent(event)
-                if self.response_data()["overall_gain_db"] == 20.0:
+                if self.response_data()["overall_gain_db"] == 7.0:
                     self.target_gain_painted.emit()
 
         schema = [field for field in PID_SCHEMA if field.get("mode") == "indirect"]
@@ -131,26 +131,41 @@ class PIDParamCanvasTests(unittest.TestCase):
         self.assertTrue(canvas.isVisible())
         before_response = canvas.response_data()
         before = canvas.grab().toImage()
+        self.assertIsNotNone(canvas._plot_metrics, "The PID canvas did not initialize its plot")
+        plot_rect = canvas._plot_metrics["plot_rect"].adjusted(40, 35, -2, -2)
+        pixel_ratio = before.devicePixelRatio()
+        plot_roi = QRect(
+            round(plot_rect.x() * pixel_ratio),
+            round(plot_rect.y() * pixel_ratio),
+            round(plot_rect.width() * pixel_ratio),
+            round(plot_rect.height() * pixel_ratio),
+        )
 
         # Real typing synchronizes QuantityLineEdit's textEdited/core state.
         # setText() on a hidden dialog bypasses that state and its focus lifecycle.
+        # Avoid a 20 dB step: autoscaling shifts both axis bounds by 20 dB,
+        # leaving every curve at the same pixels and only changing tick text.
         painted = QSignalSpy(canvas.target_gain_painted)
-        QTest.keyClicks(gain_editor, "20dB")
+        QTest.keyClicks(gain_editor, "7dB")
         self.assertEqual(gain_editor.core.get_text(), gain_editor.text())
-        self.assertEqual(gain_editor.preview_quantity_value(), 20.0)
+        self.assertEqual(gain_editor.preview_quantity_value(), 7.0)
         after_response = canvas.response_data()
-        self.assertEqual(after_response["overall_gain_db"], 20.0)
+        self.assertEqual(after_response["overall_gain_db"], 7.0)
         self.assertNotEqual(before_response["total_db"], after_response["total_db"])
 
         # Observe a real event-loop paint before grab() can force a repaint.
         # This is an event-bounded wait, not a sleep to hide a missing update.
         self.assertTrue(painted.count() > 0 or painted.wait(1000),
                         "Editing the gain did not repaint the visible PID canvas")
-        self.assertEqual(canvas.response_data()["overall_gain_db"], 20.0)
+        self.assertEqual(canvas.response_data()["overall_gain_db"], 7.0)
         after = canvas.grab().toImage()
 
         self.assertEqual(before.size(), after.size())
         self.assertNotEqual(before, after)
+        self.assertFalse(plot_roi.isEmpty())
+        self.assertTrue(before.rect().contains(plot_roi))
+        self.assertNotEqual(before.copy(plot_roi), after.copy(plot_roi),
+                            "The plotted curves did not change independently of axis text")
 
     def test_manual_tuning_sliders_update_editor_curve_and_apply_callback(self):
         schema = [field for field in PID_SCHEMA if field.get("mode") == "indirect"]
