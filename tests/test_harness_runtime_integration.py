@@ -169,6 +169,15 @@ class HarnessRealRuntimeTests(unittest.TestCase):
             self.run_turn()
 
     def test_timeout_cancels_pending_host_approval_wait(self):
+        # This deadline covers a pending tool approval, not platform-dependent
+        # SDK process startup. Warm the real runtime with its normal budget,
+        # then give only the approval turn the deliberately short deadline.
+        self.provider.responses = ['done']
+        self.assertEqual(self.run_turn(), 'LOCAL_OK')
+        self.assertFalse(self.calls)
+        self.provider.requests.clear()
+        self.provider.received.clear()
+        self.provider.responses = ['tool']
         self.runtime.timeout_seconds = 1.5
         cancel, entered = threading.Event(), threading.Event()
         def pending_approval(*_args):
@@ -183,6 +192,7 @@ class HarnessRealRuntimeTests(unittest.TestCase):
         self.assertTrue(entered.is_set())
         self.assertTrue(cancel.is_set())
         self.assertLess(time.monotonic() - start, 3.5)
+        self.assertEqual(len(self.provider.requests), 1)
 
     def test_cancel_pending_tool_then_immediately_send_again(self):
         for _ in range(3):

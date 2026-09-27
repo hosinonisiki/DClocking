@@ -1,9 +1,9 @@
 import math
 import unittest
 
-from PySide6.QtCore import QPoint, QPointF, Qt
+from PySide6.QtCore import QPoint, QPointF, Qt, Signal
 from PySide6.QtGui import QImage
-from PySide6.QtTest import QTest
+from PySide6.QtTest import QSignalSpy, QTest
 from PySide6.QtWidgets import QApplication, QSlider, QToolButton
 
 from tests.qt_test_support import ensure_app
@@ -99,6 +99,14 @@ class PIDParamCanvasTests(unittest.TestCase):
         self.assertAlmostEqual(response["saturation_gain_db"], 0.0, places=6)
 
     def test_parameter_text_change_repaints_curve_immediately(self):
+        class PaintObservedCanvas(PIDParamCanvas):
+            target_gain_painted = Signal()
+
+            def paintEvent(self, event):
+                super().paintEvent(event)
+                if self.response_data()["overall_gain_db"] == 20.0:
+                    self.target_gain_painted.emit()
+
         schema = [field for field in PID_SCHEMA if field.get("mode") == "indirect"]
         dialog = ParamDialog(
             schema,
@@ -109,18 +117,40 @@ class PIDParamCanvasTests(unittest.TestCase):
                 "saturation_gain": 20.0,
                 "saturation_turning_frequency": 10.0,
             },
-            companion_widget_factory=lambda parent: PIDParamCanvas(parent),
+            companion_widget_factory=PaintObservedCanvas,
         )
+        self.addCleanup(dialog.close)
+        dialog.resize(680, 850)
+        dialog.show()
+        self.assertTrue(QTest.qWaitForWindowExposed(dialog, 1000))
         canvas = dialog._companion_widget
-        before = self._render(canvas)
-
         gain_editor = dialog._editors["overall_gain"][1]
-        gain_editor.setText("20dB")
+        gain_editor.setFocus(Qt.OtherFocusReason)
+        gain_editor.selectAll()
         self.app.processEvents()
-        after = self._render(canvas)
+        self.assertTrue(canvas.isVisible())
+        before_response = canvas.response_data()
+        before = canvas.grab().toImage()
 
+        # Real typing synchronizes QuantityLineEdit's textEdited/core state.
+        # setText() on a hidden dialog bypasses that state and its focus lifecycle.
+        painted = QSignalSpy(canvas.target_gain_painted)
+        QTest.keyClicks(gain_editor, "20dB")
+        self.assertEqual(gain_editor.core.get_text(), gain_editor.text())
+        self.assertEqual(gain_editor.preview_quantity_value(), 20.0)
+        after_response = canvas.response_data()
+        self.assertEqual(after_response["overall_gain_db"], 20.0)
+        self.assertNotEqual(before_response["total_db"], after_response["total_db"])
+
+        # Observe a real event-loop paint before grab() can force a repaint.
+        # This is an event-bounded wait, not a sleep to hide a missing update.
+        self.assertTrue(painted.count() > 0 or painted.wait(1000),
+                        "Editing the gain did not repaint the visible PID canvas")
+        self.assertEqual(canvas.response_data()["overall_gain_db"], 20.0)
+        after = canvas.grab().toImage()
+
+        self.assertEqual(before.size(), after.size())
         self.assertNotEqual(before, after)
-        dialog.close()
 
     def test_manual_tuning_sliders_update_editor_curve_and_apply_callback(self):
         schema = [field for field in PID_SCHEMA if field.get("mode") == "indirect"]

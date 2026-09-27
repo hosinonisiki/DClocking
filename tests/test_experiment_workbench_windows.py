@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from tests import qt_test_support  # noqa: F401 - installs project import paths
 from qt_experiment_storage_windows import (
     WindowsExperimentRepository,
     WindowsStorageCommitUncertainError,
@@ -17,13 +18,33 @@ from qt_experiment_storage_windows import (
 class WindowsExperimentStorageTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp_dir.name) / "records"
+        requested_root = Path(self.temp_dir.name) / "records"
         self.repository = WindowsExperimentRepository(5 * 1024 * 1024)
-        self.repository.set_root(self.root)
+        # Windows TEMP may contain an 8.3 alias such as RUNNER~1. Match the
+        # workbench caller by using the canonical path returned by set_root.
+        self.root = self.repository.set_root(requested_root)
 
     def tearDown(self):
         self.repository.close()
         self.temp_dir.cleanup()
+
+    def test_canonical_root_supports_document_create_read_and_update(self):
+        requested_root = Path(self.temp_dir.name) / "records"
+        self.assertTrue(self.root.samefile(requested_root))
+        self.assertEqual(self.root, self.repository.require_root())
+        target = self.root / "note.md"
+
+        created = self.repository.write_text(target, "original", exclusive=True)
+        self.assertEqual(created, target)
+        opened, text, snapshot = self.repository.read_text(target, {".md"})
+        self.assertEqual(opened, target)
+        self.assertEqual(text, "original")
+
+        updated = self.repository.write_text(
+            target, "updated", expected_snapshot=snapshot
+        )
+        self.assertEqual(updated, target)
+        self.assertEqual(self.repository.read_text(target, {".md"})[1], "updated")
 
     def test_unc_and_device_namespaces_are_rejected_before_access(self):
         for path in (
@@ -45,7 +66,9 @@ class WindowsExperimentStorageTests(unittest.TestCase):
         )
         if completed.returncode:
             self.skipTest(f"junction creation unavailable: {completed.stderr}")
-        with self.assertRaises(ValueError):
+        # Do not let an unrelated containment error make this security test
+        # pass before the junction's reparse-point attributes are inspected.
+        with self.assertRaisesRegex(ValueError, "junction|重解析点"):
             self.repository.read_text(junction / "secret.md", {".md"})
 
     def test_atomic_update_restores_external_edit_from_commit_boundary(self):

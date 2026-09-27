@@ -1,4 +1,4 @@
-"""Platform-neutral tests for the Windows ReplaceFileW recovery state machine.
+"""Platform-neutral Windows path-boundary and ReplaceFileW recovery tests.
 
 The real handle and junction tests run only on Windows.  These tests emulate
 the documented file-name transitions so macOS development still exercises the
@@ -7,18 +7,78 @@ data-preservation branches on every local run.
 
 from contextlib import contextmanager
 import hashlib
+import ntpath
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import tempfile
 import types
 import unittest
+from unittest.mock import patch
 
 from tests import qt_test_support  # noqa: F401 - installs project import paths
+import qt_experiment_storage_windows as windows_storage
 from qt_experiment_storage_windows import (
     WindowsExperimentRepository,
     WindowsStorageCommitUncertainError,
     WindowsStorageExternalModificationError,
 )
+
+
+class _LexicalWindowsPath(PureWindowsPath):
+    """Exercise Windows lexical paths without touching the host filesystem."""
+
+    def expanduser(self):
+        # These cases use absolute paths or repository-relative names, never ~.
+        return self
+
+
+class WindowsPathBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        self.root = _LexicalWindowsPath(
+            r"C:\Users\runneradmin\AppData\Local\Temp\test-records\records"
+        )
+        self.repository = WindowsExperimentRepository(1024, api=object())
+        self.enterContext(
+            patch.object(self.repository, "require_root", return_value=self.root)
+        )
+        self.enterContext(patch.object(windows_storage, "Path", _LexicalWindowsPath))
+        # Patch only this module's os binding, not the process-wide os.path.
+        self.enterContext(
+            patch.object(
+                windows_storage,
+                "os",
+                types.SimpleNamespace(path=ntpath, fspath=os.fspath),
+            )
+        )
+
+    def test_canonical_case_insensitive_and_relative_paths_are_accepted(self):
+        for path in (
+            self.root / "note.md",
+            str(self.root).upper() + r"\note.md",
+            "note.md",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(self.repository.relative_parts(path), ("note.md",))
+
+    def test_short_alias_is_not_a_substitute_for_the_returned_canonical_root(self):
+        short_root = str(self.root).replace("runneradmin", "RUNNER~1")
+        with self.assertRaisesRegex(ValueError, "文件不在当前实验仓库内"):
+            self.repository.relative_parts(short_root + r"\note.md")
+        self.assertEqual(
+            self.repository.relative_parts(self.root / "note.md"), ("note.md",)
+        )
+
+    def test_outside_paths_remain_rejected(self):
+        for path in (
+            self.root.parent / "records-other" / "note.md",
+            r"..\outside\note.md",
+            r"D:\records\note.md",
+            r"\\server\share\records\note.md",
+        ):
+            with self.subTest(path=path), self.assertRaisesRegex(
+                ValueError, "文件不在当前实验仓库内"
+            ):
+                self.repository.relative_parts(path)
 
 
 class _PortableNameApi:
