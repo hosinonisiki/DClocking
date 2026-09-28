@@ -38,6 +38,22 @@ class HarnessCancelled(HarnessError):
     """The user stopped this run; completed host tool effects are retained."""
 
 
+class HarnessOutputLimit(HarnessError):
+    """A provider response exhausted its output allowance, not a failed tool.
+
+    Only public final-response text belongs here. Reasoning stays private and
+    the caller must mark the turn incomplete, never retry its tools implicitly.
+    """
+    def __init__(self, partial_text: str, max_tokens: int):
+        self.partial_text = partial_text
+        self.max_tokens = max_tokens
+        answer_status = '已保留部分回答' if partial_text.strip() else '尚未生成正式回答'
+        super().__init__(
+            f'已达到单次模型输出额度（{max_tokens} tokens），本轮未完成；{answer_status}。'
+            '已执行操作保留，不自动重试。可在设置中调整输出额度，或缩小任务后手动继续。'
+        )
+
+
 def _definitions(tools):
     result = []
     for entry in tools:
@@ -429,6 +445,13 @@ class HarnessRuntime:
                 raise HarnessCancelled('已停止生成')
             if self._host.failure:
                 raise HarnessError(self._host.failure)
+            if result.finish_reason == 'max-tokens':
+                # The SDK final_response contains public text only; reasoning
+                # must not be exposed as an answer when output is truncated.
+                text = result.final_response
+                if on_text and text and not self._host.streamed_text:
+                    on_text(text)
+                raise HarnessOutputLimit(partial_text=text, max_tokens=self.max_tokens)
             if result.finish_reason not in {'completed'}:
                 raise HarnessError('Harness 未正常完成本轮（' + str(result.finish_reason) + '），请检查模型设置或重试。')
             text = result.final_response

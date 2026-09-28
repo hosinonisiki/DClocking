@@ -7,13 +7,14 @@ import threading
 import time
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'FPGA_Agent'))
 from harness_runtime import HarnessRuntime, HarnessError, HarnessCancelled, _HostTools
+import harness_runtime
 from tool_definitions import TOOLS
 
 
@@ -136,6 +137,71 @@ class HostToolsTests(unittest.TestCase):
 
 
 class RuntimeUnitTests(unittest.TestCase):
+    def _run_output_limit(self, *, partial_text='', already_streamed=False,
+                          cancel_on_return=False, timeout_on_return=False):
+        runtime = HarnessRuntime('https://api.deepseek.com/v1', 'local-test-key', 'deepseek-chat')
+        cancel = threading.Event()
+        runtime._host = _HostTools(TOOLS, 2)
+        deltas = []
+
+        def sdk_run(*_args, **_kwargs):
+            if already_streamed:
+                runtime._host.streamed_text = True
+                deltas.append(partial_text)
+            if cancel_on_return:
+                cancel.set()
+            if timeout_on_return:
+                self.assertTrue(cancel.wait(2), 'Deadline must cancel the active request')
+            runtime._host.settled.set()
+            return SimpleNamespace(finish_reason='max-tokens', final_response=partial_text)
+
+        runtime._sdk = SimpleNamespace(run=Mock(side_effect=sdk_run), close=Mock())
+        if timeout_on_return:
+            runtime.timeout_seconds = 1
+        sdk = runtime._sdk
+        try:
+            with patch.object(runtime, '_start'), self.assertRaises(HarnessError) as caught:
+                runtime.run('hello', 'safe', TOOLS, lambda *_: self.fail('No tool expected'),
+                    cancel, on_text=deltas.append)
+            sdk.run.assert_called_once()
+            self.assertFalse(runtime._requires_reset)
+            return caught.exception, deltas
+        finally:
+            runtime.close()
+
+    def test_output_limit_retains_unstreamed_final_text(self):
+        error, deltas = self._run_output_limit(partial_text='Incomplete public answer')
+        self.assertIsInstance(error, harness_runtime.HarnessOutputLimit)
+        self.assertEqual(error.partial_text, 'Incomplete public answer')
+        self.assertEqual(error.max_tokens, 4096)
+        self.assertEqual(deltas, ['Incomplete public answer'])
+        self.assertIn('本轮未完成', str(error))
+        self.assertIn('不自动重试', str(error))
+        self.assertIn('已执行操作保留', str(error))
+
+    def test_output_limit_does_not_duplicate_streamed_text(self):
+        error, deltas = self._run_output_limit(partial_text='Partial', already_streamed=True)
+        self.assertIsInstance(error, harness_runtime.HarnessOutputLimit)
+        self.assertEqual(deltas, ['Partial'])
+
+    def test_output_limit_without_public_text_explains_no_formal_answer(self):
+        error, deltas = self._run_output_limit()
+        self.assertIsInstance(error, harness_runtime.HarnessOutputLimit)
+        self.assertEqual(error.partial_text, '')
+        self.assertEqual(deltas, [])
+        self.assertIn('尚未生成正式回答', str(error))
+
+    def test_user_cancel_takes_precedence_over_output_limit(self):
+        error, deltas = self._run_output_limit(partial_text='Do not emit', cancel_on_return=True)
+        self.assertIsInstance(error, HarnessCancelled)
+        self.assertEqual(deltas, [])
+
+    def test_deadline_takes_precedence_over_output_limit(self):
+        error, deltas = self._run_output_limit(partial_text='Do not emit', timeout_on_return=True)
+        self.assertNotIsInstance(error, harness_runtime.HarnessOutputLimit)
+        self.assertIn('超时', str(error))
+        self.assertEqual(deltas, [])
+
     def test_recovery_receipts_are_bounded_and_truncation_is_explicit(self):
         runtime = HarnessRuntime('https://api.deepseek.com/v1', 'local-test-key', 'deepseek-chat')
         try:

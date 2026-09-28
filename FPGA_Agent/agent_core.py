@@ -15,6 +15,14 @@ import uuid
 from PySide6.QtCore import QObject, Signal, QThread
 
 
+class _AgentIncomplete(Exception):
+    """A bounded generation ended normally, but did not finish the task."""
+
+    def __init__(self, notice: str, partial_text: str = ""):
+        super().__init__(notice)
+        self.partial_text = partial_text
+
+
 class AgentCore(QObject):
     """Orchestrator that runs the LLM ↔ tool-calling loop."""
 
@@ -27,6 +35,7 @@ class AgentCore(QObject):
     thinking_started = Signal()
     thinking_stopped = Signal()
     generation_cancelled = Signal()
+    response_incomplete = Signal(str)     # expected output limit, not a traceback
     error_occurred = Signal(str)
 
     def __init__(self, llm_client, tool_executor, module_registry,
@@ -154,6 +163,14 @@ class AgentCore(QObject):
             return
         if outcome == "cancelled":
             self._on_worker_cancelled(worker.messages)
+            return
+        if outcome == "incomplete":
+            self._messages = worker.messages
+            self._messages_at_cancel_boundary = None
+            self.thinking_stopped.emit()
+            if worker.final_text:
+                self.response_ready.emit(worker.final_text)
+            self.response_incomplete.emit(worker.incomplete_notice)
             return
         # A model/transport failure after a tool call must not erase the
         # completed side effects from the next turn's context.
@@ -299,6 +316,7 @@ class _AgentWorker(QThread):
         self.outcome = None
         self.final_text = ""
         self.error_text = ""
+        self.incomplete_notice = ""
 
     @property
     def messages(self) -> list[dict]:
@@ -326,6 +344,22 @@ class _AgentWorker(QThread):
         except _AgentCancelled:
             self._complete_cancelled_tool_protocol()
             self.outcome = "cancelled"
+        except _AgentIncomplete as incomplete:
+            if self._cancel_event.is_set() or self.isInterruptionRequested():
+                self._complete_cancelled_tool_protocol()
+                self.outcome = "cancelled"
+            else:
+                self._complete_cancelled_tool_protocol(
+                    reason="Generation hit its output limit; do not repeat completed operations."
+                )
+                self.outcome = "incomplete"
+                self.final_text = incomplete.partial_text
+                self.incomplete_notice = str(incomplete)
+                # Preserve both the receipts and explicit incomplete status,
+                # without publishing hidden reasoning as an assistant answer.
+                self._messages.append({"role": "assistant", "content":
+                    (self.final_text + "\n\n" if self.final_text else "")
+                    + "[" + self.incomplete_notice + "]"})
         except Exception as e:
             if self._cancel_event.is_set() or self.isInterruptionRequested():
                 self._complete_cancelled_tool_protocol()

@@ -15,6 +15,11 @@ import threading
 from collections.abc import Iterable
 from typing import Any
 
+if __package__:
+    from .llm_limits import OUTPUT_BUDGET_UNSET, resolve_max_tokens
+else:
+    from llm_limits import OUTPUT_BUDGET_UNSET, resolve_max_tokens
+
 
 class LLMError(Exception):
     """Raised when the LLM API returns an error."""
@@ -34,16 +39,17 @@ class LLMClient:
     _MAX_TOOL_CALLS = 128
 
     def __init__(self, endpoint: str, api_key: str, model: str = "gpt-4o",
-                 temperature: float = 0.1, max_tokens: int = 4096,
+                 temperature: float = 0.1, max_tokens: int | None = None,
                  timeout: float = 120.0):
         self._configuration_lock = threading.RLock()
         self.endpoint = ""
         self.api_key = ""
         self.model = ""
         self.temperature = float(temperature)
-        self.max_tokens = int(max_tokens)
+        self._max_tokens_policy = None
         self.timeout = float(timeout)
-        self.configure(endpoint=endpoint, api_key=api_key, model=model)
+        self.configure(endpoint=endpoint, api_key=api_key, model=model,
+                       max_tokens=max_tokens)
         self._curl_binary = shutil.which("curl")
         self._active_lock = threading.Lock()
         self._active_requests: dict[object, dict[str, Any]] = {}
@@ -57,8 +63,9 @@ class LLMClient:
             return base
         return base + "/chat/completions"
 
-    def configure(self, *, endpoint: str, api_key: str, model: str) -> None:
-        """Atomically publish one provider/model/credential configuration."""
+    def configure(self, *, endpoint: str, api_key: str, model: str,
+                  max_tokens=OUTPUT_BUDGET_UNSET) -> None:
+        """Atomically publish settings, retaining the budget policy if omitted."""
 
         normalized_endpoint = self._chat_completions_endpoint(endpoint)
         key = str(api_key or "")
@@ -72,9 +79,13 @@ class LLMClient:
         if not model_name:
             raise ValueError("Model name is required")
         with self._configuration_lock:
+            policy = self._max_tokens_policy if max_tokens is OUTPUT_BUDGET_UNSET else max_tokens
+            resolved_budget = resolve_max_tokens(model_name, policy)
             self.endpoint = normalized_endpoint
             self.api_key = key
             self.model = model_name
+            self._max_tokens_policy = policy
+            self.max_tokens = resolved_budget
 
     def configuration_snapshot(self) -> dict[str, Any]:
         with self._configuration_lock:
@@ -476,5 +487,5 @@ class LLMClient:
             api_key=llm_cfg.get("api_key", ""),
             model=llm_cfg.get("model", "gpt-4o"),
             temperature=llm_cfg.get("temperature", 0.1),
-            max_tokens=llm_cfg.get("max_tokens", 4096),
+            max_tokens=llm_cfg.get("max_tokens"),
         )

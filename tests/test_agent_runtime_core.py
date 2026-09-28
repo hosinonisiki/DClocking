@@ -240,6 +240,57 @@ class HarnessFacadeTests(_QtCase):
         finally:
             agent.shutdown(2000)
 
+    def test_output_limit_is_incomplete_retains_receipts_and_allows_next_turn(self):
+        from harness_runtime import HarnessOutputLimit
+
+        for partial in ("", "已检查 PID，后续分析尚未完成"):
+            with self.subTest(partial=partial):
+                class Runtime:
+                    def __init__(self, **kwargs):
+                        self.calls = 0
+
+                    def run(self, **kwargs):
+                        self.calls += 1
+                        if self.calls == 1:
+                            kwargs["dispatch"]("list_modules", {}, "read-before-limit")
+                            if partial:
+                                kwargs["on_text"](partial)
+                            raise HarnessOutputLimit(partial_text=partial, max_tokens=4096)
+                        return "本轮恢复正常，未重复工具操作"
+
+                    def close(self):
+                        pass
+
+                agent = self.make_agent(Runtime)
+                notices, errors, replies, cancelled = [], [], [], []
+                agent.response_incomplete.connect(notices.append)
+                agent.error_occurred.connect(errors.append)
+                agent.response_ready.connect(replies.append)
+                agent.generation_cancelled.connect(lambda: cancelled.append(True))
+                try:
+                    self.assertTrue(agent.send_message("查询"))
+                    self.assertTrue(self.wait_until(lambda: not agent.is_busy))
+                    self.assertEqual(agent._worker.outcome, "incomplete")
+                    self.assertEqual(len(notices), 1)
+                    self.assertIn("4096", notices[0])
+                    self.assertIn("未完成", notices[0])
+                    self.assertNotIn("Traceback", notices[0])
+                    self.assertEqual(errors, [])
+                    self.assertEqual(cancelled, [])
+                    self.assertEqual(replies, [partial] if partial else [])
+                    self.assertEqual(len(agent._tools.calls), 1)
+                    self.assertEqual(len([m for m in agent._messages if m["role"] == "tool"]), 1)
+                    self.assertIn("未完成", agent._messages[-1]["content"])
+                    self.assertEqual(agent._harness.calls, 1)
+                    self.assertTrue(agent.send_message("请继续说明，不要重复已完成操作"))
+                    self.assertTrue(self.wait_until(lambda: not agent.is_busy))
+                    self.assertEqual(agent._worker.outcome, "completed")
+                    self.assertEqual(len(agent._tools.calls), 1)
+                    self.assertEqual(len(notices), 1)
+                    self.assertIn("恢复正常", replies[-1])
+                finally:
+                    agent.shutdown(2000)
+
     def test_runtime_close_error_preserves_history_and_engine(self):
         class Runtime:
             def close(self):
@@ -326,6 +377,42 @@ class IntegratedSettingsTests(unittest.TestCase):
             finally:
                 agent._harness = None
                 agent._active_turn = False
+                parts["gateway"].shutdown()
+                agent.shutdown(1000)
+                window.close()
+
+    def test_output_budget_is_effective_at_launch_and_after_settings_save(self):
+        from FPGA_Agent.main import create_window
+
+        with tempfile.TemporaryDirectory() as directory:
+            config = {"agent": {"engine": "harness"}, "llm": {
+                "endpoint": "https://example.test/v1", "model": "deepseek-v4-pro"}}
+            with patch("secret_store.load_agent_configuration", return_value=(config, "test-key", "")):
+                window = create_window(QSettings(str(Path(directory) / "ui.ini"), QSettings.IniFormat))
+            parts = window._agent_components
+            agent, llm, chat = parts["agent"], parts["llm"], parts["chat"]
+            try:
+                self.assertEqual(llm.configuration_snapshot()["max_tokens"], 32768)
+                for fields, expected, policy in (
+                    ({"max_tokens": 8192}, 8192, 8192),
+                    ({"model": "gpt-4o"}, 8192, 8192),
+                    ({"model": "deepseek-v4-pro", "max_tokens": None}, 32768, None),
+                    ({"model": "gpt-4o"}, 4096, None),
+                ):
+                    chat.settings_saved.emit({"config": {"agent": {"engine": "harness"}, "llm": {
+                        "endpoint": "https://example.test/v1", **fields}}, "api_key": "test-key"})
+                    self.assertEqual(llm.configuration_snapshot()["max_tokens"], expected)
+                    self.assertEqual(config["llm"]["max_tokens"], policy)
+                    captured = []
+                    agent._runtime_factory = lambda **kwargs: captured.append(kwargs) or object()
+                    agent._get_harness()
+                    self.assertEqual(captured[0]["max_tokens"], expected)
+                    agent._harness = None
+                previous = llm.configuration_snapshot()
+                chat.settings_saved.emit({"config": {"llm": {"max_tokens": False}}, "api_key": "test-key"})
+                self.assertEqual(llm.configuration_snapshot(), previous)
+                self.assertIsNone(config["llm"]["max_tokens"])
+            finally:
                 parts["gateway"].shutdown()
                 agent.shutdown(1000)
                 window.close()

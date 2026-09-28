@@ -12,7 +12,8 @@ import threading
 
 from PySide6.QtCore import Signal
 
-from agent_core import AgentCore, _AgentWorker
+from agent_core import AgentCore, _AgentWorker, _AgentIncomplete
+from llm_limits import resolve_max_tokens
 
 
 HARNESS_SYSTEM_PROMPT = """You are the DClocking FPGA optical-control assistant.
@@ -101,7 +102,7 @@ class RuntimeAgentCore(AgentCore):
                 endpoint=configuration["endpoint"],
                 api_key=configuration["api_key"],
                 model=configuration["model"],
-                max_tokens=configuration.get("max_tokens", 4096),
+                max_tokens=resolve_max_tokens(configuration["model"], configuration.get("max_tokens")),
                 max_iterations=self._max_iterations,
                 timeout_seconds=self._config.get("agent", {}).get("run_timeout_seconds", 180),
                 temperature=configuration.get("temperature", 0.1),
@@ -161,14 +162,20 @@ class _HarnessWorker(_AgentWorker):
             })
             return result
 
-        final_text = runtime.run(
-            user_text=self._messages[-1]["content"],
-            system_prompt=HARNESS_SYSTEM_PROMPT,
-            tools=self._tools_def,
-            dispatch=dispatch,
-            cancel_event=self._execution_cancel_event,
-            on_text=lambda text: self.text_delta.emit(self.run_id, text),
-        )
+        from harness_runtime import HarnessOutputLimit
+
+        try:
+            final_text = runtime.run(
+                user_text=self._messages[-1]["content"],
+                system_prompt=HARNESS_SYSTEM_PROMPT,
+                tools=self._tools_def,
+                dispatch=dispatch,
+                cancel_event=self._execution_cancel_event,
+                on_text=lambda text: self.text_delta.emit(self.run_id, text),
+            )
+        except HarnessOutputLimit as incomplete:
+            self._raise_if_cancelled()
+            raise _AgentIncomplete(str(incomplete), incomplete.partial_text) from None
         self._raise_if_cancelled()
         self._messages.append({"role": "assistant", "content": final_text})
         return final_text

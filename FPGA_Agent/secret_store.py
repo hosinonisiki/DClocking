@@ -15,6 +15,11 @@ from pathlib import Path
 import secrets
 from urllib.parse import urlparse
 
+if __package__:
+    from .llm_limits import OUTPUT_BUDGET_UNSET, resolve_max_tokens
+else:
+    from llm_limits import OUTPUT_BUDGET_UNSET, resolve_max_tokens
+
 
 SERVICE_NAME = "DClocking FPGA Agent"
 # Legacy unscoped account name. New credentials derive an account from the
@@ -197,6 +202,9 @@ def load_agent_configuration(config_path, *, keyring_backend=None):
     model = validate_model(llm.get("model", DEFAULT_MODEL))
     llm["endpoint"] = endpoint
     llm["model"] = model
+    # Validate before credential migration can cause any external writes.
+    # Keep a missing field missing: automatic policy needs no config rewrite.
+    resolve_max_tokens(model, llm.get("max_tokens"))
 
     environment_key, environment_warning = _environment_key_for_endpoint(endpoint)
     backend = keyring_backend if keyring_backend is not None else _system_keyring()
@@ -272,6 +280,7 @@ def save_agent_settings(
     api_key: str,
     model: str,
     engine: str | None = None,
+    max_tokens=OUTPUT_BUDGET_UNSET,
     keyring_backend=None,
 ):
     path = Path(config_path)
@@ -285,6 +294,9 @@ def save_agent_settings(
     previous_endpoint = validate_endpoint(llm.get("endpoint", DEFAULT_ENDPOINT))
     llm["endpoint"] = validate_endpoint(endpoint)
     llm["model"] = validate_model(model)
+    if max_tokens is not OUTPUT_BUDGET_UNSET:
+        llm["max_tokens"] = max_tokens
+    resolve_max_tokens(llm["model"], llm.get("max_tokens"))
     account = credential_account(llm["endpoint"])
 
     entered_key = validate_api_key(api_key)

@@ -72,7 +72,7 @@ def create_window(settings=None):
         api_key=api_key,
         model=llm_cfg.get("model", "gpt-4o"),
         temperature=llm_cfg.get("temperature", 0.1),
-        max_tokens=llm_cfg.get("max_tokens", 4096),
+        max_tokens=llm_cfg.get("max_tokens"),
     )
 
     # Agent core
@@ -99,6 +99,11 @@ def create_window(settings=None):
         current = llm.configuration_snapshot()
         candidate = deepcopy(config)
         candidate.update(updated)
+        # A caller may update only the model or budget. Preserve omitted public
+        # settings and, crucially, the automatic-vs-explicit budget policy.
+        candidate["llm"] = {**config.get("llm", {}), **updated_llm}
+        candidate["agent"] = {**config.get("agent", {}), **updated.get("agent", {})}
+        budget_policy = candidate["llm"].get("max_tokens")
         try:
             # Validate the entire provider tuple before retiring the old
             # session. A busy/close failure must not partially replace its key.
@@ -106,10 +111,12 @@ def create_window(settings=None):
                 endpoint=updated_llm.get("endpoint", current["endpoint"]),
                 model=updated_llm.get("model", current["model"]),
                 api_key=payload.get("api_key", ""),
+                max_tokens=budget_policy,
             ).configuration_snapshot()
             agent.reconfigure(candidate)
             llm.configure(endpoint=prepared["endpoint"], model=prepared["model"],
-                          api_key=prepared["api_key"])
+                          api_key=prepared["api_key"],
+                          max_tokens=budget_policy)
         except (ValueError, RuntimeError, OSError):
             chat.add_system_message("运行中的设置未修改：请先停止任务并检查运行时，再重新保存设置。")
             return
@@ -124,6 +131,7 @@ def create_window(settings=None):
     chat.settings_saved.connect(apply_saved_settings)
 
     agent.response_ready.connect(chat.finish_assistant_message)
+    agent.response_incomplete.connect(chat.add_system_message)
     agent.response_delta.connect(chat.append_assistant_delta)
     agent.thinking_started.connect(lambda: chat.set_thinking(True))
     agent.thinking_stopped.connect(lambda: chat.set_thinking(False))

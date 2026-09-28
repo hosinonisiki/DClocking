@@ -8,7 +8,10 @@ from unittest.mock import Mock, patch
 
 from tests.qt_test_support import ensure_app
 from PySide6.QtCore import QPoint, Qt
-from PySide6.QtWidgets import QComboBox, QDialog, QFrame, QLabel, QPushButton, QTextBrowser
+from PySide6.QtWidgets import (
+    QComboBox, QDialog, QDialogButtonBox, QFrame, QLabel, QLineEdit,
+    QPushButton, QSpinBox, QTextBrowser,
+)
 
 from agent_chat_widget import AgentChatWidget
 from secret_store import load_agent_configuration, save_agent_settings
@@ -303,6 +306,48 @@ class HarnessChatUiTests(unittest.TestCase):
             self.chat._save_settings(dialog, "https://example.test", "", "model", "native")
         self.assertEqual(emitted, [])
         dialog.accept.assert_not_called()
+
+    def test_budget_auto_label_tracks_model_and_explains_scope_and_cost(self):
+        def inspect_dialog(dialog):
+            budget = dialog.findChild(QSpinBox, "agent_max_tokens")
+            self.assertIsNotNone(budget)
+            self.assertEqual((budget.minimum(), budget.maximum(), budget.value()), (0, 131072, 0))
+            self.assertIn("自动", budget.specialValueText())
+            hint = dialog.findChild(QLabel, "agent_max_tokens_hint")
+            self.assertIn("32768", hint.text())
+            for detail in ("推理", "回答", "单次", "轮数", "费用", "耗时", "模型上限"):
+                self.assertIn(detail, hint.text())
+            dialog.findChild(QLineEdit, "agent_model").setText("gpt-4o")
+            self.assertIn("4096", hint.text())
+            budget.setValue(8192)
+            self.assertIn("8192", hint.text())
+            return QDialog.Rejected
+
+        with (
+            patch("secret_store.load_agent_configuration", return_value=({"llm": {"model": "deepseek-v4-pro"}}, "", "")),
+            patch.object(QDialog, "exec", inspect_dialog),
+        ):
+            self.chat._open_settings()
+
+    def test_budget_dialog_saves_explicit_or_auto_policy(self):
+        for initial, selected, expected in ((4096, 65536, 65536), (4096, 0, None), (None, 0, None)):
+            with self.subTest(selected=selected):
+                def inspect_dialog(dialog):
+                    budget = dialog.findChild(QSpinBox, "agent_max_tokens")
+                    self.assertIsNotNone(budget)
+                    self.assertEqual(budget.value(), initial or 0)
+                    budget.setValue(selected)
+                    dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.Save).click()
+                    return QDialog.Accepted
+
+                config = {"llm": {"model": "deepseek-v4-pro", "max_tokens": initial}}
+                with (
+                    patch("secret_store.load_agent_configuration", return_value=(config, "", "")),
+                    patch("secret_store.save_agent_settings", return_value=(config, "")) as save,
+                    patch.object(QDialog, "exec", inspect_dialog),
+                ):
+                    self.chat._open_settings()
+                self.assertEqual(save.call_args.kwargs["max_tokens"], expected)
 
 
 class HarnessSettingsPersistenceTests(unittest.TestCase):

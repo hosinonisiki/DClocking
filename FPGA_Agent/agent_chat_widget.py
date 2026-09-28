@@ -17,8 +17,10 @@ from PySide6.QtWidgets import (
     QScrollArea, QPlainTextEdit, QPushButton, QLabel,
     QTextBrowser, QFrame, QSizePolicy, QDialog,
     QFormLayout, QLineEdit, QDialogButtonBox, QComboBox,
-    QMessageBox,
+    QMessageBox, QSpinBox,
 )
+
+from llm_limits import MAX_OUTPUT_TOKENS, OUTPUT_BUDGET_UNSET, resolve_max_tokens
 
 from chat_styles import (
     CHAT_WIDGET_STYLE,
@@ -689,23 +691,38 @@ class AgentChatWidget(QDockWidget):
     def _open_settings(self):
         """Open a simple settings dialog."""
         dialog = QDialog(self)
+        dialog.setObjectName("agent_settings_dialog")
         dialog.setWindowTitle("FPGA Agent Settings")
-        dialog.setMinimumWidth(420)
+        dialog.setMinimumWidth(560)
 
         layout = QFormLayout(dialog)
 
         endpoint_edit = QLineEdit()
+        endpoint_edit.setObjectName("agent_endpoint")
         endpoint_edit.setPlaceholderText("https://api.openai.com/v1")
         api_key_edit = QLineEdit()
+        api_key_edit.setObjectName("agent_api_key")
         api_key_edit.setEchoMode(QLineEdit.Password)
         api_key_edit.setPlaceholderText("sk-...")
         model_edit = QLineEdit()
+        model_edit.setObjectName("agent_model")
         model_edit.setPlaceholderText("gpt-4o")
         engine_select = QComboBox()
         engine_select.setObjectName("agent_engine_selector")
         engine_select.setAccessibleName("Agent 执行引擎")
         engine_select.addItem("DeepSeek Harness（默认）", "harness")
         engine_select.addItem("Native（原生兼容引擎）", "native")
+        budget_spin = QSpinBox()
+        budget_spin.setObjectName("agent_max_tokens")
+        budget_spin.setAccessibleName("单次输出额度（tokens）")
+        budget_spin.setRange(0, MAX_OUTPUT_TOKENS)
+        budget_spin.setSpecialValueText("自动（按模型）")
+        budget_spin.setToolTip("0 表示自动；手动范围 1–131072 tokens。实际模型上限仍适用。")
+        budget_hint = QLabel()
+        budget_hint.setObjectName("agent_max_tokens_hint")
+        budget_hint.setWordWrap(True)
+        budget_hint.setTextFormat(Qt.PlainText)
+        budget_hint.setMaximumWidth(620)
 
         from pathlib import Path
         from secret_store import load_agent_configuration
@@ -719,6 +736,7 @@ class AgentChatWidget(QDockWidget):
         llm = cfg.get("llm", {})
         endpoint_edit.setText(llm.get("endpoint", ""))
         model_edit.setText(llm.get("model", ""))
+        budget_spin.setValue(llm.get("max_tokens") or 0)
         engine_select.setCurrentIndex(max(0, engine_select.findData(
             cfg.get("agent", {}).get("engine", "harness")
         )))
@@ -740,18 +758,36 @@ class AgentChatWidget(QDockWidget):
         layout.addRow("API Endpoint:", endpoint_edit)
         layout.addRow("API Key:", api_key_edit)
         layout.addRow("Model:", model_edit)
+        layout.addRow("单次输出额度（tokens）:", budget_spin)
+        layout.addRow(budget_hint)
+
+        def update_budget_hint():
+            policy = budget_spin.value() or None
+            effective = resolve_max_tokens(model_edit.text(), policy)
+            mode = "自动预算" if policy is None else "手动预算"
+            budget_hint.setText(
+                f"当前{mode}：{effective} tokens。用于单次模型调用的推理 + 回答，"
+                "不是对话总额度或工具轮数；额度越高，可能增加费用与耗时。"
+                "这是应用预算，实际模型上限仍适用。0 表示恢复自动。"
+            )
+
+        model_edit.textChanged.connect(update_budget_hint)
+        budget_spin.valueChanged.connect(update_budget_hint)
+        update_budget_hint()
 
         buttons = QDialogButtonBox(QDialogButtonBox.Save |
                                    QDialogButtonBox.Cancel)
         buttons.accepted.connect(lambda: self._save_settings(
             dialog, endpoint_edit.text(), api_key_edit.text(),
-            model_edit.text(), engine_select.currentData()))
+            model_edit.text(), engine_select.currentData(),
+            max_tokens=budget_spin.value() or None))
         buttons.rejected.connect(dialog.reject)
         layout.addRow(buttons)
 
         dialog.exec()
 
-    def _save_settings(self, dialog, endpoint, api_key, model, engine=None):
+    def _save_settings(self, dialog, endpoint, api_key, model, engine=None,
+                       max_tokens=OUTPUT_BUDGET_UNSET):
         from pathlib import Path
         from secret_store import save_agent_settings
 
@@ -763,6 +799,7 @@ class AgentChatWidget(QDockWidget):
                 api_key=api_key,
                 model=model,
                 engine=engine,
+                max_tokens=max_tokens,
             )
         except (OSError, RuntimeError, ValueError) as exc:
             QMessageBox.warning(self, "无法保存 Agent 设置", str(exc))

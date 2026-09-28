@@ -11,6 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'FPGA_Agent'))
 from harness_runtime import HarnessRuntime, HarnessCancelled, HarnessError
+import harness_runtime
 from tool_definitions import TOOLS
 
 
@@ -37,23 +38,31 @@ class LocalProvider:
                 if mode == 'wait':
                     owner.release.wait(10)
                     return
-                if mode in {'tool', 'two_tools', 'info_tool'}:
+                if mode in {'tool', 'two_tools', 'info_tool', 'truncated_tool'}:
                     delta = {'role': 'assistant', 'content': None, 'tool_calls': [{
                         # Some compatible providers reuse IDs in another turn.
                         'index': 0, 'id': 'call_reused', 'type': 'function',
                         'function': {'name': 'list_modules', 'arguments': '{"scope":"on_canvas"}'}}]}
                     reason = 'tool_calls'
+                    if mode == 'truncated_tool':
+                        reason = 'length'
                     if mode == 'info_tool':
                         delta['tool_calls'][0]['function'] = {
                             'name': 'get_module_info', 'arguments': '{"module_type":"PID控制器"}'}
                     if mode == 'two_tools':
                         delta['tool_calls'].append({'index': 1, 'id': 'second-call', 'type': 'function',
                             'function': {'name': 'list_modules', 'arguments': '{}'}})
+                elif mode in {'reasoning_length', 'partial_length'}:
+                    delta = {'role': 'assistant', 'reasoning_content': 'PRIVATE_REASONING_ONLY',
+                             'content': 'PARTIAL_PUBLIC' if mode == 'partial_length' else None}
+                    reason = 'length'
                 else:
                     delta, reason = {'role': 'assistant', 'content': 'LOCAL_OK'}, 'stop'
+                output_tokens = body['max_tokens'] if reason == 'length' else 4
                 for payload in ({'choices': [{'index': 0, 'delta': delta, 'finish_reason': None}]},
                                 {'choices': [{'index': 0, 'delta': {}, 'finish_reason': reason}],
-                                 'usage': {'prompt_tokens': 10, 'completion_tokens': 4, 'total_tokens': 14}}):
+                                 'usage': {'prompt_tokens': 10, 'completion_tokens': output_tokens,
+                                           'total_tokens': 10 + output_tokens}}):
                     payload.update({'id': 'completion-test', 'object': 'chat.completion.chunk', 'model': 'deepseek-chat'})
                     self.wfile.write(('data: ' + json.dumps(payload) + '\n\n').encode())
                 self.wfile.write(b'data: [DONE]\n\n')
@@ -142,6 +151,70 @@ class HarnessRealRuntimeTests(unittest.TestCase):
             self.run_turn()
         self.assertEqual(len(self.provider.requests), 1)
         self.assertEqual(len(self.calls), 1)
+
+    def test_reasoning_only_output_limit_is_incomplete_without_automatic_retry(self):
+        self.provider.responses = ['reasoning_length', 'done']
+        deltas = []
+        with self.assertRaises(HarnessError) as caught:
+            self.runtime.run('Inspect safely.', 'Use only the application tools.', TOOLS,
+                lambda *_: self.fail('No tools should run'), threading.Event(), on_text=deltas.append)
+        self.assertIsInstance(caught.exception, harness_runtime.HarnessOutputLimit)
+        self.assertEqual(caught.exception.partial_text, '')
+        self.assertEqual(caught.exception.max_tokens, 4096)
+        self.assertIn('尚未生成正式回答', str(caught.exception))
+        self.assertNotIn('PRIVATE_REASONING_ONLY', str(caught.exception))
+        self.assertEqual(deltas, [])
+        self.assertEqual(len(self.provider.requests), 1)
+        self.assertEqual(self.provider.requests[0][1]['max_tokens'], 4096)
+        # A separately initiated user turn still works in the same session.
+        self.assertEqual(self.run_turn(), 'LOCAL_OK')
+        self.assertEqual(len(self.provider.requests), 2)
+        self.assertFalse(self.calls)
+
+    def test_partial_output_limit_preserves_public_text_without_duplicate_stream(self):
+        self.provider.responses = ['partial_length']
+        deltas = []
+        with self.assertRaises(HarnessError) as caught:
+            self.runtime.run('Inspect safely.', 'Use only the application tools.', TOOLS,
+                lambda *_: self.fail('No tools should run'), threading.Event(), on_text=deltas.append)
+        self.assertIsInstance(caught.exception, harness_runtime.HarnessOutputLimit)
+        self.assertEqual(caught.exception.partial_text, 'PARTIAL_PUBLIC')
+        self.assertEqual(''.join(deltas), 'PARTIAL_PUBLIC')
+        self.assertNotIn('PRIVATE_REASONING_ONLY', str(caught.exception))
+        self.assertIn('本轮未完成', str(caught.exception))
+        self.assertEqual(len(self.provider.requests), 1)
+
+    def test_output_limit_preserves_tool_receipt_and_manual_next_turn_does_not_replay(self):
+        self.provider.responses = ['tool', 'reasoning_length', 'done']
+        with self.assertRaises(HarnessError) as caught:
+            self.run_turn()
+        self.assertIsInstance(caught.exception, harness_runtime.HarnessOutputLimit)
+        self.assertEqual(len(self.provider.requests), 2)
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(len(self.runtime._pending_receipts), 1)
+        receipt_id = self.calls[0][2]
+        self.assertEqual(self.runtime._pending_receipts[0]['call_id'], receipt_id)
+        self.assertEqual(self.run_turn(), 'LOCAL_OK')
+        self.assertEqual(len(self.provider.requests), 3)
+        self.assertEqual(len(self.calls), 1)
+        self.assertIn(receipt_id, json.dumps(self.provider.requests[-1][1]['messages']))
+        self.assertEqual(self.runtime._pending_receipts, [])
+
+    def test_length_terminated_tool_call_is_not_executed(self):
+        # Even syntactically complete tool arguments are not authoritative when
+        # the provider explicitly marks that response as token-truncated.
+        self.provider.responses = ['truncated_tool', 'done']
+        with self.assertRaises(HarnessError) as caught:
+            self.run_turn()
+        self.assertFalse(self.calls, 'A token-truncated tool call must never dispatch')
+        self.assertEqual(len(self.provider.requests), 1)
+        self.assertIsInstance(caught.exception, harness_runtime.HarnessOutputLimit)
+        self.assertEqual(self.run_turn(), 'LOCAL_OK')
+        self.assertFalse(self.calls)
+        self.assertEqual(len(self.provider.requests), 2)
+        # Truncation must not leave an orphaned tool call in provider history.
+        self.assertFalse(any(message.get('tool_calls')
+                             for message in self.provider.requests[-1][1]['messages']))
 
     def test_cancel_after_first_atomic_tool_preserves_receipt_and_skips_sibling(self):
         self.provider.responses = ['two_tools', 'done']

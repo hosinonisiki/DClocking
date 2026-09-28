@@ -18,9 +18,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import patch
 
 from tests.qt_test_support import ensure_app
-from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QSettings, Qt
+from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QSettings, Qt, QTimer
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QPushButton, QFrame, QTextBrowser
+from PySide6.QtWidgets import (QPushButton, QFrame, QLabel, QTextBrowser,
+                              QDialog, QDialogButtonBox, QSpinBox)
 from FPGA_Agent.main import create_window
 
 
@@ -53,7 +54,9 @@ class _ProgrammedModel:
                     owner.waiting.set()
                     owner.release.wait(30)
                     return
-                if isinstance(step, tuple):
+                if isinstance(step, dict):
+                    delta, reason = step["delta"], step["finish_reason"]
+                elif isinstance(step, tuple):
                     name, args = step
                     delta = {"role": "assistant", "tool_calls": [{
                         "index": 0, "id": "call-" + str(len(owner.requests)),
@@ -69,6 +72,10 @@ class _ProgrammedModel:
                     event["index"] = 0
                     payload = {"id": "qt-e2e", "model": "deepseek-chat",
                                "object": "chat.completion.chunk", "choices": [event]}
+                    if isinstance(step, dict) and event["finish_reason"]:
+                        payload["usage"] = {"prompt_tokens": 20,
+                            "completion_tokens": body["max_tokens"],
+                            "total_tokens": body["max_tokens"] + 20}
                     self.wfile.write(("data: " + json.dumps(payload) + "\n\n").encode())
                 self.wfile.write(b"data: [DONE]\n\n")
                 self.wfile.flush()
@@ -148,13 +155,13 @@ class HarnessQtEndToEndTests(unittest.TestCase):
         QTest.keyClick(self.chat._input, Qt.Key_Return)
         self.assertTrue(self.agent.is_busy)
 
-    def capture(self, name):
+    def capture(self, name, widget=None):
         directory = os.environ.get("DCLOCKING_HARNESS_SCREENSHOTS")
         if directory:
             target = Path(directory)
             target.mkdir(parents=True, exist_ok=True)
             QTest.qWait(150)
-            self.assertTrue(self.window.grab().save(str(target / f"{name}.png")))
+            self.assertTrue((widget or self.window).grab().save(str(target / f"{name}.png")))
 
     def pending_approval(self):
         return next((frame for frame in self.chat.findChildren(QFrame, "tool_approval_frame")
@@ -252,6 +259,110 @@ class HarnessQtEndToEndTests(unittest.TestCase):
         self.assertEqual(cancelled, [])
         self.assertIsNone(self.pending_approval())
         self.assertEqual(self.receipts[-1]["status"], "cancelled")
+
+    def test_reasoning_only_limit_is_visible_without_traceback_or_hidden_text(self):
+        notices = []
+        self.agent.response_incomplete.connect(notices.append)
+        self.provider.plan({"delta": {"role": "assistant",
+            "reasoning_content": "PRIVATE_REASONING_NOT_A_USER_ANSWER"}, "finish_reason": "length"})
+        self.send("请分析 PDH 方案（本地截断测试）")
+        self.wait_until(lambda: not self.agent.is_busy)
+        self.assertFalse(self.errors)
+        self.assertEqual(self.agent._worker.outcome, "incomplete")
+        self.assertEqual(len(notices), 1)
+        self.assertIn("未完成", notices[0])
+        self.assertIn("4096", notices[0])
+        text = "\n".join(label.text() for label in self.chat.findChildren(QLabel))
+        self.assertIn(notices[0], text)
+        self.assertNotIn("Traceback", text)
+        self.assertNotIn("PRIVATE_REASONING", text)
+        self.assertFalse(self.receipts)
+        self.assertEqual(len(self.provider.requests), 1)
+        self.assertEqual(self.chat._send_btn.property("mode"), "send")
+        self.assertTrue(self.chat._settings_btn.isEnabled())
+        self.capture("04-harness-reasoning-output-limit")
+        self.provider.plan("已恢复：请先确认判锁输入与接线。")
+        self.send("仅继续说明，不执行工具")
+        self.wait_until(lambda: not self.agent.is_busy)
+        self.assertFalse(self.errors)
+        self.assertEqual(len(self.provider.requests), 2)
+        self.assertEqual(len(notices), 1)
+        self.assertEqual(self.agent._worker.outcome, "completed")
+
+    def test_partial_answer_limit_keeps_one_bubble_and_actual_canvas_receipt(self):
+        partial = "累加器已创建在本地画布；后续方案尚未说明完。"
+        self.provider.plan(
+            ("create_module", {"module_type": "累加器", "position_x": 250, "position_y": 160}),
+            {"delta": {"role": "assistant", "content": partial}, "finish_reason": "length"},
+        )
+        self.send("离线创建累加器并说明方案（本地截断测试）")
+        self.wait_until(lambda: not self.agent.is_busy)
+        self.assertFalse(self.errors)
+        self.assertEqual(self.agent._worker.outcome, "incomplete")
+        node = self.bridge._find_node("ACCM")
+        self.assertIsNotNone(node)
+        for view in node.scene().views():
+            view.centerOn(node)
+        self.assertEqual([r["status"] for r in self.receipts], ["local_staged"])
+        self.assertEqual(len(self.chat._pending_tool_frames), 1)
+        self.assertEqual(sum(b.toPlainText() == partial for b in self.chat.findChildren(QTextBrowser)), 1)
+        self.assertEqual(len(self.provider.requests), 2)
+        self.capture("05-harness-partial-output-limit")
+        self.provider.plan("仅补充说明；没有重新创建模块，也没有写入硬件。")
+        self.send("保留累加器，仅继续说明")
+        self.wait_until(lambda: not self.agent.is_busy)
+        self.assertFalse(self.errors)
+        self.assertEqual(self.agent._worker.outcome, "completed")
+        self.assertEqual(len(self.receipts), 1)
+        self.assertIs(self.bridge._find_node("ACCM"), node)
+        self.assertEqual(len(self.provider.requests), 3)
+        self.assertTrue(any(m["role"] == "tool" for m in self.provider.requests[-1]["messages"]))
+        self.capture("06-harness-output-limit-recovered")
+
+    def test_budget_settings_save_reaches_actual_next_provider_request(self):
+        config = {"agent": {"engine": "harness", "run_timeout_seconds": 30},
+                  "llm": {"endpoint": self.provider.url, "model": "deepseek-v4-pro"}}
+        saved = {"agent": dict(config["agent"]), "llm": {**config["llm"], "max_tokens": 16384}}
+        interaction_errors = []
+
+        def exercise_dialog():
+            dialog = self.chat.findChild(QDialog, "agent_settings_dialog")
+            try:
+                self.assertIsNotNone(dialog)
+                spin = dialog.findChild(QSpinBox, "agent_max_tokens")
+                self.assertEqual(spin.value(), 0)
+                self.assertIn("32768", dialog.findChild(QLabel, "agent_max_tokens_hint").text())
+                self.capture("07-harness-output-budget-auto", dialog)
+                spin.setFocus()
+                spin.selectAll()
+                QTest.keyClicks(spin, "16384")
+                QTest.keyClick(spin, Qt.Key_Tab)
+                self.assertEqual(spin.value(), 16384)
+                self.capture("08-harness-output-budget-manual", dialog)
+                QTest.mouseClick(dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.Save), Qt.LeftButton)
+            except BaseException as error:
+                interaction_errors.append(error)
+            finally:
+                # A failed assertion must never strand CI in a modal event loop.
+                if dialog is not None and dialog.isVisible():
+                    dialog.reject()
+
+        with patch("secret_store.load_agent_configuration", return_value=(config, "local-only-key", "")), \
+                patch("secret_store.save_agent_settings", return_value=(saved, "local-only-key")) as save:
+            QTimer.singleShot(0, exercise_dialog)
+            self.chat.open_settings()
+        if interaction_errors:
+            raise interaction_errors[0]
+        self.assertEqual(save.call_args.kwargs["max_tokens"], 16384)
+        self.assertEqual(self.window._agent_components["llm"].max_tokens, 16384)
+        self.provider.plan("预算已生效，本轮未执行工具。")
+        self.send("仅检查预算")
+        self.wait_until(lambda: not self.agent.is_busy)
+        self.assertFalse(self.errors)
+        self.assertEqual(len(self.provider.requests), 1)
+        self.assertEqual(self.provider.requests[0]["max_tokens"], 16384)
+        self.assertEqual(self.provider.requests[0]["model"], "deepseek-v4-pro")
+        self.assertFalse(self.receipts)
 
     def test_shutdown_wakes_approval_wait_without_gui_event_pump(self):
         self.provider.plan(("clear_canvas", {"confirm": True}))
